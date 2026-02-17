@@ -10,8 +10,12 @@ import { healthRouter } from './routes/health.js';
 import { authRouter } from './routes/auth.js';
 import { userRouter } from './routes/user.js';
 import { workspaceRouter } from './routes/workspace.js';
+import { billingRouter } from './routes/billing.js';
 
 const app = express();
+
+// Stripe webhook needs raw body — must be before express.json()
+app.use('/api/v1/billing/webhook', express.raw({ type: 'application/json' }));
 
 // Security & parsing
 app.use(helmet());
@@ -27,6 +31,7 @@ app.use('/api/v1/health', healthRouter);
 app.use('/api/v1/auth', authRouter);
 app.use('/api/v1/users', userRouter);
 app.use('/api/v1/workspaces', workspaceRouter);
+app.use('/api/v1/billing', billingRouter);
 
 // Error handling
 app.use(errorHandler);

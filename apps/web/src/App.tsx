@@ -10,6 +10,7 @@ import { ConnectionsPage } from '@/pages/ConnectionsPage';
 import { TemplatesPage } from '@/pages/TemplatesPage';
 import { AIPage } from '@/pages/AIPage';
 import { SettingsPage } from '@/pages/SettingsPage';
+import { BillingPage } from '@/pages/BillingPage';
 import { LoginPage } from '@/pages/auth/LoginPage';
 import { RegisterPage } from '@/pages/auth/RegisterPage';
 import { ForgotPasswordPage } from '@/pages/auth/ForgotPasswordPage';
@@ -47,7 +48,7 @@ export default function App() {
             <Route path="/ai" element={<AIPage />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/team" element={<SettingsPage />} />
-            <Route path="/billing" element={<SettingsPage />} />
+            <Route path="/billing" element={<BillingPage />} />
           </Route>
         </Routes>
       </BrowserRouter>

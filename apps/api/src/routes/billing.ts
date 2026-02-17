@@ -1,0 +1,105 @@
+import { Router, Response, NextFunction, Request } from 'express';
+import { authenticate, AuthRequest } from '../middleware/auth.js';
+import { stripeService } from '../services/stripe.service.js';
+import { config } from '../config/index.js';
+
+export const billingRouter = Router();
+
+// Get subscription status
+billingRouter.get(
+  '/status',
+  authenticate,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      if (!req.workspaceId) {
+        return res.status(400).json({
+          success: false,
+          error: { code: 'NO_WORKSPACE', message: 'Workspace context required' },
+        });
+      }
+      const status = await stripeService.getSubscriptionStatus(req.workspaceId);
+      res.json({ success: true, data: status });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+// Create checkout session (upgrade)
+billingRouter.post(
+  '/checkout',
+  authenticate,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      if (!req.workspaceId) {
+        return res.status(400).json({
+          success: false,
+          error: { code: 'NO_WORKSPACE', message: 'Workspace context required' },
+        });
+      }
+
+      const { priceKey } = req.body;
+      if (!priceKey) {
+        return res.status(400).json({
+          success: false,
+          error: { code: 'MISSING_PRICE', message: 'Price key is required' },
+        });
+      }
+
+      const url = await stripeService.createCheckoutSession(
+        req.workspaceId,
+        priceKey,
+        `${config.frontend.url}/billing?success=true`,
+        `${config.frontend.url}/billing?canceled=true`,
+      );
+
+      res.json({ success: true, data: { url } });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+// Create customer portal session
+billingRouter.post(
+  '/portal',
+  authenticate,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      if (!req.workspaceId) {
+        return res.status(400).json({
+          success: false,
+          error: { code: 'NO_WORKSPACE', message: 'Workspace context required' },
+        });
+      }
+
+      const url = await stripeService.createPortalSession(
+        req.workspaceId,
+        `${config.frontend.url}/billing`,
+      );
+
+      res.json({ success: true, data: { url } });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+// Stripe webhook (raw body required)
+billingRouter.post(
+  '/webhook',
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const signature = req.headers['stripe-signature'] as string;
+      if (!signature) {
+        return res.status(400).json({ error: 'Missing stripe-signature header' });
+      }
+
+      // Express raw body via middleware configured in index.ts
+      await stripeService.handleWebhookEvent(req.body, signature);
+      res.json({ received: true });
+    } catch (err) {
+      next(err);
+    }
+  },
+);

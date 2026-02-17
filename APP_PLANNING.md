@@ -115,18 +115,18 @@ A comprehensive, industry-grade social media management platform enabling users 
 ## Milestone 2: Authentication & User Management
 > **Goal**: Full auth system with social logins, user profiles, team support
 
-- [ ] **2.1** Registration & login (email/password with bcrypt)
-- [ ] **2.2** JWT access + refresh token flow (httpOnly cookies)
-- [ ] **2.3** OAuth 2.0 social login (Google, GitHub, Facebook)
-- [ ] **2.4** Email verification & password reset (SendGrid/Resend)
-- [ ] **2.5** User profile management (avatar upload to S3, bio, timezone)
-- [ ] **2.6** Team/workspace model
+- [x] **2.1** Registration & login (email/password with bcrypt)
+- [x] **2.2** JWT access + refresh token flow (httpOnly cookies)
+- [x] **2.3** OAuth 2.0 social login (Google, GitHub, Facebook)
+- [x] **2.4** Email verification & password reset (SendGrid/Resend)
+- [x] **2.5** User profile management (avatar upload to S3, bio, timezone)
+- [x] **2.6** Team/workspace model
   - Roles: Owner, Admin, Editor, Viewer
   - Invite by email, accept/decline flow
-- [ ] **2.7** Auth middleware, rate limiting, CORS configuration
-- [ ] **2.8** Frontend auth pages (sign up, login, forgot password, verify email)
+- [x] **2.7** Auth middleware, rate limiting, CORS configuration
+- [x] **2.8** Frontend auth pages (sign up, login, forgot password, verify email)
   - Ultra-modern split-screen layout, animated transitions
-- [ ] **2.9** Protected route system + auth state management
+- [x] **2.9** Protected route system + auth state management
 
 ---
 

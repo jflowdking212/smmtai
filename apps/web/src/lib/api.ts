@@ -107,6 +107,19 @@ export const api = {
     removeMember: (workspaceId: string, userId: string) =>
       request(`/workspaces/${workspaceId}/members/${userId}`, { method: 'DELETE' }),
   },
+  billing: {
+    status: () =>
+      request<{ success: true; data: any }>('/billing/status'),
+    checkout: (priceKey: string) =>
+      request<{ success: true; data: { url: string } }>('/billing/checkout', {
+        method: 'POST',
+        body: JSON.stringify({ priceKey }),
+      }),
+    portal: () =>
+      request<{ success: true; data: { url: string } }>('/billing/portal', {
+        method: 'POST',
+      }),
+  },
 };
 
 // Import auth store (circular-safe: only used at runtime)
