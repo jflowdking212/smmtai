@@ -14,7 +14,7 @@
     "@ee-postmind/db": "*",
     "@ee-postmind/shared": "*",
     "bcryptjs": "^2.4.3",
-    "bullmq": "^5.31.0",
+    "bullmq": "^5.69.3",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^16.4.0",
