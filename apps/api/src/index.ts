@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import hpp from 'hpp';
 import morgan from 'morgan';
 import cookieParser from 'cookie-parser';
 import { config } from './config/index.js';
@@ -24,6 +25,7 @@ app.use('/api/v1/billing/webhook', express.raw({ type: 'application/json' }));
 
 // Security & parsing
 app.use(helmet());
+app.use(hpp());
 app.use(cors({ origin: config.frontend.url, credentials: true }));
 app.use(morgan(config.isDev ? 'dev' : 'combined'));
 app.use(express.json({ limit: '10mb' }));
