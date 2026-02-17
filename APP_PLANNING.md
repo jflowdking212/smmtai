@@ -82,7 +82,7 @@ A comprehensive, industry-grade social media management platform enabling users 
 ## Milestone 1: Project Foundation & Infrastructure
 > **Goal**: Monorepo setup, dev environment, CI/CD, database schema, base UI shell
 
-- [ ] **1.1** Initialize monorepo structure (Turborepo or Nx)
+- [x] **1.1** Initialize monorepo structure (Turborepo or Nx)
   ```
   smmt/
   ├── apps/
@@ -97,18 +97,18 @@ A comprehensive, industry-grade social media management platform enabling users 
   ├── turbo.json
   └── package.json
   ```
-- [ ] **1.2** Configure TypeScript, ESLint, Prettier across all packages
-- [ ] **1.3** Set up PostgreSQL + Prisma ORM with initial schema
+- [x] **1.2** Configure TypeScript, ESLint, Prettier across all packages
+- [x] **1.3** Set up PostgreSQL + Prisma ORM with initial schema
   - Users, Accounts, Subscriptions, SocialConnections, Posts, Schedules, Analytics
-- [ ] **1.4** Set up Redis (caching + job queues)
-- [ ] **1.5** Docker Compose for local dev (Postgres, Redis, API, AI service)
-- [ ] **1.6** GitHub Actions CI pipeline (lint, type-check, test on PR)
-- [ ] **1.7** React app scaffold with Tailwind CSS, routing (React Router v6), base layout
-- [ ] **1.8** Design system foundation
+- [x] **1.4** Set up Redis (caching + job queues)
+- [x] **1.5** Docker Compose for local dev (Postgres, Redis, API, AI service)
+- [x] **1.6** GitHub Actions CI pipeline (lint, type-check, test on PR)
+- [x] **1.7** React app scaffold with Tailwind CSS, routing (React Router v6), base layout
+- [x] **1.8** Design system foundation
   - Color tokens, typography scale, spacing system
   - Base components: Button, Input, Card, Modal, Badge, Avatar, Tooltip
   - Dark mode support (CSS variables)
-- [ ] **1.9** Responsive app shell: sidebar nav, top bar, main content area, mobile drawer
+- [x] **1.9** Responsive app shell: sidebar nav, top bar, main content area, mobile drawer
 
 ---
 
