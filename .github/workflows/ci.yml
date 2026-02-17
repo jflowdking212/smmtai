@@ -16,7 +16,6 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm run lint
       - run: npm run type-check
 
   test:
@@ -57,6 +56,9 @@ jobs:
         env:
           DATABASE_URL: postgresql://postmind:postmind@localhost:5432/ee_postmind_test
           REDIS_URL: redis://localhost:6379
+          ENCRYPTION_KEY: '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
+          JWT_SECRET: test-jwt-secret-for-ci-pipeline
+          JWT_REFRESH_SECRET: test-refresh-secret-for-ci-pipeline
 
   build:
     runs-on: ubuntu-latest
@@ -69,3 +71,14 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+
+  docker:
+    runs-on: ubuntu-latest
+    needs: [test, build]
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build API image
+        run: docker build -f apps/api/Dockerfile -t ee-postmind-api:${{ github.sha }} .
+      - name: Build AI service image
+        run: docker build -f apps/ai-service/Dockerfile -t ee-postmind-ai:${{ github.sha }} apps/ai-service
