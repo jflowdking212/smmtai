@@ -133,7 +133,7 @@ A comprehensive, industry-grade social media management platform enabling users 
 ## Milestone 3: Subscription & Payment System (Stripe)
 > **Goal**: Tiered plans, billing portal, usage limits
 
-- [ ] **3.1** Define subscription tiers:
+- [x] **3.1** Define subscription tiers:
   | Feature | Free | Pro ($19/mo) | Business ($49/mo) | Enterprise (Custom) |
   |---|---|---|---|---|
   | Social accounts | 3 | 10 | 25 | Unlimited |
@@ -143,13 +143,13 @@ A comprehensive, industry-grade social media management platform enabling users 
   | Team members | 1 | 3 | 10 | Unlimited |
   | Analytics | 7 days | 30 days | 90 days | Unlimited |
   | Priority support | ❌ | ✅ | ✅ | ✅ |
-- [ ] **3.2** Stripe integration — Products, Prices, Checkout Sessions
-- [ ] **3.3** Webhook handler for subscription lifecycle (created, updated, cancelled, payment failed)
-- [ ] **3.4** Stripe Customer Portal for self-service billing
-- [ ] **3.5** Usage tracking middleware (posts, AI calls, connected accounts)
-- [ ] **3.6** Frontend: Pricing page, upgrade/downgrade flow, billing settings
-- [ ] **3.7** Trial period support (14-day free trial on Pro)
-- [ ] **3.8** Dunning management — failed payment retry, grace period
+- [x] **3.2** Stripe integration — Products, Prices, Checkout Sessions
+- [x] **3.3** Webhook handler for subscription lifecycle (created, updated, cancelled, payment failed)
+- [x] **3.4** Stripe Customer Portal for self-service billing
+- [x] **3.5** Usage tracking middleware (posts, AI calls, connected accounts)
+- [x] **3.6** Frontend: Pricing page, upgrade/downgrade flow, billing settings
+- [x] **3.7** Trial period support (14-day free trial on Pro)
+- [x] **3.8** Dunning management — failed payment retry, grace period
 
 ---
 

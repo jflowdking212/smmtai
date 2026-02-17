@@ -120,6 +120,21 @@ export const api = {
         method: 'POST',
       }),
   },
+  connections: {
+    list: () =>
+      request<{ success: true; data: any[] }>('/connections'),
+    initiateOAuth: (platform: string) =>
+      request<{ success: true; data: { authUrl: string } }>(`/connections/${platform}/auth`, {
+        method: 'POST',
+      }),
+    manualConnect: (platform: string, credentials: string) =>
+      request<{ success: true; data: any }>(`/connections/${platform}/connect`, {
+        method: 'POST',
+        body: JSON.stringify({ credentials }),
+      }),
+    disconnect: (connectionId: string) =>
+      request(`/connections/${connectionId}`, { method: 'DELETE' }),
+  },
 };
 
 // Import auth store (circular-safe: only used at runtime)

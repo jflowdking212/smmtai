@@ -11,6 +11,7 @@ import { authRouter } from './routes/auth.js';
 import { userRouter } from './routes/user.js';
 import { workspaceRouter } from './routes/workspace.js';
 import { billingRouter } from './routes/billing.js';
+import { connectionRouter } from './routes/connections.js';
 
 const app = express();
 
@@ -32,6 +33,7 @@ app.use('/api/v1/auth', authRouter);
 app.use('/api/v1/users', userRouter);
 app.use('/api/v1/workspaces', workspaceRouter);
 app.use('/api/v1/billing', billingRouter);
+app.use('/api/v1/connections', connectionRouter);
 
 // Error handling
 app.use(errorHandler);
