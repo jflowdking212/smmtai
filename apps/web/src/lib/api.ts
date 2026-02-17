@@ -153,6 +153,20 @@ export const api = {
     trending: (data: any) =>
       request<{ success: true; data: any }>('/ai/trending', { method: 'POST', body: JSON.stringify(data) }),
   },
+  posts: {
+    list: (params?: Record<string, string>) =>
+      request<{ success: true; data: any }>(`/posts${params ? '?' + new URLSearchParams(params) : ''}`),
+    get: (postId: string) =>
+      request<{ success: true; data: any }>(`/posts/${postId}`),
+    create: (data: any) =>
+      request<{ success: true; data: any }>('/posts', { method: 'POST', body: JSON.stringify(data) }),
+    update: (postId: string, data: any) =>
+      request<{ success: true; data: any }>(`/posts/${postId}`, { method: 'PUT', body: JSON.stringify(data) }),
+    publish: (postId: string) =>
+      request<{ success: true; data: any }>(`/posts/${postId}/publish`, { method: 'POST' }),
+    delete: (postId: string) =>
+      request(`/posts/${postId}`, { method: 'DELETE' }),
+  },
 };
 
 // Import auth store (circular-safe: only used at runtime)

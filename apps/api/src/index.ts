@@ -13,6 +13,7 @@ import { workspaceRouter } from './routes/workspace.js';
 import { billingRouter } from './routes/billing.js';
 import { connectionRouter } from './routes/connections.js';
 import { aiRouter } from './routes/ai.js';
+import { postRouter } from './routes/posts.js';
 
 const app = express();
 
@@ -36,6 +37,7 @@ app.use('/api/v1/workspaces', workspaceRouter);
 app.use('/api/v1/billing', billingRouter);
 app.use('/api/v1/connections', connectionRouter);
 app.use('/api/v1/ai', aiRouter);
+app.use('/api/v1/posts', postRouter);
 
 // Error handling
 app.use(errorHandler);
