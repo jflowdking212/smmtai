@@ -1,0 +1,294 @@
+// Prisma Schema for EE PostMind
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// User & Auth
+// ============================================================
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String
+  passwordHash  String?
+  avatar        String?
+  bio           String?
+  timezone      String    @default("UTC")
+  emailVerified Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  refreshTokens  RefreshToken[]
+  workspaces     WorkspaceMember[]
+  ownedWorkspaces Workspace[]    @relation("WorkspaceOwner")
+  posts          Post[]
+  oauthAccounts  OAuthAccount[]
+
+  @@map("users")
+}
+
+model OAuthAccount {
+  id           String   @id @default(cuid())
+  userId       String
+  provider     String   // google, github, facebook
+  providerId   String
+  accessToken  String?
+  refreshToken String?
+  expiresAt    DateTime?
+  createdAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerId])
+  @@map("oauth_accounts")
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("refresh_tokens")
+}
+
+// ============================================================
+// Workspace & Teams
+// ============================================================
+
+model Workspace {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  ownerId   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  owner             User              @relation("WorkspaceOwner", fields: [ownerId], references: [id])
+  members           WorkspaceMember[]
+  subscription      Subscription?
+  socialConnections SocialConnection[]
+  posts             Post[]
+  templates         Template[]
+
+  @@map("workspaces")
+}
+
+model WorkspaceMember {
+  id          String @id @default(cuid())
+  userId      String
+  workspaceId String
+  role        String @default("editor") // owner, admin, editor, viewer
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, workspaceId])
+  @@map("workspace_members")
+}
+
+// ============================================================
+// Subscriptions & Billing
+// ============================================================
+
+model Subscription {
+  id                   String    @id @default(cuid())
+  workspaceId          String    @unique
+  tier                 String    @default("free") // free, pro, business, enterprise
+  stripeCustomerId     String?   @unique
+  stripeSubscriptionId String?   @unique
+  stripePriceId        String?
+  status               String    @default("active") // active, past_due, canceled, trialing
+  trialEndsAt          DateTime?
+  currentPeriodStart   DateTime?
+  currentPeriodEnd     DateTime?
+  cancelAtPeriodEnd    Boolean   @default(false)
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  workspace    Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  usageRecords UsageRecord[]
+
+  @@map("subscriptions")
+}
+
+model UsageRecord {
+  id             String   @id @default(cuid())
+  subscriptionId String
+  metric         String   // posts, ai_generations, social_accounts
+  count          Int      @default(0)
+  periodStart    DateTime
+  periodEnd      DateTime
+  createdAt      DateTime @default(now())
+
+  subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@unique([subscriptionId, metric, periodStart])
+  @@map("usage_records")
+}
+
+// ============================================================
+// Social Connections
+// ============================================================
+
+model SocialConnection {
+  id           String    @id @default(cuid())
+  workspaceId  String
+  platform     String    // facebook, instagram, tiktok, linkedin, twitter, youtube, pinterest, bluesky, mastodon, telegram, entreprenrs, chrxstians, iohah
+  accountName  String
+  accountId    String
+  accessToken  String    // encrypted (AES-256-GCM)
+  refreshToken String?   // encrypted
+  tokenExpiry  DateTime?
+  metadata     Json?     // platform-specific data (instance URL for Mastodon, bot token for Telegram, etc.)
+  isActive     Boolean   @default(true)
+  lastSyncAt   DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  workspace     Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  platformPosts PlatformPost[]
+
+  @@unique([workspaceId, platform, accountId])
+  @@map("social_connections")
+}
+
+// ============================================================
+// Posts & Publishing
+// ============================================================
+
+model Post {
+  id          String    @id @default(cuid())
+  workspaceId String
+  authorId    String
+  content     String
+  platforms   String[]  // target platforms
+  status      String    @default("draft") // draft, scheduled, publishing, published, failed
+  scheduledAt DateTime?
+  publishedAt DateTime?
+  designData  Json?     // Fabric.js canvas JSON
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  workspace     Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  author        User           @relation(fields: [authorId], references: [id])
+  media         Media[]
+  platformPosts PlatformPost[]
+  schedule      Schedule?
+
+  @@index([workspaceId, status])
+  @@index([scheduledAt])
+  @@map("posts")
+}
+
+model Media {
+  id       String @id @default(cuid())
+  postId   String
+  url      String
+  type     String // image, video, gif
+  width    Int?
+  height   Int?
+  fileSize Int?
+  mimeType String?
+  order    Int    @default(0)
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@map("media")
+}
+
+model PlatformPost {
+  id                 String    @id @default(cuid())
+  postId             String
+  socialConnectionId String
+  platform           String
+  platformPostId     String?   // ID returned by the platform after publishing
+  status             String    @default("pending") // pending, publishing, published, failed
+  error              String?
+  publishedAt        DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  post             Post              @relation(fields: [postId], references: [id], onDelete: Cascade)
+  socialConnection SocialConnection  @relation(fields: [socialConnectionId], references: [id])
+  analytics        AnalyticsSnapshot[]
+
+  @@index([platform, status])
+  @@map("platform_posts")
+}
+
+// ============================================================
+// Scheduling
+// ============================================================
+
+model Schedule {
+  id        String    @id @default(cuid())
+  postId    String    @unique
+  cronExpr  String?   // for recurring posts
+  timezone  String    @default("UTC")
+  nextRunAt DateTime?
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([nextRunAt, isActive])
+  @@map("schedules")
+}
+
+// ============================================================
+// Analytics
+// ============================================================
+
+model AnalyticsSnapshot {
+  id             String   @id @default(cuid())
+  platformPostId String
+  impressions    Int      @default(0)
+  reach          Int      @default(0)
+  likes          Int      @default(0)
+  comments       Int      @default(0)
+  shares         Int      @default(0)
+  clicks         Int      @default(0)
+  saves          Int      @default(0)
+  engagementRate Float    @default(0)
+  metadata       Json?    // platform-specific metrics
+  capturedAt     DateTime @default(now())
+
+  platformPost PlatformPost @relation(fields: [platformPostId], references: [id], onDelete: Cascade)
+
+  @@index([platformPostId, capturedAt])
+  @@map("analytics_snapshots")
+}
+
+// ============================================================
+// Templates
+// ============================================================
+
+model Template {
+  id          String   @id @default(cuid())
+  workspaceId String?  // null = system template
+  name        String
+  category    String   // business, food, fashion, tech, fitness, travel, ecommerce, motivational, event
+  thumbnail   String?
+  designData  Json     // Fabric.js canvas JSON
+  platforms   String[] // compatible platforms
+  isPremium   Boolean  @default(false)
+  isSystem    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([category, isSystem])
+  @@map("templates")
+}
