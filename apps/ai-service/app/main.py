@@ -2,6 +2,10 @@
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from app.config import get_settings
+from app.routes import router as ai_router
+
+settings = get_settings()
 
 app = FastAPI(
     title="EE PostMind AI Service",
@@ -11,16 +15,15 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:4000"],
+    allow_origins=settings.allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+app.include_router(ai_router)
+
 
 @app.get("/health")
 async def health():
     return {"status": "healthy", "service": "ai-service", "version": "0.1.0"}
-
-
-# AI endpoints will be added in Milestone 5

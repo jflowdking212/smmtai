@@ -135,6 +135,24 @@ export const api = {
     disconnect: (connectionId: string) =>
       request(`/connections/${connectionId}`, { method: 'DELETE' }),
   },
+  ai: {
+    caption: (data: any) =>
+      request<{ success: true; data: any }>('/ai/caption', { method: 'POST', body: JSON.stringify(data) }),
+    hashtags: (data: any) =>
+      request<{ success: true; data: any }>('/ai/hashtags', { method: 'POST', body: JSON.stringify(data) }),
+    imagePrompt: (data: any) =>
+      request<{ success: true; data: any }>('/ai/image-prompt', { method: 'POST', body: JSON.stringify(data) }),
+    rewrite: (data: any) =>
+      request<{ success: true; data: any }>('/ai/rewrite', { method: 'POST', body: JSON.stringify(data) }),
+    translate: (data: any) =>
+      request<{ success: true; data: any }>('/ai/translate', { method: 'POST', body: JSON.stringify(data) }),
+    compliance: (data: any) =>
+      request<{ success: true; data: any }>('/ai/compliance', { method: 'POST', body: JSON.stringify(data) }),
+    bestTimes: (data: any) =>
+      request<{ success: true; data: any }>('/ai/best-times', { method: 'POST', body: JSON.stringify(data) }),
+    trending: (data: any) =>
+      request<{ success: true; data: any }>('/ai/trending', { method: 'POST', body: JSON.stringify(data) }),
+  },
 };
 
 // Import auth store (circular-safe: only used at runtime)
