@@ -6,7 +6,6 @@ import { ProtectedRoute } from '@/components/layout/ProtectedRoute';
 import { DashboardPage } from '@/pages/DashboardPage';
 import { ComposePage } from '@/pages/ComposePage';
 import { CalendarPage } from '@/pages/CalendarPage';
-import { AnalyticsPage } from '@/pages/AnalyticsPage';
 import { ConnectionsPage } from '@/pages/ConnectionsPage';
 import { TemplatesPage } from '@/pages/TemplatesPage';
 import { AIPage } from '@/pages/AIPage';
@@ -16,8 +15,9 @@ import { LoginPage } from '@/pages/auth/LoginPage';
 import { RegisterPage } from '@/pages/auth/RegisterPage';
 import { ForgotPasswordPage } from '@/pages/auth/ForgotPasswordPage';
 
-// Lazy-load heavy editor (Fabric.js)
+// Lazy-load heavy pages
 const EditorPage = lazy(() => import('@/pages/EditorPage').then((m) => ({ default: m.EditorPage })));
+const AnalyticsPage = lazy(() => import('@/pages/AnalyticsPage').then((m) => ({ default: m.AnalyticsPage })));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -46,7 +46,7 @@ export default function App() {
             <Route path="/" element={<DashboardPage />} />
             <Route path="/compose" element={<ComposePage />} />
             <Route path="/calendar" element={<CalendarPage />} />
-            <Route path="/analytics" element={<AnalyticsPage />} />
+            <Route path="/analytics" element={<Suspense fallback={<div className="p-8 text-center text-neutral-400">Loading analytics...</div>}><AnalyticsPage /></Suspense>} />
             <Route path="/connections" element={<ConnectionsPage />} />
             <Route path="/templates" element={<TemplatesPage />} />
             <Route path="/editor" element={<Suspense fallback={<div className="p-8 text-center text-neutral-400">Loading editor...</div>}><EditorPage /></Suspense>} />

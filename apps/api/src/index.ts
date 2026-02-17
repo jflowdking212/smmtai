@@ -15,6 +15,7 @@ import { connectionRouter } from './routes/connections.js';
 import { aiRouter } from './routes/ai.js';
 import { postRouter } from './routes/posts.js';
 import { scheduleRouter } from './routes/schedule.js';
+import { analyticsRouter } from './routes/analytics.js';
 
 const app = express();
 
@@ -40,6 +41,7 @@ app.use('/api/v1/connections', connectionRouter);
 app.use('/api/v1/ai', aiRouter);
 app.use('/api/v1/posts', postRouter);
 app.use('/api/v1/schedule', scheduleRouter);
+app.use('/api/v1/analytics', analyticsRouter);
 
 // Error handling
 app.use(errorHandler);

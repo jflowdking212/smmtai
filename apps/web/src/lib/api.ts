@@ -167,6 +167,14 @@ export const api = {
     delete: (postId: string) =>
       request(`/posts/${postId}`, { method: 'DELETE' }),
   },
+  analytics: {
+    overview: (days = 30) =>
+      request<{ success: true; data: any }>(`/analytics/overview?days=${days}`),
+    platform: (platform: string, days = 30) =>
+      request<{ success: true; data: any }>(`/analytics/platform/${platform}?days=${days}`),
+    topPosts: (limit = 10) =>
+      request<{ success: true; data: any }>(`/analytics/top-posts?limit=${limit}`),
+  },
 };
 
 // Import auth store (circular-safe: only used at runtime)
