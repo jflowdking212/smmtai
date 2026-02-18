@@ -80,3 +80,77 @@ h1, h2, h3, h4, h5, h6 {
 .transition-smooth {
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
+
+/* ============================================================
+   Dark Mode
+   ============================================================ */
+
+.dark body {
+  background-color: #0a0a0a;
+  color: #e5e5e5;
+}
+
+.dark .bg-white {
+  background-color: #171717;
+}
+
+.dark .bg-neutral-50 {
+  background-color: #0a0a0a;
+}
+
+.dark .bg-neutral-100 {
+  background-color: #1a1a1a;
+}
+
+.dark .border-neutral-200\/60,
+.dark .border-neutral-200 {
+  border-color: rgba(64, 64, 64, 0.6);
+}
+
+.dark .border-neutral-100 {
+  border-color: #262626;
+}
+
+.dark .text-neutral-900 {
+  color: #fafafa;
+}
+
+.dark .text-neutral-800 {
+  color: #e5e5e5;
+}
+
+.dark .text-neutral-700 {
+  color: #d4d4d4;
+}
+
+.dark .text-neutral-600 {
+  color: #a3a3a3;
+}
+
+.dark .text-neutral-500 {
+  color: #737373;
+}
+
+.dark .text-neutral-400 {
+  color: #525252;
+}
+
+.dark .hover\:bg-neutral-100:hover {
+  background-color: #262626;
+}
+
+.dark .bg-white\/80 {
+  background-color: rgba(23, 23, 23, 0.8);
+}
+
+.dark .shadow-sm {
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #404040;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #525252;
+}

@@ -356,6 +356,12 @@ export const api = {
     delete: (templateId: string) =>
       request('/templates/' + templateId, { method: 'DELETE' }),
   },
+  feedback: {
+    submit: (data: { type: string; message: string; rating: number }) =>
+      request<{ success: true; data: { id: string } }>('/feedback', { method: 'POST', body: JSON.stringify(data) }),
+    list: () =>
+      request<{ success: true; data: any[] }>('/feedback'),
+  },
 };
 
 // Import auth store (circular-safe: only used at runtime)

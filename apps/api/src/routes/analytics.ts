@@ -2,6 +2,7 @@ import { Router, Response, NextFunction } from 'express';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
 import { analyticsService } from '../services/analytics.service.js';
 import { collectWorkspaceAnalytics } from '../jobs/scheduler.js';
+import { cacheResponse } from '../middleware/cache.js';
 
 export const analyticsRouter = Router();
 
@@ -27,6 +28,7 @@ analyticsRouter.post(
 analyticsRouter.get(
   '/overview',
   authenticate,
+  cacheResponse({ ttl: 300, keyPrefix: 'analytics' }),
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       if (!req.workspaceId) {

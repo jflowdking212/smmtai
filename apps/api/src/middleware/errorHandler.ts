@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import * as Sentry from '@sentry/node';
 
 export class AppError extends Error {
   public statusCode: number;
@@ -14,12 +15,16 @@ export class AppError extends Error {
 
 export function errorHandler(err: Error, _req: Request, res: Response, _next: NextFunction) {
   if (err instanceof AppError) {
+    if (err.statusCode >= 500) {
+      Sentry.captureException(err);
+    }
     return res.status(err.statusCode).json({
       success: false,
       error: { code: err.code, message: err.message },
     });
   }
 
+  Sentry.captureException(err);
   console.error('Unhandled error:', err);
   return res.status(500).json({
     success: false,

@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { Button, Card } from '@/components/ui';
+import { api } from '@/lib/api';
 import { MessageSquare, X, Send, Star } from 'lucide-react';
 
 type FeedbackType = 'bug' | 'feature' | 'general';
@@ -22,8 +23,7 @@ export function FeedbackWidget() {
     if (!message.trim()) return;
     setSubmitting(true);
     try {
-      // In production, POST to /api/v1/feedback
-      await new Promise((r) => setTimeout(r, 500));
+      await api.feedback.submit({ type, message: message.trim(), rating });
       setSubmitted(true);
       setTimeout(() => {
         setOpen(false);
@@ -32,10 +32,12 @@ export function FeedbackWidget() {
         setRating(0);
         setType('general');
       }, 2000);
+    } catch {
+      // Silently fail — user can retry
     } finally {
       setSubmitting(false);
     }
-  }, [message]);
+  }, [message, type, rating]);
 
   if (!open) {
     return (

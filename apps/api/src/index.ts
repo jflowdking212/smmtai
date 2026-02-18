@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import hpp from 'hpp';
 import morgan from 'morgan';
 import cookieParser from 'cookie-parser';
+import * as Sentry from '@sentry/node';
 import { resolve } from 'path';
 import { config } from './config/index.js';
 import { errorHandler } from './middleware/errorHandler.js';
@@ -21,7 +22,18 @@ import { postRouter } from './routes/posts.js';
 import { scheduleRouter } from './routes/schedule.js';
 import { analyticsRouter } from './routes/analytics.js';
 import { templateRouter } from './routes/templates.js';
+import { feedbackRouter } from './routes/feedback.js';
 import { scheduleAnalyticsIngestion, scheduleAnalyticsDigestReports, scheduleConnectionHealthMonitoring } from './jobs/scheduler.js';
+
+// Initialize Sentry
+if (config.sentry.dsn) {
+  Sentry.init({
+    dsn: config.sentry.dsn,
+    environment: config.sentry.environment,
+    tracesSampleRate: config.isDev ? 1.0 : 0.2,
+    profilesSampleRate: config.isDev ? 1.0 : 0.1,
+  });
+}
 
 const app = express();
 app.set('trust proxy', 1);
@@ -54,6 +66,12 @@ app.use('/api/v1/posts', postRouter);
 app.use('/api/v1/schedule', scheduleRouter);
 app.use('/api/v1/analytics', analyticsRouter);
 app.use('/api/v1/templates', templateRouter);
+app.use('/api/v1/feedback', feedbackRouter);
+
+// Sentry error handler (must be before custom errorHandler)
+if (config.sentry.dsn) {
+  Sentry.setupExpressErrorHandler(app);
+}
 
 // Error handling
 app.use(errorHandler);

@@ -1,6 +1,7 @@
 import { Router, Response, NextFunction } from 'express';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
 import { prisma } from '../config/database.js';
+import { cacheResponse } from '../middleware/cache.js';
 
 export const templateRouter = Router();
 
@@ -8,6 +9,7 @@ export const templateRouter = Router();
 templateRouter.get(
   '/',
   authenticate,
+  cacheResponse({ ttl: 600, keyPrefix: 'templates' }),
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const { category } = req.query;

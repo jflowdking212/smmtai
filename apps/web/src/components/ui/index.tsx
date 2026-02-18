@@ -164,3 +164,52 @@ export function Avatar({ src, name, size = 'md', className }: AvatarProps) {
     </div>
   );
 }
+
+// ============================================================
+// Skeleton
+// ============================================================
+
+interface SkeletonProps {
+  className?: string;
+  variant?: 'text' | 'circular' | 'rectangular';
+  width?: string | number;
+  height?: string | number;
+}
+
+export function Skeleton({ className, variant = 'text', width, height }: SkeletonProps) {
+  const variants = {
+    text: 'h-4 rounded-md',
+    circular: 'rounded-full',
+    rectangular: 'rounded-xl',
+  };
+
+  return (
+    <div
+      className={cn('animate-pulse bg-neutral-200', variants[variant], className)}
+      style={{ width, height }}
+    />
+  );
+}
+
+export function CardSkeleton({ className }: { className?: string }) {
+  return (
+    <div className={cn('bg-white rounded-2xl border border-neutral-200/60 shadow-sm p-6', className)}>
+      <Skeleton variant="text" className="w-1/3 h-4 mb-3" />
+      <Skeleton variant="text" className="w-full h-3 mb-2" />
+      <Skeleton variant="text" className="w-2/3 h-3" />
+    </div>
+  );
+}
+
+export function StatSkeleton() {
+  return (
+    <div className="bg-white rounded-2xl border border-neutral-200/60 shadow-sm p-6">
+      <div className="flex items-center justify-between mb-3">
+        <Skeleton variant="text" className="w-24 h-3" />
+        <Skeleton variant="circular" className="w-8 h-8" />
+      </div>
+      <Skeleton variant="text" className="w-16 h-7 mb-1" />
+      <Skeleton variant="text" className="w-12 h-3" />
+    </div>
+  );
+}

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Card, Button } from '@/components/ui';
 import { useAuthStore } from '@/stores/authStore';
+import { useTheme } from '@/components/ThemeProvider';
 import { api } from '@/lib/api';
 import {
   User, Bell, Shield, Palette, Key, Trash2, Save,
@@ -24,6 +25,7 @@ const TABS: { id: SettingsTab; label: string; icon: React.ReactNode }[] = [
 export function SettingsPage() {
   const [tab, setTab] = useState<SettingsTab>('profile');
   const { user } = useAuthStore();
+  const { theme, setTheme } = useTheme();
 
   // Form states
   const [name, setName] = useState(user?.name || '');
@@ -38,7 +40,6 @@ export function SettingsPage() {
   });
   const [notificationLoadingKey, setNotificationLoadingKey] = useState<NotificationPreferenceKey | null>(null);
   const [notificationMessage, setNotificationMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('light');
 
   useEffect(() => {
     let active = true;
