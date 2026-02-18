@@ -1,7 +1,7 @@
 import 'dotenv/config';
 
 export const config = {
-  port: parseInt(process.env.PORT || '4000', 10),
+  port: parseInt(process.env.PORT || '4016', 10),
   nodeEnv: process.env.NODE_ENV || 'development',
   isDev: process.env.NODE_ENV !== 'production',
 
@@ -25,7 +25,34 @@ export const config = {
     webhookSecret: process.env.STRIPE_WEBHOOK_SECRET || '',
   },
 
+  oauth: {
+    google: {
+      clientId: process.env.GOOGLE_CLIENT_ID || '',
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
+      callbackUrl: process.env.GOOGLE_CALLBACK_URL || 'http://localhost:4016/api/v1/auth/oauth/google/callback',
+    },
+    github: {
+      clientId: process.env.GITHUB_CLIENT_ID || '',
+      clientSecret: process.env.GITHUB_CLIENT_SECRET || '',
+      callbackUrl: process.env.GITHUB_CALLBACK_URL || 'http://localhost:4016/api/v1/auth/oauth/github/callback',
+    },
+    facebook: {
+      clientId: process.env.FACEBOOK_APP_ID || '',
+      clientSecret: process.env.FACEBOOK_APP_SECRET || '',
+      callbackUrl: process.env.FACEBOOK_CALLBACK_URL || 'http://localhost:4016/api/v1/auth/oauth/facebook/callback',
+    },
+  },
+
   frontend: {
     url: process.env.FRONTEND_URL || 'http://localhost:5173',
+  },
+
+  sentry: {
+    dsn: process.env.SENTRY_DSN || '',
+    environment: process.env.NODE_ENV || 'development',
+  },
+
+  monitoring: {
+    uptimeUrl: process.env.UPTIME_WEBHOOK_URL || '',
   },
 } as const;

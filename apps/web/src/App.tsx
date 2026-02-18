@@ -6,14 +6,19 @@ import { ProtectedRoute } from '@/components/layout/ProtectedRoute';
 import { DashboardPage } from '@/pages/DashboardPage';
 import { ComposePage } from '@/pages/ComposePage';
 import { CalendarPage } from '@/pages/CalendarPage';
+import { PostHistoryPage } from '@/pages/PostHistoryPage';
 import { ConnectionsPage } from '@/pages/ConnectionsPage';
 import { TemplatesPage } from '@/pages/TemplatesPage';
 import { AIPage } from '@/pages/AIPage';
 import { SettingsPage } from '@/pages/SettingsPage';
 import { BillingPage } from '@/pages/BillingPage';
+import { HelpPage } from '@/pages/HelpPage';
 import { LoginPage } from '@/pages/auth/LoginPage';
 import { RegisterPage } from '@/pages/auth/RegisterPage';
 import { ForgotPasswordPage } from '@/pages/auth/ForgotPasswordPage';
+import { ResetPasswordPage } from '@/pages/auth/ResetPasswordPage';
+import { VerifyEmailPage } from '@/pages/auth/VerifyEmailPage';
+import { OAuthCallbackPage } from '@/pages/auth/OAuthCallbackPage';
 
 // Lazy-load heavy pages
 const EditorPage = lazy(() => import('@/pages/EditorPage').then((m) => ({ default: m.EditorPage })));
@@ -34,6 +39,9 @@ export default function App() {
           <Route path="/auth/login" element={<LoginPage />} />
           <Route path="/auth/register" element={<RegisterPage />} />
           <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
+          <Route path="/auth/verify-email" element={<VerifyEmailPage />} />
+          <Route path="/auth/oauth/callback" element={<OAuthCallbackPage />} />
 
           {/* Protected app routes */}
           <Route
@@ -45,6 +53,7 @@ export default function App() {
           >
             <Route path="/" element={<DashboardPage />} />
             <Route path="/compose" element={<ComposePage />} />
+            <Route path="/posts" element={<PostHistoryPage />} />
             <Route path="/calendar" element={<CalendarPage />} />
             <Route path="/analytics" element={<Suspense fallback={<div className="p-8 text-center text-neutral-400">Loading analytics...</div>}><AnalyticsPage /></Suspense>} />
             <Route path="/connections" element={<ConnectionsPage />} />
@@ -54,6 +63,7 @@ export default function App() {
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/team" element={<SettingsPage />} />
             <Route path="/billing" element={<BillingPage />} />
+            <Route path="/help" element={<HelpPage />} />
           </Route>
         </Routes>
       </BrowserRouter>

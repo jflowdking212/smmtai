@@ -1,18 +1,45 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Card, Button, Badge } from '@/components/ui';
-import { api } from '@/lib/api';
-import { PLATFORMS, type PlatformType } from '@ee-postmind/shared';
+import { Card, Button, Badge, Input } from '@/components/ui';
+import { api, ApiError } from '@/lib/api';
+import {
+  MANUAL_CONNECTION_PLATFORMS,
+  OAUTH_PLATFORMS,
+  PLATFORMS,
+  isPlatformType,
+  type PlatformType,
+} from '@ee-postmind/shared';
 import { Plus, Unplug, RefreshCw, CheckCircle2, AlertCircle } from 'lucide-react';
 
-const OAUTH_PLATFORMS: PlatformType[] = [
-  'facebook', 'instagram', 'tiktok', 'linkedin', 'twitter', 'youtube', 'pinterest',
-];
+const allPlatforms: PlatformType[] = [...OAUTH_PLATFORMS, ...MANUAL_CONNECTION_PLATFORMS];
 
-const MANUAL_PLATFORMS: PlatformType[] = [
-  'bluesky', 'mastodon', 'telegram', 'entreprenrs', 'chrxstians', 'iohah',
-];
+interface ManualField {
+  key: string;
+  label: string;
+  placeholder?: string;
+  type?: 'text' | 'password';
+  helpText?: string;
+}
 
-const allPlatforms: PlatformType[] = [...OAUTH_PLATFORMS, ...MANUAL_PLATFORMS];
+const MANUAL_FIELDS: Partial<Record<PlatformType, ManualField[]>> = {
+  bluesky: [
+    { key: 'identifier', label: 'Handle or email', placeholder: 'you.bsky.social' },
+    { key: 'password', label: 'App password', type: 'password' },
+  ],
+  mastodon: [
+    { key: 'instanceUrl', label: 'Instance URL', placeholder: 'https://mastodon.social' },
+    { key: 'accessToken', label: 'Access token', type: 'password' },
+  ],
+  telegram: [
+    { key: 'botToken', label: 'Bot token', type: 'password', helpText: 'Create one with @BotFather.' },
+    { key: 'chatId', label: 'Default chat ID', placeholder: '@mychannel or -1001234567890', helpText: 'Required for publishing. Use a channel username or numeric chat ID.' },
+  ],
+  entreprenrs: [
+    { key: 'accessToken', label: 'Access token', type: 'password' },
+    { key: 'serverKey', label: 'Server key', type: 'password' },
+  ],
+  chrxstians: [{ key: 'accessToken', label: 'Access token', type: 'password' }],
+  iohah: [{ key: 'accessToken', label: 'Access token', type: 'password' }],
+};
 
 interface Connection {
   id: string;
@@ -24,9 +51,76 @@ interface Connection {
   lastSyncAt: string | null;
 }
 
+interface ConnectionHealthResult {
+  id: string;
+  platform: string;
+  accountName: string;
+  accountId: string;
+  isActive: boolean;
+  tokenExpired: boolean;
+  lastSyncAt: string | null;
+  healthy: boolean;
+  error?: { code: string; message: string };
+}
+
+function buildCredentials(platform: PlatformType, values: Record<string, string>): string {
+  switch (platform) {
+    case 'bluesky':
+      return JSON.stringify({ identifier: values.identifier?.trim(), password: values.password || '' });
+    case 'mastodon':
+      return JSON.stringify({
+        instanceUrl: values.instanceUrl?.trim() || 'https://mastodon.social',
+        accessToken: values.accessToken?.trim() || '',
+      });
+    case 'telegram':
+      return JSON.stringify({
+        botToken: values.botToken?.trim() || '',
+        chatId: values.chatId?.trim() || '',
+      });
+    case 'entreprenrs':
+      return JSON.stringify({
+        accessToken: values.accessToken?.trim() || '',
+        serverKey: values.serverKey?.trim() || '',
+      });
+    case 'chrxstians':
+      return JSON.stringify({ accessToken: values.accessToken?.trim() || '' });
+    case 'iohah':
+      return JSON.stringify({ accessToken: values.accessToken?.trim() || '' });
+    default:
+      return '';
+  }
+}
+
+function getInitialForm(platform: PlatformType): Record<string, string> {
+  if (platform === 'mastodon') {
+    return { instanceUrl: 'https://mastodon.social', accessToken: '' };
+  }
+  return {};
+}
+
+function formatCallbackError(error: string): string {
+  switch (error) {
+    case 'invalid_platform':
+      return 'That platform is not supported for connection.';
+    case 'invalid_connection_mode':
+      return 'This platform must be connected using manual credentials.';
+    case 'missing_params':
+      return 'The authorization response was incomplete.';
+    case 'invalid_state':
+      return 'The authorization request has expired. Please try again.';
+    case 'connection_failed':
+      return 'Connection failed. Please retry or verify your credentials.';
+    default:
+      return 'Connection failed. Please try again.';
+  }
+}
+
 export function ConnectionsPage() {
   const [connections, setConnections] = useState<Connection[]>([]);
   const [loading, setLoading] = useState<string | null>(null);
+  const [manualPlatform, setManualPlatform] = useState<PlatformType | null>(null);
+  const [manualValues, setManualValues] = useState<Record<string, string>>({});
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const fetchConnections = useCallback(async () => {
     try {
@@ -38,17 +132,39 @@ export function ConnectionsPage() {
   }, []);
 
   useEffect(() => { fetchConnections(); }, [fetchConnections]);
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const connected = params.get('connected');
+    const error = params.get('error');
+
+    if (connected && isPlatformType(connected)) {
+      setMessage({ type: 'success', text: `${PLATFORMS[connected].name} connected successfully.` });
+      fetchConnections();
+    } else if (error) {
+      setMessage({ type: 'error', text: formatCallbackError(error) });
+    }
+
+    if (connected || error) {
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, [fetchConnections]);
 
   async function handleConnect(platform: PlatformType) {
     setLoading(platform);
+    setMessage(null);
     try {
       if (OAUTH_PLATFORMS.includes(platform)) {
         const res = await api.connections.initiateOAuth(platform);
         window.location.href = res.data.authUrl;
+        return;
       }
-      // Manual platforms would open a modal — simplified for now
+      if (MANUAL_CONNECTION_PLATFORMS.includes(platform)) {
+        setManualPlatform(platform);
+        setManualValues(getInitialForm(platform));
+      }
     } catch (err) {
-      console.error('Connect error:', err);
+      const text = err instanceof ApiError ? err.message : 'Unable to start connection flow';
+      setMessage({ type: 'error', text });
     } finally {
       setLoading(null);
     }
@@ -56,11 +172,79 @@ export function ConnectionsPage() {
 
   async function handleDisconnect(connectionId: string) {
     setLoading(connectionId);
+    setMessage(null);
     try {
       await api.connections.disconnect(connectionId);
       setConnections((prev) => prev.filter((c) => c.id !== connectionId));
+      setMessage({ type: 'success', text: 'Platform disconnected.' });
     } catch (err) {
-      console.error('Disconnect error:', err);
+      const text = err instanceof ApiError ? err.message : 'Unable to disconnect platform';
+      setMessage({ type: 'error', text });
+    } finally {
+      setLoading(null);
+    }
+  }
+
+  async function handleHealthCheck(connectionId: string) {
+    const loadingKey = `health-${connectionId}`;
+    setLoading(loadingKey);
+    setMessage(null);
+
+    try {
+      const res = await api.connections.healthCheck(connectionId);
+      const updated = res.data as ConnectionHealthResult;
+      setConnections((prev) => prev.map((connection) => (
+        connection.id === updated.id
+          ? {
+            id: updated.id,
+            platform: updated.platform,
+            accountName: updated.accountName,
+            accountId: updated.accountId,
+            isActive: updated.isActive,
+            tokenExpired: updated.tokenExpired,
+            lastSyncAt: updated.lastSyncAt,
+          }
+          : connection
+      )));
+
+      if (updated.healthy) {
+        setMessage({ type: 'success', text: 'Connection is healthy.' });
+      } else {
+        setMessage({
+          type: 'error',
+          text: updated.error?.message || 'Connection needs attention. Reconnect the account.',
+        });
+      }
+    } catch (err) {
+      const text = err instanceof ApiError ? err.message : 'Unable to check connection health';
+      setMessage({ type: 'error', text });
+    } finally {
+      setLoading(null);
+    }
+  }
+
+  async function handleManualConnect() {
+    if (!manualPlatform) return;
+    const fields = MANUAL_FIELDS[manualPlatform] || [];
+    const missingField = fields.find((field) => !manualValues[field.key]?.trim());
+    if (missingField) {
+      setMessage({ type: 'error', text: `${missingField.label} is required.` });
+      return;
+    }
+
+    setLoading(manualPlatform);
+    setMessage(null);
+
+    try {
+      const credentials = buildCredentials(manualPlatform, manualValues);
+      await api.connections.manualConnect(manualPlatform, credentials);
+      await fetchConnections();
+      setManualPlatform(null);
+      setManualValues({});
+      setMessage({ type: 'success', text: `${PLATFORMS[manualPlatform].name} connected successfully.` });
+    } catch (err) {
+      const text = err instanceof ApiError ? err.message : 'Could not connect platform';
+      setMessage({ type: 'error', text });
     } finally {
       setLoading(null);
     }
@@ -69,6 +253,8 @@ export function ConnectionsPage() {
   function getConnection(platform: PlatformType): Connection | undefined {
     return connections.find((c) => c.platform === platform);
   }
+
+  const manualFields = manualPlatform ? MANUAL_FIELDS[manualPlatform] || [] : [];
 
   return (
     <div className="space-y-6">
@@ -83,12 +269,18 @@ export function ConnectionsPage() {
           <RefreshCw className="w-4 h-4" /> Refresh
         </Button>
       </div>
+      {message && (
+        <Card className={`p-3 ${message.type === 'error' ? 'border-red-200 bg-red-50/50' : 'border-emerald-200 bg-emerald-50/50'}`}>
+          <p className={`text-sm ${message.type === 'error' ? 'text-red-700' : 'text-emerald-700'}`}>{message.text}</p>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {allPlatforms.map((platformId) => {
           const platform = PLATFORMS[platformId];
           const connection = getConnection(platformId);
           const isConnected = !!connection;
+          const needsReconnect = isConnected && (!connection.isActive || connection.tokenExpired);
 
           return (
             <Card key={platformId} hover className="p-5">
@@ -114,9 +306,9 @@ export function ConnectionsPage() {
                   </div>
                 </div>
                 {isConnected ? (
-                  connection.tokenExpired ? (
+                  !connection.isActive || connection.tokenExpired ? (
                     <Badge variant="warning">
-                      <AlertCircle className="w-3 h-3 mr-1" /> Expired
+                      <AlertCircle className="w-3 h-3 mr-1" /> {connection.tokenExpired ? 'Expired' : 'Needs attention'}
                     </Badge>
                   ) : (
                     <Badge variant="success">
@@ -128,15 +320,41 @@ export function ConnectionsPage() {
                 )}
               </div>
               {isConnected ? (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="w-full text-red-500 hover:text-red-600 hover:bg-red-50"
-                  loading={loading === connection.id}
-                  onClick={() => handleDisconnect(connection.id)}
-                >
-                  <Unplug className="w-4 h-4" /> Disconnect
-                </Button>
+                <div className="grid grid-cols-2 gap-2">
+                  {needsReconnect ? (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      className="w-full"
+                      loading={loading === platformId}
+                      disabled={loading === connection.id || loading === `health-${connection.id}`}
+                      onClick={() => handleConnect(platformId)}
+                    >
+                      <RefreshCw className="w-4 h-4" /> Reconnect
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      className="w-full"
+                      loading={loading === `health-${connection.id}`}
+                      disabled={loading === connection.id || loading === platformId}
+                      onClick={() => handleHealthCheck(connection.id)}
+                    >
+                      <RefreshCw className="w-4 h-4" /> Check
+                    </Button>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full text-red-500 hover:text-red-600 hover:bg-red-50"
+                    loading={loading === connection.id}
+                    disabled={loading === `health-${connection.id}` || loading === platformId}
+                    onClick={() => handleDisconnect(connection.id)}
+                  >
+                    <Unplug className="w-4 h-4" /> Disconnect
+                  </Button>
+                </div>
               ) : (
                 <Button
                   variant="secondary"
@@ -152,6 +370,55 @@ export function ConnectionsPage() {
           );
         })}
       </div>
+
+      {manualPlatform && (
+        <div
+          className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
+          onClick={() => setManualPlatform(null)}
+        >
+          <Card className="w-full max-w-md p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
+            <div>
+              <h2 className="text-lg font-heading font-semibold text-neutral-900">
+                Connect {PLATFORMS[manualPlatform].name}
+              </h2>
+              <p className="text-sm text-neutral-500 mt-1">Enter your credentials to securely connect this account.</p>
+            </div>
+
+            <div className="space-y-3">
+              {manualFields.map((field) => (
+                <div key={field.key} className="space-y-1.5">
+                  <Input
+                    label={field.label}
+                    type={field.type || 'text'}
+                    placeholder={field.placeholder}
+                    value={manualValues[field.key] || ''}
+                    onChange={(e) => setManualValues((prev) => ({ ...prev, [field.key]: e.target.value }))}
+                  />
+                  {field.helpText && <p className="text-xs text-neutral-500">{field.helpText}</p>}
+                </div>
+              ))}
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setManualPlatform(null)}
+                disabled={loading === manualPlatform}
+              >
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                loading={loading === manualPlatform}
+                onClick={handleManualConnect}
+              >
+                Connect account
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }

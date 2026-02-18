@@ -11,7 +11,7 @@ export interface PlatformAdapter {
   getAuthUrl(state: string): string;
 
   /** Exchange authorization code for tokens */
-  exchangeCode(code: string): Promise<PlatformTokens>;
+  exchangeCode(code: string, context?: PlatformOAuthContext): Promise<PlatformTokens>;
 
   /** Refresh expired access token */
   refreshAccessToken(refreshToken: string): Promise<PlatformTokens>;
@@ -37,6 +37,10 @@ export interface PlatformTokens {
   refreshToken?: string;
   expiresAt?: Date;
   scope?: string;
+}
+
+export interface PlatformOAuthContext {
+  state?: string;
 }
 
 export interface PlatformAccount {

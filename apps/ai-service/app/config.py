@@ -1,10 +1,22 @@
 """Application configuration from environment variables."""
 
-from pydantic_settings import BaseSettings
 from functools import lru_cache
+from pathlib import Path
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+ENV_FILE = Path(__file__).resolve().parents[1] / ".env"
 
 
 class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=str(ENV_FILE),
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
+    # Internal API auth
+    ai_service_key: str = "dev-key"
+
     # OpenAI
     openai_api_key: str = ""
     openai_model: str = "gpt-4o-mini"
@@ -26,14 +38,11 @@ class Settings(BaseSettings):
 
     # CORS
     allowed_origins: list[str] = [
+        "http://localhost:3016",
         "http://localhost:5173",
-        "http://localhost:4000",
+        "http://localhost:4016",
+        "https://smmt.entreprenreducation.com",
     ]
-
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-
 
 @lru_cache
 def get_settings() -> Settings:

@@ -1,18 +1,22 @@
-import { useState, FormEvent } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useState, FormEvent, useEffect } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Button, Input } from '@/components/ui';
 import { api, ApiError } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
-import { Sparkles, Check } from 'lucide-react';
+import { Sparkles, Check, Chrome, Github, Facebook } from 'lucide-react';
 
 export function RegisterPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const setAuth = useAuthStore((s) => s.setAuth);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [inviteNotice, setInviteNotice] = useState('');
+  const inviteToken = searchParams.get('invite_token');
+  const inviteAction = searchParams.get('invite_action');
 
   const passwordChecks = [
     { label: '8+ characters', valid: password.length >= 8 },
@@ -20,6 +24,18 @@ export function RegisterPage() {
     { label: 'Lowercase letter', valid: /[a-z]/.test(password) },
     { label: 'Number', valid: /[0-9]/.test(password) },
   ];
+
+  function startOAuth(provider: 'google' | 'github' | 'facebook') {
+    window.location.href = api.auth.oauthUrl(provider);
+  }
+
+  useEffect(() => {
+    if (!inviteToken || inviteAction !== 'decline') return;
+    api.workspaces
+      .declineInvite(inviteToken)
+      .then(() => setInviteNotice('Invitation declined.'))
+      .catch(() => setInviteNotice('We could not decline this invitation.'));
+  }, [inviteAction, inviteToken]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -29,6 +45,11 @@ export function RegisterPage() {
     try {
       const res = await api.auth.register({ name, email, password });
       setAuth(res.data.user, res.data.accessToken, res.data.workspaceId);
+
+      if (inviteToken && inviteAction !== 'decline') {
+        await api.workspaces.acceptInvite(inviteToken);
+      }
+
       navigate('/');
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Something went wrong');
@@ -86,6 +107,31 @@ export function RegisterPage() {
           {error && (
             <div className="mb-6 p-3 rounded-xl bg-red-50 text-red-700 text-sm">{error}</div>
           )}
+
+          {inviteNotice && (
+            <div className="mb-6 p-3 rounded-xl bg-emerald-50 text-emerald-700 text-sm">{inviteNotice}</div>
+          )}
+
+          <div className="space-y-2 mb-5">
+            <Button type="button" variant="secondary" className="w-full" onClick={() => startOAuth('google')}>
+              <Chrome className="w-4 h-4" /> Continue with Google
+            </Button>
+            <Button type="button" variant="secondary" className="w-full" onClick={() => startOAuth('github')}>
+              <Github className="w-4 h-4" /> Continue with GitHub
+            </Button>
+            <Button type="button" variant="secondary" className="w-full" onClick={() => startOAuth('facebook')}>
+              <Facebook className="w-4 h-4" /> Continue with Facebook
+            </Button>
+          </div>
+
+          <div className="relative mb-5">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t border-neutral-200" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-neutral-50 px-2 text-neutral-400">Or create with email</span>
+            </div>
+          </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <Input

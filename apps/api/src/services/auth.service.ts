@@ -8,6 +8,9 @@ import {
   hashToken,
 } from '../utils/tokens.js';
 import { AppError } from '../middleware/errorHandler.js';
+import { config } from '../config/index.js';
+import { emailService } from './email.service.js';
+import type { OAuthIdentity } from './oauth.service.js';
 
 const SALT_ROUNDS = 12;
 
@@ -36,40 +39,13 @@ export class AuthService {
         },
       });
 
-      // Create default workspace
-      const workspaceSlug = slugify(data.name) + '-' + newUser.id.slice(-6);
-      const workspace = await tx.workspace.create({
-        data: {
-          name: `${data.name}'s Workspace`,
-          slug: workspaceSlug,
-          ownerId: newUser.id,
-        },
-      });
-
-      // Add owner as member
-      await tx.workspaceMember.create({
-        data: {
-          userId: newUser.id,
-          workspaceId: workspace.id,
-          role: 'owner',
-        },
-      });
-
-      // Create free subscription
-      await tx.subscription.create({
-        data: {
-          workspaceId: workspace.id,
-          tier: 'free',
-          status: 'active',
-        },
-      });
-
-      return { ...newUser, workspaceId: workspace.id };
+      const workspaceId = await this.createDefaultWorkspace(tx, newUser.id, data.name);
+      return { ...newUser, workspaceId };
     });
 
-    // Generate verification token
-    const verificationToken = generateRandomToken();
-    // TODO: Store token and send verification email (Milestone 2.4)
+    const verificationToken = await this.createEmailVerificationToken(user.id);
+    const verificationLink = `${config.frontend.url}/auth/verify-email?token=${verificationToken}`;
+    await emailService.sendVerificationEmail(user.email, user.name, verificationLink);
 
     const tokens = this.generateTokenPair(user.id, user.workspaceId);
 
@@ -115,6 +91,90 @@ export class AuthService {
     };
   }
 
+  async loginWithOAuth(identity: OAuthIdentity) {
+    const normalizedEmail = identity.email.toLowerCase();
+
+    const result = await prisma.$transaction(async (tx: any) => {
+      const existingOAuth = await tx.oAuthAccount.findUnique({
+        where: {
+          provider_providerId: {
+            provider: identity.provider,
+            providerId: identity.providerId,
+          },
+        },
+      });
+
+      let user: any;
+
+      if (existingOAuth) {
+        user = await tx.user.update({
+          where: { id: existingOAuth.userId },
+          data: {
+            name: identity.name || undefined,
+            avatar: identity.avatar,
+            emailVerified: identity.emailVerified ? true : undefined,
+          },
+        });
+
+        await tx.oAuthAccount.update({
+          where: { id: existingOAuth.id },
+          data: {
+            accessToken: identity.providerAccessToken ?? existingOAuth.accessToken,
+            refreshToken: identity.providerRefreshToken ?? existingOAuth.refreshToken,
+            expiresAt: identity.providerTokenExpiry ?? existingOAuth.expiresAt,
+          },
+        });
+      } else {
+        const existingUser = await tx.user.findUnique({
+          where: { email: normalizedEmail },
+        });
+
+        if (existingUser) {
+          user = await tx.user.update({
+            where: { id: existingUser.id },
+            data: {
+              name: existingUser.name || identity.name,
+              avatar: identity.avatar ?? existingUser.avatar,
+              emailVerified: existingUser.emailVerified || identity.emailVerified,
+            },
+          });
+        } else {
+          user = await tx.user.create({
+            data: {
+              email: normalizedEmail,
+              name: identity.name || normalizedEmail.split('@')[0],
+              avatar: identity.avatar,
+              emailVerified: identity.emailVerified,
+            },
+          });
+        }
+
+        await tx.oAuthAccount.create({
+          data: {
+            userId: user.id,
+            provider: identity.provider,
+            providerId: identity.providerId,
+            accessToken: identity.providerAccessToken ?? null,
+            refreshToken: identity.providerRefreshToken ?? null,
+            expiresAt: identity.providerTokenExpiry ?? null,
+          },
+        });
+      }
+
+      const workspaceId = await this.getWorkspaceIdForUser(tx, user.id, user.name);
+      return { user, workspaceId };
+    });
+
+    const tokens = this.generateTokenPair(result.user.id, result.workspaceId);
+    await this.storeRefreshToken(result.user.id, tokens.refreshToken);
+
+    return {
+      user: this.sanitizeUser(result.user),
+      workspaceId: result.workspaceId,
+      ...tokens,
+    };
+  }
+
   async refreshTokens(refreshToken: string) {
     try {
       const payload = verifyRefreshToken(refreshToken);
@@ -149,15 +209,106 @@ export class AuthService {
     // Always return success to prevent email enumeration
     if (!user) return;
 
-    const resetToken = generateRandomToken();
-    // TODO: Store reset token with expiry and send email (Milestone 2.4)
-    console.log(`[DEV] Password reset token for ${email}: ${resetToken}`);
+    const resetToken = await this.createPasswordResetToken(user.id);
+    const resetLink = `${config.frontend.url}/auth/reset-password?token=${resetToken}`;
+
+    try {
+      await emailService.sendPasswordResetEmail(user.email, user.name, resetLink);
+    } catch (err) {
+      console.error('[EMAIL ERROR] Password reset email failed:', err);
+    }
   }
 
   async resetPassword(token: string, newPassword: string) {
-    // TODO: Verify token from store (Milestone 2.4)
-    // For now, this is a stub
-    throw new AppError('Not yet implemented', 501, 'NOT_IMPLEMENTED');
+    const hashedToken = hashToken(token);
+    const resetToken = await prisma.passwordResetToken.findUnique({
+      where: { token: hashedToken },
+    });
+
+    if (!resetToken || resetToken.expiresAt < new Date()) {
+      throw new AppError('Invalid or expired reset token', 400, 'INVALID_RESET_TOKEN');
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
+
+    await prisma.$transaction(async (tx: any) => {
+      await tx.user.update({
+        where: { id: resetToken.userId },
+        data: { passwordHash },
+      });
+
+      await tx.passwordResetToken.deleteMany({
+        where: { userId: resetToken.userId },
+      });
+
+      await tx.refreshToken.deleteMany({
+        where: { userId: resetToken.userId },
+      });
+    });
+  }
+
+  async verifyEmail(token: string) {
+    const hashedToken = hashToken(token);
+    const verificationToken = await prisma.emailVerificationToken.findUnique({
+      where: { token: hashedToken },
+    });
+
+    if (!verificationToken || verificationToken.expiresAt < new Date()) {
+      throw new AppError('Invalid or expired verification token', 400, 'INVALID_VERIFICATION_TOKEN');
+    }
+
+    await prisma.$transaction(async (tx: any) => {
+      await tx.user.update({
+        where: { id: verificationToken.userId },
+        data: { emailVerified: true },
+      });
+
+      await tx.emailVerificationToken.deleteMany({
+        where: { userId: verificationToken.userId },
+      });
+    });
+  }
+
+  private async createDefaultWorkspace(tx: any, userId: string, userName: string): Promise<string> {
+    const workspaceSlug = `${slugify(userName)}-${userId.slice(-6)}`;
+    const workspace = await tx.workspace.create({
+      data: {
+        name: `${userName}'s Workspace`,
+        slug: workspaceSlug,
+        ownerId: userId,
+      },
+    });
+
+    await tx.workspaceMember.create({
+      data: {
+        userId,
+        workspaceId: workspace.id,
+        role: 'owner',
+      },
+    });
+
+    await tx.subscription.create({
+      data: {
+        workspaceId: workspace.id,
+        tier: 'free',
+        status: 'active',
+      },
+    });
+
+    return workspace.id;
+  }
+
+  private async getWorkspaceIdForUser(tx: any, userId: string, userName: string): Promise<string> {
+    const ownerMembership = await tx.workspaceMember.findFirst({
+      where: { userId, role: 'owner' },
+      orderBy: { id: 'asc' },
+    });
+
+    if (ownerMembership?.workspaceId) {
+      return ownerMembership.workspaceId;
+    }
+
+    return this.createDefaultWorkspace(tx, userId, userName);
   }
 
   private generateTokenPair(userId: string, workspaceId?: string) {
@@ -173,6 +324,34 @@ export class AuthService {
     await prisma.refreshToken.create({
       data: { token: hashed, userId, expiresAt },
     });
+  }
+
+  private async createEmailVerificationToken(userId: string): Promise<string> {
+    const token = generateRandomToken();
+    const hashed = hashToken(token);
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h
+
+    await prisma.emailVerificationToken.upsert({
+      where: { userId },
+      create: { userId, token: hashed, expiresAt },
+      update: { token: hashed, expiresAt },
+    });
+
+    return token;
+  }
+
+  private async createPasswordResetToken(userId: string): Promise<string> {
+    const token = generateRandomToken();
+    const hashed = hashToken(token);
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1h
+
+    await prisma.passwordResetToken.upsert({
+      where: { userId },
+      create: { userId, token: hashed, expiresAt },
+      update: { token: hashed, expiresAt },
+    });
+
+    return token;
   }
 
   private sanitizeUser(user: { id: string; email: string; name: string; avatar: string | null; timezone: string; emailVerified: boolean; createdAt: Date }) {

@@ -30,10 +30,24 @@ export const resetPasswordSchema = z.object({
     .regex(/[0-9]/, 'Password must contain at least one number'),
 });
 
+export const verifyEmailSchema = z.object({
+  token: z.string().min(1),
+});
+
 export const updateProfileSchema = z.object({
   name: z.string().min(2).max(100).optional(),
   bio: z.string().max(500).optional(),
   timezone: z.string().optional(),
+});
+
+export const updateNotificationPreferencesSchema = z.object({
+  postPublished: z.boolean().optional(),
+  postFailed: z.boolean().optional(),
+  upcomingScheduled: z.boolean().optional(),
+  weeklyAnalyticsDigest: z.boolean().optional(),
+  monthlyAnalyticsDigest: z.boolean().optional(),
+}).refine((value) => Object.keys(value).length > 0, {
+  message: 'At least one notification preference must be provided',
 });
 
 export const inviteMemberSchema = z.object({
@@ -43,4 +57,8 @@ export const inviteMemberSchema = z.object({
 
 export const createWorkspaceSchema = z.object({
   name: z.string().min(2, 'Workspace name must be at least 2 characters').max(50),
+});
+
+export const workspaceInviteActionSchema = z.object({
+  token: z.string().min(1, 'Invitation token is required'),
 });

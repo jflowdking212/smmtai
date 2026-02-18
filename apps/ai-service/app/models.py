@@ -15,6 +15,13 @@ class Tone(str, Enum):
     persuasive = "persuasive"
 
 
+class BrandVoiceProfile(str, Enum):
+    formal = "formal"
+    casual = "casual"
+    witty = "witty"
+    professional = "professional"
+
+
 class Platform(str, Enum):
     facebook = "facebook"
     instagram = "instagram"
@@ -56,9 +63,11 @@ class GenerateCaptionRequest(BaseModel):
     tone: Tone = Tone.professional
     language: str = Field(default="en", max_length=10)
     max_length: Optional[int] = Field(default=None, description="Override max character length")
+    brand_voice_profile: Optional[BrandVoiceProfile] = Field(default=None, description="Preset brand voice profile")
     brand_voice: Optional[str] = Field(default=None, max_length=500, description="Brand voice description")
     industry: Optional[str] = Field(default=None, max_length=100)
     audience: Optional[str] = Field(default=None, max_length=200)
+    audience_persona: Optional[str] = Field(default=None, max_length=200)
     include_cta: bool = Field(default=False, description="Include a call-to-action")
     include_emoji: bool = Field(default=True)
 
@@ -67,6 +76,8 @@ class GenerateHashtagsRequest(BaseModel):
     topic: str = Field(..., min_length=2, max_length=500)
     platform: Platform
     count: int = Field(default=15, ge=1, le=30)
+    industry: Optional[str] = Field(default=None, max_length=100)
+    audience_persona: Optional[str] = Field(default=None, max_length=200)
     include_trending: bool = True
     niche_specific: bool = True
 
@@ -105,6 +116,7 @@ class BestTimesRequest(BaseModel):
 
 class TrendingTopicsRequest(BaseModel):
     industry: Optional[str] = None
+    audience_persona: Optional[str] = Field(default=None, max_length=200)
     platform: Platform
     count: int = Field(default=10, ge=1, le=25)
 

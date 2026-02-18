@@ -177,6 +177,29 @@ export const PLATFORMS: Record<PlatformType, Platform> = {
   },
 };
 
+export const OAUTH_PLATFORMS: PlatformType[] = [
+  'facebook',
+  'instagram',
+  'tiktok',
+  'linkedin',
+  'twitter',
+  'youtube',
+  'pinterest',
+];
+
+export const MANUAL_CONNECTION_PLATFORMS: PlatformType[] = [
+  'bluesky',
+  'mastodon',
+  'telegram',
+  'entreprenrs',
+  'chrxstians',
+  'iohah',
+];
+
+export function isPlatformType(value: string): value is PlatformType {
+  return value in PLATFORMS;
+}
+
 // ============================================================
 // User & Auth Types
 // ============================================================
@@ -214,7 +237,17 @@ export interface WorkspaceMember {
 // Post Types
 // ============================================================
 
-export type PostStatus = 'draft' | 'scheduled' | 'publishing' | 'published' | 'failed';
+export type PostStatus =
+  | 'draft'
+  | 'pending_approval'
+  | 'approved'
+  | 'rejected'
+  | 'scheduled'
+  | 'pending'
+  | 'publishing'
+  | 'partial'
+  | 'published'
+  | 'failed';
 
 export interface Post {
   id: string;

@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, Button, Badge } from '@/components/ui';
-import { api } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 import { PLATFORMS, type PlatformType } from '@ee-postmind/shared';
 import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
@@ -32,18 +32,78 @@ interface OverviewData {
   recentPosts: any[];
 }
 
+interface AnalyticsInsight {
+  id: string;
+  severity: 'success' | 'warning' | 'info';
+  title: string;
+  description: string;
+  metric?: {
+    label: string;
+    value: string;
+  };
+}
+
 export function AnalyticsPage() {
   const [data, setData] = useState<OverviewData | null>(null);
+  const [topPosts, setTopPosts] = useState<any[]>([]);
+  const [insights, setInsights] = useState<AnalyticsInsight[]>([]);
+  const [selectedPlatform, setSelectedPlatform] = useState<string>('all');
+  const [platformDetails, setPlatformDetails] = useState<any | null>(null);
   const [days, setDays] = useState(30);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const loadOverview = useCallback(async (daysValue: number) => {
+    const [overviewRes, topPostsRes, insightsRes] = await Promise.all([
+      api.analytics.overview(daysValue),
+      api.analytics.topPosts(10),
+      api.analytics.insights(daysValue),
+    ]);
+    setData(overviewRes.data);
+    setTopPosts(Array.isArray(topPostsRes.data) ? topPostsRes.data : []);
+    setInsights(Array.isArray(insightsRes.data?.insights) ? insightsRes.data.insights : []);
+  }, []);
+
+  const loadPlatformDetails = useCallback(async (platform: string, daysValue: number) => {
+    if (platform === 'all') {
+      setPlatformDetails(null);
+      return;
+    }
+    const res = await api.analytics.platform(platform, daysValue);
+    setPlatformDetails(res.data);
+  }, []);
 
   useEffect(() => {
     setLoading(true);
-    api.analytics.overview(days)
-      .then((res) => setData(res.data))
-      .catch(() => setData(null))
+    loadOverview(days)
+      .catch(() => {
+        setData(null);
+        setTopPosts([]);
+        setInsights([]);
+      })
       .finally(() => setLoading(false));
-  }, [days]);
+  }, [days, loadOverview]);
+
+  useEffect(() => {
+    loadPlatformDetails(selectedPlatform, days).catch(() => setPlatformDetails(null));
+  }, [selectedPlatform, days, loadPlatformDetails]);
+
+  async function handleRefresh() {
+    setRefreshing(true);
+    setMessage(null);
+    try {
+      await api.analytics.refresh();
+      await loadOverview(days);
+      await loadPlatformDetails(selectedPlatform, days);
+      setMessage({ type: 'success', text: 'Analytics refresh queued and dashboard data updated.' });
+    } catch (error) {
+      const text = error instanceof ApiError ? error.message : 'Unable to refresh analytics';
+      setMessage({ type: 'error', text });
+    } finally {
+      setRefreshing(false);
+    }
+  }
 
   // Generate demo data for charts when no real data exists
   const trendData = data?.postsPerDay
@@ -100,7 +160,47 @@ export function AnalyticsPage() {
             </button>
           ))}
         </div>
+        <Button variant="secondary" size="sm" loading={refreshing} onClick={handleRefresh}>
+          Refresh analytics
+        </Button>
       </div>
+
+      {message && (
+        <Card className={`p-3 ${message.type === 'error' ? 'border-red-200 bg-red-50/50' : 'border-emerald-200 bg-emerald-50/50'}`}>
+          <p className={`text-sm ${message.type === 'error' ? 'text-red-700' : 'text-emerald-700'}`}>{message.text}</p>
+        </Card>
+      )}
+
+      <Card className="p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-neutral-700">AI-driven Insights</h3>
+          <Badge variant="brand">{days}d window</Badge>
+        </div>
+        {insights.length > 0 ? (
+          <div className="space-y-2">
+            {insights.slice(0, 5).map((insight) => (
+              <div key={insight.id} className="p-3 rounded-lg bg-neutral-50 border border-neutral-100">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-medium text-neutral-800">{insight.title}</p>
+                    <p className="text-xs text-neutral-500 mt-1">{insight.description}</p>
+                    {insight.metric ? (
+                      <p className="text-xs text-neutral-600 mt-1">
+                        {insight.metric.label}: <span className="font-semibold">{insight.metric.value}</span>
+                      </p>
+                    ) : null}
+                  </div>
+                  <Badge variant={insight.severity === 'success' ? 'success' : insight.severity === 'warning' ? 'warning' : 'default'}>
+                    {insight.severity}
+                  </Badge>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-xs text-neutral-400">No insights available yet. Publish and collect more analytics data.</p>
+        )}
+      </Card>
 
       {/* Stat cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -213,6 +313,68 @@ export function AnalyticsPage() {
           </div>
         ) : (
           <p className="text-xs text-neutral-400 py-6 text-center">No published posts yet. Create your first post!</p>
+        )}
+      </Card>
+
+      <Card className="p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-neutral-700">Platform Drilldown</h3>
+          <select
+            value={selectedPlatform}
+            onChange={(e) => setSelectedPlatform(e.target.value)}
+            className="px-3 py-1.5 border border-neutral-200 rounded-lg text-xs bg-white"
+          >
+            <option value="all">All platforms</option>
+            {Object.keys(data?.platformBreakdown || {}).map((platformId) => (
+              <option key={platformId} value={platformId}>
+                {PLATFORMS[platformId as PlatformType]?.name || platformId}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {selectedPlatform === 'all' || !platformDetails ? (
+          <p className="text-xs text-neutral-400">Select a platform to view post-level metrics.</p>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <Card className="p-3"><p className="text-xs text-neutral-500">Impressions</p><p className="text-lg font-bold">{(platformDetails.metrics?.impressions || 0).toLocaleString()}</p></Card>
+              <Card className="p-3"><p className="text-xs text-neutral-500">Likes</p><p className="text-lg font-bold">{(platformDetails.metrics?.likes || 0).toLocaleString()}</p></Card>
+              <Card className="p-3"><p className="text-xs text-neutral-500">Comments</p><p className="text-lg font-bold">{(platformDetails.metrics?.comments || 0).toLocaleString()}</p></Card>
+              <Card className="p-3"><p className="text-xs text-neutral-500">Shares</p><p className="text-lg font-bold">{(platformDetails.metrics?.shares || 0).toLocaleString()}</p></Card>
+            </div>
+            <div className="space-y-2">
+              {(platformDetails.posts || []).slice(0, 5).map((post: any) => (
+                <div key={post.id} className="p-3 rounded-lg bg-neutral-50">
+                  <p className="text-sm text-neutral-800 truncate">{post.content}</p>
+                  <p className="text-xs text-neutral-500 mt-1">
+                    {(post.metrics?.impressions || 0).toLocaleString()} impressions • {(post.metrics?.likes || 0).toLocaleString()} likes
+                  </p>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </Card>
+
+      <Card className="p-4 space-y-3">
+        <h3 className="text-sm font-semibold text-neutral-700">Top Posts by Engagement</h3>
+        {topPosts.length > 0 ? (
+          <div className="space-y-2">
+            {topPosts.slice(0, 8).map((post: any) => (
+              <div key={post.id} className="flex items-center justify-between p-3 rounded-lg bg-neutral-50">
+                <div className="min-w-0">
+                  <p className="text-sm text-neutral-800 truncate">{post.post?.content || 'Untitled post'}</p>
+                  <p className="text-xs text-neutral-500 mt-1">
+                    {PLATFORMS[post.platform as PlatformType]?.name || post.platform}
+                  </p>
+                </div>
+                <Badge variant="brand">Score {Math.round(post.engagementScore || 0)}</Badge>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-xs text-neutral-400">No top post data yet.</p>
         )}
       </Card>
     </div>

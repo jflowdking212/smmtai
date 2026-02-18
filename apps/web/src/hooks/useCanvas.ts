@@ -36,7 +36,6 @@ export function useCanvas(canvasId: string, initialSize: CanvasSize) {
       canvas.dispose();
       canvasRef.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canvasId]);
 
   const saveState = useCallback(() => {
@@ -88,7 +87,7 @@ export function useCanvas(canvasId: string, initialSize: CanvasSize) {
     saveState();
   }, [saveState]);
 
-  const addShape = useCallback((type: 'rect' | 'circle' | 'line') => {
+  const addShape = useCallback((type: 'rect' | 'circle' | 'line' | 'arrow') => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     let shape: fabric.FabricObject;
@@ -102,6 +101,16 @@ export function useCanvas(canvasId: string, initialSize: CanvasSize) {
       case 'line':
         shape = new fabric.Line([100, 100, 300, 100], { stroke: '#6B7280', strokeWidth: 3 });
         break;
+      case 'arrow': {
+        const line = new fabric.Line([100, 150, 300, 150], { stroke: '#6B7280', strokeWidth: 3 });
+        const head = new fabric.Triangle({
+          left: 300, top: 150, width: 20, height: 20,
+          fill: '#6B7280', angle: 90, originX: 'center', originY: 'center',
+        });
+        const group = new fabric.Group([line, head], { left: 100, top: 130 });
+        shape = group;
+        break;
+      }
     }
     canvas.add(shape);
     canvas.setActiveObject(shape);
@@ -139,6 +148,20 @@ export function useCanvas(canvasId: string, initialSize: CanvasSize) {
   const resizeCanvas = useCallback((size: CanvasSize) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+    const oldW = canvas.width!;
+    const oldH = canvas.height!;
+    const scaleX = size.width / oldW;
+    const scaleY = size.height / oldH;
+    // Proportionally reflow all objects
+    canvas.getObjects().forEach((obj) => {
+      obj.set({
+        left: (obj.left || 0) * scaleX,
+        top: (obj.top || 0) * scaleY,
+        scaleX: (obj.scaleX || 1) * scaleX,
+        scaleY: (obj.scaleY || 1) * scaleY,
+      });
+      obj.setCoords();
+    });
     canvas.setDimensions({ width: size.width, height: size.height });
     canvas.renderAll();
     saveState();
@@ -147,7 +170,23 @@ export function useCanvas(canvasId: string, initialSize: CanvasSize) {
   const setBackground = useCallback((color: string) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    canvas.backgroundColor = color;
+    // Support gradient strings: "linear(#hex1, #hex2)"
+    const gradMatch = color.match(/^linear\((.+),\s*(.+)\)$/);
+    if (gradMatch) {
+      const grad = new fabric.Gradient({
+        type: 'linear',
+        coords: { x1: 0, y1: 0, x2: canvas.width!, y2: canvas.height! },
+        colorStops: [
+          { offset: 0, color: gradMatch[1].trim() },
+          { offset: 1, color: gradMatch[2].trim() },
+        ],
+      });
+      canvas.backgroundImage = undefined;
+      (canvas as any).backgroundColor = grad;
+    } else {
+      canvas.backgroundImage = undefined;
+      canvas.backgroundColor = color;
+    }
     canvas.renderAll();
     saveState();
   }, [saveState]);

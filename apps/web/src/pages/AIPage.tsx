@@ -7,6 +7,13 @@ import {
 } from 'lucide-react';
 
 type Tab = 'caption' | 'hashtags' | 'image-prompt' | 'rewrite' | 'translate' | 'compliance' | 'best-times' | 'trending';
+type HistoryEntry = {
+  id: string;
+  tab: Tab;
+  platform: string;
+  createdAt: string;
+  content: string;
+};
 
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: 'caption', label: 'Caption', icon: <Sparkles className="w-4 h-4" /> },
@@ -20,12 +27,43 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
 ];
 
 const TONES = ['professional', 'casual', 'witty', 'formal', 'inspirational', 'educational', 'persuasive'];
+const BRAND_VOICE_PROFILES = ['formal', 'casual', 'witty', 'professional'];
 const PLATFORMS = ['facebook', 'instagram', 'tiktok', 'linkedin', 'twitter', 'youtube', 'pinterest', 'bluesky', 'mastodon', 'telegram', 'entreprenrs', 'chrxstians', 'iohah'];
+const HISTORY_LIMIT = 12;
+
+function summarizeResult(tab: Tab, value: any): string {
+  if (!value || typeof value !== 'object') return '';
+  switch (tab) {
+    case 'caption':
+      return typeof value.caption === 'string' ? value.caption : '';
+    case 'hashtags':
+      return Array.isArray(value.hashtags) ? value.hashtags.map((tag: string) => `#${tag}`).join(' ') : '';
+    case 'image-prompt':
+      return typeof value.prompt === 'string' ? value.prompt : '';
+    case 'rewrite':
+      return typeof value.rewritten === 'string' ? value.rewritten : '';
+    case 'translate':
+      return typeof value.translated === 'string' ? value.translated : '';
+    case 'compliance':
+      return `Compliance: ${value.is_safe ? 'Safe' : 'Issues detected'} (${Math.round((value.score || 0) * 100)}% risk)`;
+    case 'best-times':
+      return Array.isArray(value.times)
+        ? value.times.map((item: any) => `${item.day || ''} ${item.time || ''}`.trim()).filter(Boolean).join(', ')
+        : '';
+    case 'trending':
+      return Array.isArray(value.topics)
+        ? value.topics.map((item: any) => item.topic).filter(Boolean).join(', ')
+        : '';
+    default:
+      return '';
+  }
+}
 
 export function AIPage() {
   const [tab, setTab] = useState<Tab>('caption');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [copied, setCopied] = useState(false);
 
   // Form state
@@ -36,6 +74,11 @@ export function AIPage() {
   const [language, setLanguage] = useState('en');
   const [targetLang, setTargetLang] = useState('Spanish');
   const [industry, setIndustry] = useState('');
+  const [audiencePersona, setAudiencePersona] = useState('');
+  const [brandVoiceProfile, setBrandVoiceProfile] = useState('');
+  const [brandVoice, setBrandVoice] = useState('');
+
+  const optionalValue = (value: string) => value.trim() || undefined;
 
   async function handleGenerate() {
     setLoading(true);
@@ -44,10 +87,27 @@ export function AIPage() {
       let res: any;
       switch (tab) {
         case 'caption':
-          res = await api.ai.caption({ topic, platform, tone, language, include_emoji: true, include_cta: true });
+          res = await api.ai.caption({
+            topic,
+            platform,
+            tone,
+            language,
+            include_emoji: true,
+            include_cta: true,
+            brand_voice_profile: brandVoiceProfile || undefined,
+            brand_voice: optionalValue(brandVoice),
+            industry: optionalValue(industry),
+            audience_persona: optionalValue(audiencePersona),
+          });
           break;
         case 'hashtags':
-          res = await api.ai.hashtags({ topic, platform, count: 15 });
+          res = await api.ai.hashtags({
+            topic,
+            platform,
+            count: 15,
+            industry: optionalValue(industry),
+            audience_persona: optionalValue(audiencePersona),
+          });
           break;
         case 'image-prompt':
           res = await api.ai.imagePrompt({ topic, platform, style: 'modern, clean, professional' });
@@ -62,13 +122,32 @@ export function AIPage() {
           res = await api.ai.compliance({ content, platform });
           break;
         case 'best-times':
-          res = await api.ai.bestTimes({ platform, industry: industry || undefined });
+          res = await api.ai.bestTimes({ platform, industry: optionalValue(industry) });
           break;
         case 'trending':
-          res = await api.ai.trending({ platform, industry: industry || undefined, count: 10 });
+          res = await api.ai.trending({
+            platform,
+            industry: optionalValue(industry),
+            audience_persona: optionalValue(audiencePersona),
+            count: 10,
+          });
           break;
       }
-      setResult(res?.data || res);
+      const data = res?.data || res;
+      setResult(data);
+      const summary = summarizeResult(tab, data).trim();
+      if (summary) {
+        setHistory((prev) => [
+          {
+            id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            tab,
+            platform,
+            createdAt: new Date().toISOString(),
+            content: summary,
+          },
+          ...prev,
+        ].slice(0, HISTORY_LIMIT));
+      }
     } catch (err: any) {
       setResult({ error: err.message || 'AI service unavailable' });
     } finally {
@@ -82,8 +161,10 @@ export function AIPage() {
     setTimeout(() => setCopied(false), 2000);
   }
 
-  const needsTopic = ['caption', 'hashtags', 'image-prompt', 'best-times', 'trending'].includes(tab);
+  const needsTopic = ['caption', 'hashtags', 'image-prompt'].includes(tab);
   const needsContent = ['rewrite', 'translate', 'compliance'].includes(tab);
+  const showsIndustry = ['caption', 'hashtags', 'best-times', 'trending'].includes(tab);
+  const showsAudiencePersona = ['caption', 'hashtags', 'trending'].includes(tab);
 
   return (
     <div className="space-y-6">
@@ -150,25 +231,72 @@ export function AIPage() {
           {/* Topic input */}
           {needsTopic && (
             <div>
-              <label className="block text-sm font-medium text-neutral-700 mb-1">
-                {tab === 'best-times' || tab === 'trending' ? 'Industry (optional)' : 'Topic'}
-              </label>
-              {tab === 'best-times' || tab === 'trending' ? (
+              <label className="block text-sm font-medium text-neutral-700 mb-1">Topic</label>
+              <textarea
+                value={topic}
+                onChange={(e) => setTopic(e.target.value)}
+                placeholder="Describe what your post should be about..."
+                rows={3}
+                className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-sm resize-none focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue"
+              />
+            </div>
+          )}
+
+          {tab === 'caption' && (
+            <>
+              <div>
+                <label htmlFor="brand-voice-profile" className="block text-sm font-medium text-neutral-700 mb-1">Brand Voice Profile (optional)</label>
+                <select
+                  id="brand-voice-profile"
+                  value={brandVoiceProfile}
+                  onChange={(e) => setBrandVoiceProfile(e.target.value)}
+                  className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue"
+                >
+                  <option value="">Select a profile</option>
+                  {BRAND_VOICE_PROFILES.map((profile) => (
+                    <option key={profile} value={profile}>
+                      {profile.charAt(0).toUpperCase() + profile.slice(1)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label htmlFor="brand-voice-details" className="block text-sm font-medium text-neutral-700 mb-1">Brand Voice Details (optional)</label>
                 <input
-                  value={industry}
-                  onChange={(e) => setIndustry(e.target.value)}
-                  placeholder="e.g. Technology, Fitness, Fashion..."
+                  id="brand-voice-details"
+                  value={brandVoice}
+                  onChange={(e) => setBrandVoice(e.target.value)}
+                  placeholder="e.g. Bold, practical, and data-driven"
                   className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue"
                 />
-              ) : (
-                <textarea
-                  value={topic}
-                  onChange={(e) => setTopic(e.target.value)}
-                  placeholder="Describe what your post should be about..."
-                  rows={3}
-                  className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-sm resize-none focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue"
-                />
-              )}
+              </div>
+            </>
+          )}
+
+          {showsIndustry && (
+            <div>
+              <label htmlFor="industry" className="block text-sm font-medium text-neutral-700 mb-1">Industry (optional)</label>
+              <input
+                id="industry"
+                value={industry}
+                onChange={(e) => setIndustry(e.target.value)}
+                placeholder="e.g. Technology, Fitness, Fashion..."
+                className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue"
+              />
+            </div>
+          )}
+
+          {showsAudiencePersona && (
+            <div>
+              <label htmlFor="audience-persona" className="block text-sm font-medium text-neutral-700 mb-1">Audience Persona (optional)</label>
+              <input
+                id="audience-persona"
+                value={audiencePersona}
+                onChange={(e) => setAudiencePersona(e.target.value)}
+                placeholder="e.g. Small business owners launching their first campaign"
+                className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue"
+              />
             </div>
           )}
 
@@ -397,6 +525,40 @@ export function AIPage() {
               ))}
             </div>
           )}
+
+          <div className="pt-4 border-t border-neutral-100 space-y-3">
+            <div className="flex items-center justify-between">
+              <h4 className="text-sm font-semibold text-neutral-800">Recent history</h4>
+              {history.length > 0 && (
+                <button
+                  onClick={() => setHistory([])}
+                  className="text-xs text-neutral-500 hover:text-neutral-700 transition-colors"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+            {history.length === 0 ? (
+              <p className="text-xs text-neutral-400">No history yet.</p>
+            ) : (
+              <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                {history.map((entry) => (
+                  <div key={entry.id} className="p-3 bg-neutral-50 rounded-lg">
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <Badge variant="default" className="text-[10px] uppercase tracking-wide">
+                        {entry.tab}
+                      </Badge>
+                      <span className="text-[11px] text-neutral-400">
+                        {new Date(entry.createdAt).toLocaleTimeString()}
+                      </span>
+                    </div>
+                    <p className="text-xs text-neutral-600 mb-1">{entry.platform}</p>
+                    <p className="text-sm text-neutral-800 whitespace-pre-wrap break-words">{entry.content}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </Card>
       </div>
     </div>

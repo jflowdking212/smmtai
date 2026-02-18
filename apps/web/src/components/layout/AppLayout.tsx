@@ -4,9 +4,11 @@ import { cn } from '@/lib/utils';
 import { Avatar } from '@/components/ui';
 import { useAuthStore } from '@/stores/authStore';
 import { api } from '@/lib/api';
+import { FeedbackWidget } from '@/components/FeedbackWidget';
 import {
   LayoutDashboard,
   PenSquare,
+  History,
   Calendar,
   BarChart3,
   Link2,
@@ -22,11 +24,13 @@ import {
   Bell,
   Search,
   LogOut,
+  HelpCircle,
 } from 'lucide-react';
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
   { name: 'Compose', href: '/compose', icon: PenSquare },
+  { name: 'Post History', href: '/posts', icon: History },
   { name: 'Calendar', href: '/calendar', icon: Calendar },
   { name: 'Analytics', href: '/analytics', icon: BarChart3 },
   { name: 'Connections', href: '/connections', icon: Link2 },
@@ -37,6 +41,7 @@ const navigation = [
 const bottomNav = [
   { name: 'Team', href: '/team', icon: Users },
   { name: 'Billing', href: '/billing', icon: CreditCard },
+  { name: 'Help', href: '/help', icon: HelpCircle },
   { name: 'Settings', href: '/settings', icon: Settings },
 ];
 
@@ -193,6 +198,9 @@ export function AppLayout() {
           <Outlet />
         </main>
       </div>
+
+      {/* Feedback widget */}
+      <FeedbackWidget />
     </div>
   );
 }

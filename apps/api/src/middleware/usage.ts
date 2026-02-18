@@ -5,6 +5,65 @@ import { AuthRequest } from './auth.js';
 import { SUBSCRIPTION_LIMITS, type SubscriptionTier } from '@ee-postmind/shared';
 
 type UsageMetric = 'posts' | 'ai_generations' | 'social_accounts';
+type UsageAccessInput = {
+  tier: SubscriptionTier;
+  status: string;
+  currentPeriodEnd: Date | null;
+};
+
+type UsageAccessDecision =
+  | { allowed: true }
+  | { allowed: false; code: string; message: string };
+
+function parseGracePeriodDays(value: string | undefined): number {
+  const parsed = Number.parseInt(value || '7', 10);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : 7;
+}
+
+const billingGracePeriodDays = parseGracePeriodDays(process.env.BILLING_GRACE_PERIOD_DAYS);
+
+export function resolveUsageAccess(
+  input: UsageAccessInput,
+  now: Date = new Date(),
+  gracePeriodDays: number = billingGracePeriodDays,
+): UsageAccessDecision {
+  if (input.tier === 'free') {
+    return { allowed: true };
+  }
+
+  const status = input.status.trim().toLowerCase();
+  if (status === 'active' || status === 'trialing') {
+    return { allowed: true };
+  }
+
+  if (status === 'past_due') {
+    if (!input.currentPeriodEnd) {
+      return {
+        allowed: false,
+        code: 'BILLING_ACTION_REQUIRED',
+        message: 'Your subscription payment is overdue. Update your billing method to continue.',
+      };
+    }
+
+    const graceEndsAt = new Date(input.currentPeriodEnd);
+    graceEndsAt.setDate(graceEndsAt.getDate() + Math.max(0, gracePeriodDays));
+    if (now <= graceEndsAt) {
+      return { allowed: true };
+    }
+
+    return {
+      allowed: false,
+      code: 'BILLING_GRACE_EXPIRED',
+      message: 'Your billing grace period has ended. Update your payment method to continue.',
+    };
+  }
+
+  return {
+    allowed: false,
+    code: 'SUBSCRIPTION_INACTIVE',
+    message: 'Your subscription is inactive. Update billing to continue using paid features.',
+  };
+}
 
 export function checkUsage(metric: UsageMetric) {
   return async (req: AuthRequest, _res: Response, next: NextFunction) => {
@@ -22,6 +81,15 @@ export function checkUsage(metric: UsageMetric) {
       }
 
       const tier = subscription.tier as SubscriptionTier;
+      const access = resolveUsageAccess({
+        tier,
+        status: subscription.status,
+        currentPeriodEnd: subscription.currentPeriodEnd,
+      });
+      if (!access.allowed) {
+        throw new AppError(access.message, 402, access.code);
+      }
+
       const limits = SUBSCRIPTION_LIMITS[tier];
       const limit = limits[metric === 'posts' ? 'postsPerMonth' : metric === 'ai_generations' ? 'aiGenerationsPerMonth' : 'socialAccounts'];
 

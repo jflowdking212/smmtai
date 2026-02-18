@@ -3,9 +3,16 @@ import { authenticate, AuthRequest } from '../middleware/auth.js';
 import { checkUsage } from '../middleware/usage.js';
 import { connectionService } from '../services/connection.service.js';
 import { config } from '../config/index.js';
-import type { PlatformType } from '@ee-postmind/shared';
+import {
+  MANUAL_CONNECTION_PLATFORMS,
+  OAUTH_PLATFORMS,
+  isPlatformType,
+  type PlatformType,
+} from '@ee-postmind/shared';
 
 export const connectionRouter = Router();
+const oauthPlatforms = new Set<PlatformType>(OAUTH_PLATFORMS);
+const manualPlatforms = new Set<PlatformType>(MANUAL_CONNECTION_PLATFORMS);
 
 // List all connections
 connectionRouter.get(
@@ -34,7 +41,21 @@ connectionRouter.post(
       if (!req.workspaceId) {
         return res.status(400).json({ success: false, error: { code: 'NO_WORKSPACE', message: 'Workspace required' } });
       }
-      const platform = req.params.platform as PlatformType;
+      const rawPlatform = req.params.platform as string;
+      if (!isPlatformType(rawPlatform)) {
+        return res.status(400).json({ success: false, error: { code: 'INVALID_PLATFORM', message: 'Unsupported platform' } });
+      }
+      const platform = rawPlatform as PlatformType;
+      if (!oauthPlatforms.has(platform)) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: 'UNSUPPORTED_OAUTH_PLATFORM',
+            message: 'This platform uses manual connection',
+          },
+        });
+      }
+
       const authUrl = await connectionService.initiateConnection(req.workspaceId, platform);
       res.json({ success: true, data: { authUrl } });
     } catch (err) {
@@ -46,9 +67,17 @@ connectionRouter.post(
 // OAuth callback
 connectionRouter.get(
   '/:platform/callback',
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  async (req: AuthRequest, res: Response) => {
     try {
-      const platform = req.params.platform as PlatformType;
+      const rawPlatform = req.params.platform as string;
+      if (!isPlatformType(rawPlatform)) {
+        return res.redirect(`${config.frontend.url}/connections?error=invalid_platform`);
+      }
+      const platform = rawPlatform as PlatformType;
+      if (!oauthPlatforms.has(platform)) {
+        return res.redirect(`${config.frontend.url}/connections?error=invalid_connection_mode`);
+      }
+
       const code = req.query.code as string;
       const state = req.query.state as string;
 
@@ -56,16 +85,14 @@ connectionRouter.get(
         return res.redirect(`${config.frontend.url}/connections?error=missing_params`);
       }
 
-      // Decode workspace from state
       let workspaceId: string;
       try {
-        const parsed = JSON.parse(Buffer.from(state, 'base64url').toString());
-        workspaceId = parsed.workspaceId;
+        workspaceId = connectionService.getWorkspaceIdFromState(platform, state);
       } catch {
         return res.redirect(`${config.frontend.url}/connections?error=invalid_state`);
       }
 
-      await connectionService.completeConnection(workspaceId, platform, code);
+      await connectionService.completeConnection(workspaceId, platform, code, state);
       res.redirect(`${config.frontend.url}/connections?connected=${platform}`);
     } catch (err) {
       res.redirect(`${config.frontend.url}/connections?error=connection_failed`);
@@ -83,9 +110,23 @@ connectionRouter.post(
       if (!req.workspaceId) {
         return res.status(400).json({ success: false, error: { code: 'NO_WORKSPACE', message: 'Workspace required' } });
       }
-      const platform = req.params.platform as PlatformType;
+      const rawPlatform = req.params.platform as string;
+      if (!isPlatformType(rawPlatform)) {
+        return res.status(400).json({ success: false, error: { code: 'INVALID_PLATFORM', message: 'Unsupported platform' } });
+      }
+      const platform = rawPlatform as PlatformType;
+      if (!manualPlatforms.has(platform)) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: 'UNSUPPORTED_MANUAL_PLATFORM',
+            message: 'This platform requires OAuth connection',
+          },
+        });
+      }
+
       const { credentials } = req.body;
-      if (!credentials) {
+      if (!credentials || typeof credentials !== 'string') {
         return res.status(400).json({ success: false, error: { code: 'MISSING_CREDENTIALS', message: 'Credentials required' } });
       }
 
@@ -108,6 +149,23 @@ connectionRouter.delete(
       }
       await connectionService.disconnect(req.workspaceId, req.params.connectionId as string);
       res.json({ success: true, data: { message: 'Disconnected' } });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+// Connection health check
+connectionRouter.post(
+  '/:connectionId/health-check',
+  authenticate,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      if (!req.workspaceId) {
+        return res.status(400).json({ success: false, error: { code: 'NO_WORKSPACE', message: 'Workspace required' } });
+      }
+      const health = await connectionService.checkConnectionHealth(req.workspaceId, req.params.connectionId as string);
+      res.json({ success: true, data: health });
     } catch (err) {
       next(err);
     }

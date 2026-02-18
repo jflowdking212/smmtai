@@ -20,7 +20,12 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     api.auth
       .me()
       .then((res) => {
-        setAuth(res.data.user, '', res.data.workspaceId);
+        const token = useAuthStore.getState().accessToken;
+        if (!token) {
+          logout();
+          return;
+        }
+        setAuth(res.data.user, token, res.data.workspaceId);
       })
       .catch(() => {
         logout();

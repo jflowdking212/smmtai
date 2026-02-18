@@ -1,7 +1,11 @@
 import { Router, Response, NextFunction } from 'express';
 import { authenticate, AuthRequest, requireRole } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
-import { createWorkspaceSchema, inviteMemberSchema } from '../utils/validators.js';
+import {
+  createWorkspaceSchema,
+  inviteMemberSchema,
+  workspaceInviteActionSchema,
+} from '../utils/validators.js';
 import { workspaceService } from '../services/workspace.service.js';
 
 export const workspaceRouter = Router();
@@ -64,6 +68,35 @@ workspaceRouter.post(
         req.body.role,
       );
       res.status(201).json({ success: true, data: member });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+// Accept invitation
+workspaceRouter.post(
+  '/invitations/accept',
+  authenticate,
+  validate(workspaceInviteActionSchema),
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const result = await workspaceService.acceptInvite(req.body.token, req.userId!);
+      res.json({ success: true, data: result });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+// Decline invitation
+workspaceRouter.post(
+  '/invitations/decline',
+  validate(workspaceInviteActionSchema),
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const result = await workspaceService.declineInvite(req.body.token, req.userId);
+      res.json({ success: true, data: result });
     } catch (err) {
       next(err);
     }

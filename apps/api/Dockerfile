@@ -30,9 +30,9 @@ COPY --from=builder /app/packages/shared/dist ./node_modules/@ee-postmind/shared
 COPY --from=builder /app/packages/db ./node_modules/@ee-postmind/db
 
 USER api
-EXPOSE 4000
+EXPOSE 4016
 
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
-  CMD wget -q --spider http://localhost:4000/api/v1/health || exit 1
+  CMD wget -q --spider http://localhost:4016/api/v1/health || exit 1
 
 CMD ["node", "dist/index.js"]

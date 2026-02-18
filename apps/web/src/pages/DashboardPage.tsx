@@ -1,5 +1,7 @@
+import { useState } from 'react';
 import { Card, Badge, Button } from '@/components/ui';
 import { PLATFORMS, type PlatformType } from '@ee-postmind/shared';
+import { OnboardingWizard, shouldShowOnboarding } from '@/components/OnboardingWizard';
 import {
   TrendingUp,
   Users,
@@ -27,8 +29,15 @@ const connectedPlatforms: PlatformType[] = [
 ];
 
 export function DashboardPage() {
+  const [showOnboarding, setShowOnboarding] = useState(shouldShowOnboarding);
+
   return (
     <div className="space-y-8">
+      {/* Onboarding wizard */}
+      {showOnboarding && (
+        <OnboardingWizard onDismiss={() => setShowOnboarding(false)} />
+      )}
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>

@@ -2,8 +2,19 @@ import Stripe from 'stripe';
 import { config } from '../config/index.js';
 import { prisma } from '../config/database.js';
 import { AppError } from '../middleware/errorHandler.js';
+import { emailService } from './email.service.js';
 
-const stripe = new Stripe(config.stripe.secretKey);
+let _stripe: Stripe | null = null;
+
+function getStripe(): Stripe {
+  if (!_stripe) {
+    if (!config.stripe.secretKey) {
+      throw new AppError('Stripe is not configured. Set STRIPE_SECRET_KEY in .env', 503, 'STRIPE_NOT_CONFIGURED');
+    }
+    _stripe = new Stripe(config.stripe.secretKey);
+  }
+  return _stripe;
+}
 
 // Price IDs — set these in .env after creating products in Stripe Dashboard
 const PRICE_IDS: Record<string, string> = {
@@ -37,7 +48,7 @@ export class StripeService {
 
     if (!workspace) throw new AppError('Workspace not found', 404, 'WORKSPACE_NOT_FOUND');
 
-    const customer = await stripe.customers.create({
+    const customer = await getStripe().customers.create({
       email: workspace.owner.email,
       name: workspace.name,
       metadata: { workspaceId, ownerId: workspace.ownerId },
@@ -63,7 +74,7 @@ export class StripeService {
 
     const customerId = await this.getOrCreateCustomer(workspaceId);
 
-    const session = await stripe.checkout.sessions.create({
+    const session = await getStripe().checkout.sessions.create({
       customer: customerId,
       mode: 'subscription',
       payment_method_types: ['card'],
@@ -85,7 +96,7 @@ export class StripeService {
   async createPortalSession(workspaceId: string, returnUrl: string): Promise<string> {
     const customerId = await this.getOrCreateCustomer(workspaceId);
 
-    const session = await stripe.billingPortal.sessions.create({
+    const session = await getStripe().billingPortal.sessions.create({
       customer: customerId,
       return_url: returnUrl,
     });
@@ -131,7 +142,7 @@ export class StripeService {
   async handleWebhookEvent(body: Buffer, signature: string) {
     let event: Stripe.Event;
     try {
-      event = stripe.webhooks.constructEvent(body, signature, config.stripe.webhookSecret);
+      event = getStripe().webhooks.constructEvent(body, signature, config.stripe.webhookSecret);
     } catch {
       throw new AppError('Invalid webhook signature', 400, 'INVALID_SIGNATURE');
     }
@@ -207,6 +218,19 @@ export class StripeService {
     const workspaceId = sub.metadata?.workspaceId;
     if (!workspaceId) return;
 
+    const workspace = await prisma.workspace.findUnique({
+      where: { id: workspaceId },
+      select: {
+        name: true,
+        owner: {
+          select: {
+            email: true,
+            name: true,
+          },
+        },
+      },
+    });
+
     await prisma.subscription.update({
       where: { workspaceId },
       data: {
@@ -217,12 +241,36 @@ export class StripeService {
         cancelAtPeriodEnd: false,
       },
     });
+
+    if (workspace) {
+      await emailService.sendSubscriptionCanceledEmail({
+        email: workspace.owner.email,
+        name: workspace.owner.name,
+        workspaceName: workspace.name,
+        billingLink: `${config.frontend.url}/billing`,
+      });
+    }
   }
 
   private async handlePaymentFailed(invoice: Stripe.Invoice) {
     const customerId = invoice.customer as string;
     const subscription = await prisma.subscription.findUnique({
       where: { stripeCustomerId: customerId },
+      select: {
+        id: true,
+        workspaceId: true,
+        workspace: {
+          select: {
+            name: true,
+            owner: {
+              select: {
+                email: true,
+                name: true,
+              },
+            },
+          },
+        },
+      },
     });
     if (!subscription) return;
 
@@ -231,7 +279,16 @@ export class StripeService {
       data: { status: 'past_due' },
     });
 
-    // TODO: Send payment failed notification email
+    const nextRetryAt = typeof invoice.next_payment_attempt === 'number'
+      ? new Date(invoice.next_payment_attempt * 1000)
+      : null;
+    await emailService.sendPaymentFailedEmail({
+      email: subscription.workspace.owner.email,
+      name: subscription.workspace.owner.name,
+      workspaceName: subscription.workspace.name,
+      nextRetryAt,
+      billingLink: `${config.frontend.url}/billing`,
+    });
     console.log(`[BILLING] Payment failed for workspace: ${subscription.workspaceId}`);
   }
 
@@ -239,8 +296,42 @@ export class StripeService {
     const customerId = invoice.customer as string;
     const subscription = await prisma.subscription.findUnique({
       where: { stripeCustomerId: customerId },
+      select: {
+        id: true,
+        status: true,
+        workspace: {
+          select: {
+            name: true,
+            owner: {
+              select: {
+                email: true,
+                name: true,
+              },
+            },
+          },
+        },
+      },
     });
     if (!subscription) return;
+
+    const shouldSendRecoveryEmail = subscription.status === 'past_due';
+    await prisma.subscription.update({
+      where: { id: subscription.id },
+      data: { status: 'active' },
+    });
+
+    if (shouldSendRecoveryEmail) {
+      const paidAt = typeof invoice.status_transitions?.paid_at === 'number'
+        ? new Date(invoice.status_transitions.paid_at * 1000)
+        : null;
+      await emailService.sendPaymentRecoveredEmail({
+        email: subscription.workspace.owner.email,
+        name: subscription.workspace.owner.name,
+        workspaceName: subscription.workspace.name,
+        paidAt,
+        billingLink: `${config.frontend.url}/billing`,
+      });
+    }
 
     // Reset usage counters for new billing period
     const now = new Date();

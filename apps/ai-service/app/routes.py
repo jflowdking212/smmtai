@@ -1,5 +1,6 @@
 """AI generation API routes."""
 
+import hmac
 from fastapi import APIRouter, HTTPException, Header
 from typing import Optional
 from app.models import (
@@ -13,6 +14,7 @@ from app.models import (
     TrendingTopicsRequest, TrendingTopicsResult,
 )
 from app import ai
+from app.config import get_settings
 from app.cache import get_cached, set_cached
 
 router = APIRouter(prefix="/api/v1/ai", tags=["AI"])
@@ -20,9 +22,9 @@ router = APIRouter(prefix="/api/v1/ai", tags=["AI"])
 
 async def _verify_api_key(x_api_key: Optional[str] = Header(None)):
     """Simple internal API key check (called from Node.js API)."""
-    # In production, validate against a shared secret
-    if not x_api_key:
-        raise HTTPException(status_code=401, detail="API key required")
+    expected_key = get_settings().ai_service_key
+    if not x_api_key or not hmac.compare_digest(x_api_key, expected_key):
+        raise HTTPException(status_code=401, detail="Invalid API key")
 
 
 @router.post("/caption", response_model=GeneratedCaption)

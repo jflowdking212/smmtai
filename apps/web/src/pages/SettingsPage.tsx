@@ -1,11 +1,18 @@
-import { useState } from 'react';
-import { Card, Button, Badge } from '@/components/ui';
+import { useEffect, useState } from 'react';
+import { Card, Button } from '@/components/ui';
 import { useAuthStore } from '@/stores/authStore';
+import { api } from '@/lib/api';
 import {
-  User, Bell, Shield, Palette, Globe, Key, Trash2, Save,
+  User, Bell, Shield, Palette, Key, Trash2, Save,
 } from 'lucide-react';
 
 type SettingsTab = 'profile' | 'notifications' | 'security' | 'appearance';
+type NotificationPreferenceKey =
+  | 'postPublished'
+  | 'postFailed'
+  | 'upcomingScheduled'
+  | 'weeklyAnalyticsDigest'
+  | 'monthlyAnalyticsDigest';
 
 const TABS: { id: SettingsTab; label: string; icon: React.ReactNode }[] = [
   { id: 'profile', label: 'Profile', icon: <User className="w-4 h-4" /> },
@@ -22,9 +29,50 @@ export function SettingsPage() {
   const [name, setName] = useState(user?.name || '');
   const [email, setEmail] = useState(user?.email || '');
   const [timezone, setTimezone] = useState('America/New_York');
-  const [emailNotifs, setEmailNotifs] = useState(true);
-  const [pushNotifs, setPushNotifs] = useState(true);
+  const [notificationPrefs, setNotificationPrefs] = useState({
+    postPublished: true,
+    postFailed: true,
+    upcomingScheduled: true,
+    weeklyAnalyticsDigest: true,
+    monthlyAnalyticsDigest: true,
+  });
+  const [notificationLoadingKey, setNotificationLoadingKey] = useState<NotificationPreferenceKey | null>(null);
+  const [notificationMessage, setNotificationMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('light');
+
+  useEffect(() => {
+    let active = true;
+    api.users.getNotificationPreferences()
+      .then((res) => {
+        if (!active) return;
+        setNotificationPrefs(res.data);
+      })
+      .catch(() => {
+        if (!active) return;
+        setNotificationMessage({ type: 'error', text: 'Unable to load notification preferences.' });
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  async function toggleNotificationPreference(key: NotificationPreferenceKey) {
+    const nextValue = !notificationPrefs[key];
+    setNotificationLoadingKey(key);
+    setNotificationMessage(null);
+    try {
+      const res = await api.users.updateNotificationPreferences({ [key]: nextValue });
+      setNotificationPrefs(res.data);
+      setNotificationMessage({ type: 'success', text: 'Notification preferences updated.' });
+    } catch (error) {
+      setNotificationMessage({
+        type: 'error',
+        text: error instanceof Error ? error.message : 'Unable to update notification preferences.',
+      });
+    } finally {
+      setNotificationLoadingKey(null);
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -99,11 +147,39 @@ export function SettingsPage() {
           {tab === 'notifications' && (
             <Card className="p-6 space-y-5">
               <h2 className="text-lg font-heading font-semibold text-neutral-900">Notifications</h2>
+              {notificationMessage ? (
+                <div className={`text-sm ${notificationMessage.type === 'success' ? 'text-green-700' : 'text-red-600'}`}>
+                  {notificationMessage.text}
+                </div>
+              ) : null}
 
               <div className="space-y-4">
                 {[
-                  { label: 'Email notifications', desc: 'Receive email when posts are published or fail', checked: emailNotifs, onChange: setEmailNotifs },
-                  { label: 'Push notifications', desc: 'Browser push for scheduled posts and reminders', checked: pushNotifs, onChange: setPushNotifs },
+                  {
+                    key: 'postPublished' as const,
+                    label: 'Post published emails',
+                    desc: 'Receive an email when posts are published successfully.',
+                  },
+                  {
+                    key: 'postFailed' as const,
+                    label: 'Post failed emails',
+                    desc: 'Receive an email when publishing fails.',
+                  },
+                  {
+                    key: 'upcomingScheduled' as const,
+                    label: 'Upcoming schedule reminders',
+                    desc: 'Receive reminders before scheduled posts go live.',
+                  },
+                  {
+                    key: 'weeklyAnalyticsDigest' as const,
+                    label: 'Weekly analytics digest',
+                    desc: 'Receive a weekly email digest with performance highlights.',
+                  },
+                  {
+                    key: 'monthlyAnalyticsDigest' as const,
+                    label: 'Monthly analytics digest',
+                    desc: 'Receive a monthly summary with trends and top posts.',
+                  },
                 ].map((item) => (
                   <div key={item.label} className="flex items-center justify-between p-4 bg-neutral-50 rounded-lg">
                     <div>
@@ -111,11 +187,12 @@ export function SettingsPage() {
                       <p className="text-xs text-neutral-500">{item.desc}</p>
                     </div>
                     <button
-                      onClick={() => item.onChange(!item.checked)}
-                      className={`w-11 h-6 rounded-full transition-colors relative ${item.checked ? 'bg-brand-blue' : 'bg-neutral-300'}`}
+                      onClick={() => void toggleNotificationPreference(item.key)}
+                      disabled={notificationLoadingKey === item.key}
+                      className={`w-11 h-6 rounded-full transition-colors relative ${notificationPrefs[item.key] ? 'bg-brand-blue' : 'bg-neutral-300'} ${notificationLoadingKey === item.key ? 'opacity-60 cursor-not-allowed' : ''}`}
                     >
-                      <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform ${item.checked ? 'left-5.5 translate-x-0' : 'left-0.5'}`}
-                        style={{ left: item.checked ? '22px' : '2px' }} />
+                      <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform ${notificationPrefs[item.key] ? 'left-5.5 translate-x-0' : 'left-0.5'}`}
+                        style={{ left: notificationPrefs[item.key] ? '22px' : '2px' }} />
                     </button>
                   </div>
                 ))}

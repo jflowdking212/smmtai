@@ -11,3 +11,6 @@ coverage
 __pycache__
 *.pyc
 .venv
+playwright-report
+test-results
+apps/ai-service/venv/

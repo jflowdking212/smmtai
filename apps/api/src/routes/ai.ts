@@ -6,7 +6,7 @@ import { AppError } from '../middleware/errorHandler.js';
 
 export const aiRouter = Router();
 
-const AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://localhost:8000';
+const AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://localhost:8016';
 const AI_SERVICE_KEY = process.env.AI_SERVICE_KEY || 'dev-key';
 
 async function proxyToAI(path: string, body: any): Promise<any> {
@@ -34,7 +34,7 @@ aiRouter.post(
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const result = await proxyToAI('/caption', req.body);
-      await incrementUsage(req.userId!, 'ai_generations');
+      await incrementUsage(req.workspaceId!, 'ai_generations');
       res.json({ success: true, data: result });
     } catch (err) { next(err); }
   },
@@ -46,7 +46,7 @@ aiRouter.post(
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const result = await proxyToAI('/hashtags', req.body);
-      await incrementUsage(req.userId!, 'ai_generations');
+      await incrementUsage(req.workspaceId!, 'ai_generations');
       res.json({ success: true, data: result });
     } catch (err) { next(err); }
   },
@@ -58,7 +58,7 @@ aiRouter.post(
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const result = await proxyToAI('/image-prompt', req.body);
-      await incrementUsage(req.userId!, 'ai_generations');
+      await incrementUsage(req.workspaceId!, 'ai_generations');
       res.json({ success: true, data: result });
     } catch (err) { next(err); }
   },
@@ -70,7 +70,7 @@ aiRouter.post(
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const result = await proxyToAI('/rewrite', req.body);
-      await incrementUsage(req.userId!, 'ai_generations');
+      await incrementUsage(req.workspaceId!, 'ai_generations');
       res.json({ success: true, data: result });
     } catch (err) { next(err); }
   },
@@ -82,7 +82,7 @@ aiRouter.post(
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const result = await proxyToAI('/translate', req.body);
-      await incrementUsage(req.userId!, 'ai_generations');
+      await incrementUsage(req.workspaceId!, 'ai_generations');
       res.json({ success: true, data: result });
     } catch (err) { next(err); }
   },
@@ -94,6 +94,7 @@ aiRouter.post(
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const result = await proxyToAI('/compliance', req.body);
+      await incrementUsage(req.workspaceId!, 'ai_generations');
       res.json({ success: true, data: result });
     } catch (err) { next(err); }
   },
@@ -105,6 +106,7 @@ aiRouter.post(
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const result = await proxyToAI('/best-times', req.body);
+      await incrementUsage(req.workspaceId!, 'ai_generations');
       res.json({ success: true, data: result });
     } catch (err) { next(err); }
   },
@@ -116,6 +118,7 @@ aiRouter.post(
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const result = await proxyToAI('/trending', req.body);
+      await incrementUsage(req.workspaceId!, 'ai_generations');
       res.json({ success: true, data: result });
     } catch (err) { next(err); }
   },

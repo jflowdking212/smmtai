@@ -1,17 +1,54 @@
-import { useState, FormEvent } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useState, FormEvent, useEffect } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Button, Input } from '@/components/ui';
 import { api, ApiError } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
-import { Sparkles } from 'lucide-react';
+import { Sparkles, Chrome, Github, Facebook } from 'lucide-react';
+
+function getOAuthErrorMessage(errorCode: string | null): string | null {
+  if (!errorCode) return null;
+
+  switch (errorCode) {
+    case 'access_denied':
+      return 'You cancelled the social login request.';
+    case 'oauth_not_configured':
+      return 'This social login provider is not configured yet.';
+    case 'oauth_email_required':
+      return 'Your social account must provide an email address to continue.';
+    case 'invalid_oauth_state':
+      return 'Your social login session expired. Please try again.';
+    case 'oauth_failed':
+      return 'Social login failed. Please try again.';
+    default:
+      return 'Unable to complete social login.';
+  }
+}
 
 export function LoginPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const setAuth = useAuthStore((s) => s.setAuth);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [inviteNotice, setInviteNotice] = useState('');
+  const verified = searchParams.get('verified');
+  const inviteToken = searchParams.get('invite_token');
+  const inviteAction = searchParams.get('invite_action');
+  const oauthError = getOAuthErrorMessage(searchParams.get('oauth_error'));
+
+  function startOAuth(provider: 'google' | 'github' | 'facebook') {
+    window.location.href = api.auth.oauthUrl(provider);
+  }
+
+  useEffect(() => {
+    if (!inviteToken || inviteAction !== 'decline') return;
+    api.workspaces
+      .declineInvite(inviteToken)
+      .then(() => setInviteNotice('Invitation declined.'))
+      .catch(() => setInviteNotice('We could not decline this invitation.'));
+  }, [inviteAction, inviteToken]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -21,6 +58,11 @@ export function LoginPage() {
     try {
       const res = await api.auth.login({ email, password });
       setAuth(res.data.user, res.data.accessToken, res.data.workspaceId);
+
+      if (inviteToken && inviteAction !== 'decline') {
+        await api.workspaces.acceptInvite(inviteToken);
+      }
+
       navigate('/');
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Something went wrong');
@@ -65,6 +107,41 @@ export function LoginPage() {
           {error && (
             <div className="mb-6 p-3 rounded-xl bg-red-50 text-red-700 text-sm">{error}</div>
           )}
+
+          {oauthError && (
+            <div className="mb-6 p-3 rounded-xl bg-red-50 text-red-700 text-sm">{oauthError}</div>
+          )}
+
+          {inviteNotice && (
+            <div className="mb-6 p-3 rounded-xl bg-emerald-50 text-emerald-700 text-sm">{inviteNotice}</div>
+          )}
+
+          {verified === '1' && (
+            <div className="mb-6 p-3 rounded-xl bg-emerald-50 text-emerald-700 text-sm">
+              Email verified successfully. You can sign in now.
+            </div>
+          )}
+
+          <div className="space-y-2 mb-5">
+            <Button type="button" variant="secondary" className="w-full" onClick={() => startOAuth('google')}>
+              <Chrome className="w-4 h-4" /> Continue with Google
+            </Button>
+            <Button type="button" variant="secondary" className="w-full" onClick={() => startOAuth('github')}>
+              <Github className="w-4 h-4" /> Continue with GitHub
+            </Button>
+            <Button type="button" variant="secondary" className="w-full" onClick={() => startOAuth('facebook')}>
+              <Facebook className="w-4 h-4" /> Continue with Facebook
+            </Button>
+          </div>
+
+          <div className="relative mb-5">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t border-neutral-200" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-neutral-50 px-2 text-neutral-400">Or continue with email</span>
+            </div>
+          </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <Input

@@ -12,12 +12,14 @@
     "lint": "turbo run lint",
     "type-check": "turbo run type-check",
     "test": "turbo run test",
+    "test:e2e": "npm run test:e2e --workspace @ee-postmind/web --",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,css,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,css,md}\""
   },
   "devDependencies": {
-    "turbo": "^2.4.0",
-    "prettier": "^3.4.0"
+    "@typescript-eslint/parser": "^8.56.0",
+    "prettier": "^3.4.0",
+    "turbo": "^2.4.0"
   },
   "engines": {
     "node": ">=20.0.0"

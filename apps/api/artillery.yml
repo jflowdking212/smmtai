@@ -1,0 +1,103 @@
+config:
+  target: "http://localhost:3001"
+  phases:
+    - duration: 30
+      arrivalRate: 10
+      name: "Warm-up"
+    - duration: 60
+      arrivalRate: 50
+      name: "Ramp-up"
+    - duration: 120
+      arrivalRate: 100
+      name: "Sustained load"
+    - duration: 60
+      arrivalRate: 200
+      name: "Peak load (1000+ concurrent)"
+  defaults:
+    headers:
+      Content-Type: "application/json"
+
+scenarios:
+  - name: "Health check"
+    weight: 20
+    flow:
+      - get:
+          url: "/api/v1/health"
+
+  - name: "Auth flow"
+    weight: 30
+    flow:
+      - post:
+          url: "/api/v1/auth/login"
+          json:
+            email: "loadtest@example.com"
+            password: "LoadTest123!"
+          capture:
+            - json: "$.data.accessToken"
+              as: "token"
+      - get:
+          url: "/api/v1/auth/me"
+          headers:
+            Authorization: "Bearer {{ token }}"
+
+  - name: "Posts CRUD"
+    weight: 25
+    flow:
+      - post:
+          url: "/api/v1/auth/login"
+          json:
+            email: "loadtest@example.com"
+            password: "LoadTest123!"
+          capture:
+            - json: "$.data.accessToken"
+              as: "token"
+      - get:
+          url: "/api/v1/posts"
+          headers:
+            Authorization: "Bearer {{ token }}"
+      - post:
+          url: "/api/v1/posts"
+          headers:
+            Authorization: "Bearer {{ token }}"
+          json:
+            content: "Load test post {{ $timestamp }}"
+            platforms:
+              - connectionId: "test-conn-1"
+                platform: "twitter"
+            isDraft: true
+
+  - name: "Analytics overview"
+    weight: 15
+    flow:
+      - post:
+          url: "/api/v1/auth/login"
+          json:
+            email: "loadtest@example.com"
+            password: "LoadTest123!"
+          capture:
+            - json: "$.data.accessToken"
+              as: "token"
+      - get:
+          url: "/api/v1/analytics/overview?days=30"
+          headers:
+            Authorization: "Bearer {{ token }}"
+
+  - name: "Schedule operations"
+    weight: 10
+    flow:
+      - post:
+          url: "/api/v1/auth/login"
+          json:
+            email: "loadtest@example.com"
+            password: "LoadTest123!"
+          capture:
+            - json: "$.data.accessToken"
+              as: "token"
+      - get:
+          url: "/api/v1/schedule/stats"
+          headers:
+            Authorization: "Bearer {{ token }}"
+      - get:
+          url: "/api/v1/schedule/calendar"
+          headers:
+            Authorization: "Bearer {{ token }}"

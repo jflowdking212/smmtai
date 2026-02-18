@@ -1,5 +1,9 @@
 import { prisma } from '../config/database.js';
 import { AppError } from '../middleware/errorHandler.js';
+import {
+  notificationService,
+  type NotificationPreferences,
+} from './notification.service.js';
 
 export class UserService {
   async getProfile(userId: string) {
@@ -51,6 +55,33 @@ export class UserService {
       data: { avatar: avatarUrl },
       select: { id: true, avatar: true },
     });
+  }
+
+  async getNotificationPreferences(userId: string): Promise<NotificationPreferences> {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true },
+    });
+    if (!user) {
+      throw new AppError('User not found', 404, 'USER_NOT_FOUND');
+    }
+
+    return notificationService.getUserPreferences(userId);
+  }
+
+  async updateNotificationPreferences(
+    userId: string,
+    data: Partial<NotificationPreferences>,
+  ): Promise<NotificationPreferences> {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true },
+    });
+    if (!user) {
+      throw new AppError('User not found', 404, 'USER_NOT_FOUND');
+    }
+
+    return notificationService.updateUserPreferences(userId, data);
   }
 }
 

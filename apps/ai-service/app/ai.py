@@ -5,6 +5,7 @@ from typing import Optional
 from openai import AsyncOpenAI
 from app.config import get_settings
 from app.models import (
+    BrandVoiceProfile,
     PLATFORM_CHAR_LIMITS,
     GenerateCaptionRequest, GeneratedCaption,
     GenerateHashtagsRequest, GeneratedHashtags,
@@ -17,6 +18,12 @@ from app.models import (
 )
 
 _client: Optional[AsyncOpenAI] = None
+BRAND_VOICE_PROFILE_GUIDANCE: dict[str, str] = {
+    BrandVoiceProfile.formal.value: "Use polished, precise language with authoritative structure.",
+    BrandVoiceProfile.casual.value: "Use conversational, approachable language that feels natural and friendly.",
+    BrandVoiceProfile.witty.value: "Use light, clever phrasing while staying clear and brand-safe.",
+    BrandVoiceProfile.professional.value: "Use confident, credible language focused on value and outcomes.",
+}
 
 
 def _get_client() -> AsyncOpenAI:
@@ -43,19 +50,78 @@ async def _chat(system: str, user: str, json_mode: bool = True) -> str:
     return response.choices[0].message.content or ""
 
 
+def _normalize_optional_text(value: Optional[str]) -> Optional[str]:
+    if value is None:
+        return None
+    normalized = value.strip()
+    return normalized or None
+
+
+def _render_rule_lines(lines: list[str]) -> str:
+    return "\n".join(f"- {line}" for line in lines if line.strip())
+
+
+def _build_personalization_lines(
+    brand_voice_profile: Optional[str] = None,
+    brand_voice: Optional[str] = None,
+    industry: Optional[str] = None,
+    audience_persona: Optional[str] = None,
+) -> list[str]:
+    lines: list[str] = []
+
+    normalized_profile = _normalize_optional_text(brand_voice_profile)
+    if normalized_profile:
+        guidance = BRAND_VOICE_PROFILE_GUIDANCE.get(normalized_profile)
+        if guidance:
+            lines.append(f"Brand voice profile: {normalized_profile} — {guidance}")
+        else:
+            lines.append(f"Brand voice profile: {normalized_profile}")
+
+    normalized_voice = _normalize_optional_text(brand_voice)
+    if normalized_voice:
+        lines.append(f"Brand voice details: {normalized_voice}")
+
+    normalized_industry = _normalize_optional_text(industry)
+    if normalized_industry:
+        lines.append(
+            f"Industry context: {normalized_industry}. Use terminology and examples relevant to this industry."
+        )
+
+    normalized_audience = _normalize_optional_text(audience_persona)
+    if normalized_audience:
+        lines.append(
+            f"Audience persona: {normalized_audience}. Tailor benefits, vocabulary, and examples for this audience."
+        )
+
+    return lines
+
+
+def _resolve_audience_persona(primary: Optional[str], fallback: Optional[str]) -> Optional[str]:
+    return _normalize_optional_text(primary) or _normalize_optional_text(fallback)
+
+
 async def generate_caption(req: GenerateCaptionRequest) -> GeneratedCaption:
     limit = req.max_length or PLATFORM_CHAR_LIMITS.get(req.platform.value, 2200)
+    audience_persona = _resolve_audience_persona(req.audience_persona, req.audience)
+    rules = [
+        f"Tone: {req.tone.value}",
+        f"Max {limit} characters (STRICT)",
+        "Include relevant emojis" if req.include_emoji else "No emojis",
+        "End with a clear call-to-action" if req.include_cta else "",
+        f"Language: {req.language}",
+    ]
+    rules.extend(
+        _build_personalization_lines(
+            brand_voice_profile=req.brand_voice_profile.value if req.brand_voice_profile else None,
+            brand_voice=req.brand_voice,
+            industry=req.industry,
+            audience_persona=audience_persona,
+        )
+    )
 
     system = f"""You are an expert social media copywriter. Generate a single engaging {req.platform.value} caption.
 Rules:
-- Tone: {req.tone.value}
-- Max {limit} characters (STRICT)
-- {"Include relevant emojis" if req.include_emoji else "No emojis"}
-- {"End with a clear call-to-action" if req.include_cta else ""}
-- {f"Brand voice: {req.brand_voice}" if req.brand_voice else ""}
-- {f"Industry: {req.industry}" if req.industry else ""}
-- {f"Target audience: {req.audience}" if req.audience else ""}
-- Language: {req.language}
+{_render_rule_lines(rules)}
 
 Respond in JSON: {{"caption": "...", "hashtags": ["..."], "cta": "..." or null}}"""
 
@@ -73,12 +139,26 @@ Respond in JSON: {{"caption": "...", "hashtags": ["..."], "cta": "..." or null}}
 
 
 async def generate_hashtags(req: GenerateHashtagsRequest) -> GeneratedHashtags:
+    rules = [
+        "Mix of high-volume and niche-specific hashtags",
+        "Include currently trending hashtags when relevant"
+        if req.include_trending
+        else "Avoid broad trending hashtags unless directly relevant",
+        "Focus on niche-specific, less competitive hashtags"
+        if req.niche_specific
+        else "Balance niche and broad discovery hashtags",
+        "No # prefix in output",
+    ]
+    rules.extend(
+        _build_personalization_lines(
+            industry=req.industry,
+            audience_persona=req.audience_persona,
+        )
+    )
+
     system = f"""You are a social media hashtag strategist. Generate {req.count} hashtags for {req.platform.value}.
 Rules:
-- Mix of high-volume and niche-specific hashtags
-- {"Include currently trending hashtags" if req.include_trending else ""}
-- {"Focus on niche-specific, less competitive hashtags" if req.niche_specific else ""}
-- No # prefix in output
+{_render_rule_lines(rules)}
 
 Respond in JSON: {{"hashtags": ["..."], "trending": ["..."], "niche": ["..."]}}"""
 
@@ -209,16 +289,30 @@ Respond in JSON: {{"times": [{{"day": "Monday", "time": "09:00", "score": 0.95, 
 
 
 async def suggest_trending_topics(req: TrendingTopicsRequest) -> TrendingTopicsResult:
+    personalization_lines = _build_personalization_lines(
+        industry=req.industry,
+        audience_persona=req.audience_persona,
+    )
+    rules = [
+        f"Industry focus: {req.industry}" if req.industry else "General trending topics",
+        "Include relevance score (0-1)",
+        "Include suggested hashtags per topic",
+        "Mix evergreen + timely topics",
+    ]
+    rules.extend(personalization_lines)
+    audience_persona = _normalize_optional_text(req.audience_persona)
+
     system = f"""You are a social media trend analyst. Suggest {req.count} trending or high-performing content topics for {req.platform.value}.
 Rules:
-- {f"Industry focus: {req.industry}" if req.industry else "General trending topics"}
-- Include relevance score (0-1)
-- Include suggested hashtags per topic
-- Mix evergreen + timely topics
+{_render_rule_lines(rules)}
 
 Respond in JSON: {{"topics": [{{"topic": "...", "relevance": 0.9, "hashtags": ["..."], "content_idea": "..."}}, ...]}}"""
 
-    user = f"Trending topics for {req.platform.value}" + (f" in {req.industry}" if req.industry else "")
+    user = (
+        f"Trending topics for {req.platform.value}"
+        + (f" in {req.industry}" if req.industry else "")
+        + (f" targeting {audience_persona}" if audience_persona else "")
+    )
     raw = await _chat(system, user)
     data = json.loads(raw)
 

@@ -1,5 +1,6 @@
 import { Router, Response, NextFunction } from 'express';
 import { authService } from '../services/auth.service.js';
+import { oauthService, isOAuthProvider } from '../services/oauth.service.js';
 import { validate } from '../middleware/validate.js';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
 import { authLimiter } from '../middleware/rateLimiter.js';
@@ -8,8 +9,10 @@ import {
   loginSchema,
   forgotPasswordSchema,
   resetPasswordSchema,
+  verifyEmailSchema,
 } from '../utils/validators.js';
 import { config } from '../config/index.js';
+import { AppError } from '../middleware/errorHandler.js';
 
 export const authRouter = Router();
 
@@ -20,6 +23,12 @@ const COOKIE_OPTIONS = {
   maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
   path: '/',
 };
+
+function redirectOAuthError(res: Response, code: string) {
+  const redirectUrl = new URL('/auth/login', config.frontend.url);
+  redirectUrl.searchParams.set('oauth_error', code);
+  return res.redirect(redirectUrl.toString());
+}
 
 // Register
 authRouter.post(
@@ -63,6 +72,68 @@ authRouter.post(
       });
     } catch (err) {
       next(err);
+    }
+  },
+);
+
+// OAuth login redirect
+authRouter.get(
+  '/oauth/:provider',
+  authLimiter,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const providerParam = req.params.provider as string;
+      if (!isOAuthProvider(providerParam)) {
+        return res.status(400).json({
+          success: false,
+          error: { code: 'INVALID_OAUTH_PROVIDER', message: 'Unsupported OAuth provider' },
+        });
+      }
+
+      const nextPath = typeof req.query.next === 'string' ? req.query.next : '/';
+      const url = oauthService.getAuthorizationUrl(providerParam, nextPath);
+      return res.redirect(url);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+// OAuth callback
+authRouter.get(
+  '/oauth/:provider/callback',
+  async (req: AuthRequest, res: Response) => {
+    const providerParam = req.params.provider as string;
+    if (!isOAuthProvider(providerParam)) {
+      return redirectOAuthError(res, 'invalid_oauth_provider');
+    }
+
+    if (typeof req.query.error === 'string') {
+      return redirectOAuthError(res, req.query.error);
+    }
+
+    const code = typeof req.query.code === 'string' ? req.query.code : '';
+    const state = typeof req.query.state === 'string' ? req.query.state : '';
+    if (!code || !state) {
+      return redirectOAuthError(res, 'missing_oauth_params');
+    }
+
+    try {
+      const { identity, nextPath } = await oauthService.exchangeCodeForIdentity(
+        providerParam,
+        code,
+        state,
+      );
+      const result = await authService.loginWithOAuth(identity);
+      res.cookie('refreshToken', result.refreshToken, COOKIE_OPTIONS);
+
+      const redirectUrl = new URL('/auth/oauth/callback', config.frontend.url);
+      redirectUrl.searchParams.set('accessToken', result.accessToken);
+      redirectUrl.searchParams.set('next', nextPath);
+      return res.redirect(redirectUrl.toString());
+    } catch (err) {
+      const errorCode = err instanceof AppError ? err.code.toLowerCase() : 'oauth_failed';
+      return redirectOAuthError(res, errorCode);
     }
   },
 );
@@ -165,6 +236,39 @@ authRouter.post(
       res.json({ success: true, data: { message: 'Password has been reset.' } });
     } catch (err) {
       next(err);
+    }
+  },
+);
+
+// Verify email (API)
+authRouter.post(
+  '/verify-email',
+  authLimiter,
+  validate(verifyEmailSchema),
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      await authService.verifyEmail(req.body.token);
+      res.json({ success: true, data: { message: 'Email verified successfully.' } });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+// Verify email (link redirect)
+authRouter.get(
+  '/verify-email',
+  async (req: AuthRequest, res: Response) => {
+    const token = req.query.token as string | undefined;
+    if (!token) {
+      return res.redirect(`${config.frontend.url}/auth/login?verified=0`);
+    }
+
+    try {
+      await authService.verifyEmail(token);
+      return res.redirect(`${config.frontend.url}/auth/login?verified=1`);
+    } catch {
+      return res.redirect(`${config.frontend.url}/auth/login?verified=0`);
     }
   },
 );
