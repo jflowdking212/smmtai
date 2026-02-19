@@ -4,10 +4,10 @@ import { useAuthStore } from '@/stores/authStore';
 import { useTheme } from '@/components/ThemeProvider';
 import { api } from '@/lib/api';
 import {
-  User, Bell, Shield, Palette, Key, Trash2, Save,
+  User, Bell, Shield, Palette, Key, Trash2, Save, Settings2, Mail, Cloud, CheckCircle, XCircle,
 } from 'lucide-react';
 
-type SettingsTab = 'profile' | 'notifications' | 'security' | 'appearance';
+type SettingsTab = 'profile' | 'notifications' | 'security' | 'appearance' | 'admin';
 type NotificationPreferenceKey =
   | 'postPublished'
   | 'postFailed'
@@ -15,17 +15,26 @@ type NotificationPreferenceKey =
   | 'weeklyAnalyticsDigest'
   | 'monthlyAnalyticsDigest';
 
-const TABS: { id: SettingsTab; label: string; icon: React.ReactNode }[] = [
+const BASE_TABS: { id: SettingsTab; label: string; icon: React.ReactNode }[] = [
   { id: 'profile', label: 'Profile', icon: <User className="w-4 h-4" /> },
   { id: 'notifications', label: 'Notifications', icon: <Bell className="w-4 h-4" /> },
   { id: 'security', label: 'Security', icon: <Shield className="w-4 h-4" /> },
   { id: 'appearance', label: 'Appearance', icon: <Palette className="w-4 h-4" /> },
 ];
 
+const ADMIN_TAB: { id: SettingsTab; label: string; icon: React.ReactNode } = { id: 'admin', label: 'Admin', icon: <Settings2 className="w-4 h-4" /> };
+
 export function SettingsPage() {
   const [tab, setTab] = useState<SettingsTab>('profile');
   const { user } = useAuthStore();
   const { theme, setTheme } = useTheme();
+  const [isOwner, setIsOwner] = useState(false);
+
+  // Admin state
+  const [smtpConfig, setSmtpConfig] = useState({ smtp_host: '', smtp_port: '587', smtp_user: '', smtp_pass: '', smtp_from: '', smtp_secure: 'true' });
+  const [storageConfig, setStorageConfig] = useState({ storage_provider: '', storage_endpoint: '', storage_region: '', storage_bucket: '', storage_access_key: '', storage_secret_key: '' });
+  const [adminMsg, setAdminMsg] = useState<{ section: string; type: 'success' | 'error'; text: string } | null>(null);
+  const [adminLoading, setAdminLoading] = useState<string | null>(null);
 
   // Form states
   const [name, setName] = useState(user?.name || '');
@@ -52,6 +61,20 @@ export function SettingsPage() {
         if (!active) return;
         setNotificationMessage({ type: 'error', text: 'Unable to load notification preferences.' });
       });
+    // Check if user is owner by trying to load admin settings
+    api.admin.getSmtp()
+      .then((res) => {
+        if (!active) return;
+        setIsOwner(true);
+        setSmtpConfig((prev) => ({ ...prev, ...res.data, smtp_pass: '' }));
+      })
+      .catch(() => { /* Not owner or error — hide admin tab */ });
+    api.admin.getStorage()
+      .then((res) => {
+        if (!active) return;
+        setStorageConfig((prev) => ({ ...prev, ...res.data, storage_access_key: '', storage_secret_key: '' }));
+      })
+      .catch(() => { /* ignore */ });
     return () => {
       active = false;
     };
@@ -75,6 +98,62 @@ export function SettingsPage() {
     }
   }
 
+  const tabs = isOwner ? [...BASE_TABS, ADMIN_TAB] : BASE_TABS;
+
+  async function saveSmtp() {
+    setAdminLoading('smtp-save');
+    setAdminMsg(null);
+    try {
+      const res = await api.admin.saveSmtp(smtpConfig);
+      setSmtpConfig((prev) => ({ ...prev, ...res.data, smtp_pass: '' }));
+      setAdminMsg({ section: 'smtp', type: 'success', text: 'SMTP settings saved.' });
+    } catch (err: any) {
+      setAdminMsg({ section: 'smtp', type: 'error', text: err.message || 'Failed to save SMTP settings.' });
+    } finally {
+      setAdminLoading(null);
+    }
+  }
+
+  async function testSmtp() {
+    setAdminLoading('smtp-test');
+    setAdminMsg(null);
+    try {
+      const res = await api.admin.testSmtp(user?.email || '');
+      setAdminMsg({ section: 'smtp', type: 'success', text: res.data.message });
+    } catch (err: any) {
+      setAdminMsg({ section: 'smtp', type: 'error', text: err.message || 'SMTP test failed.' });
+    } finally {
+      setAdminLoading(null);
+    }
+  }
+
+  async function saveStorage() {
+    setAdminLoading('storage-save');
+    setAdminMsg(null);
+    try {
+      const res = await api.admin.saveStorage(storageConfig);
+      setStorageConfig((prev) => ({ ...prev, ...res.data, storage_access_key: '', storage_secret_key: '' }));
+      setAdminMsg({ section: 'storage', type: 'success', text: 'Storage settings saved.' });
+    } catch (err: any) {
+      setAdminMsg({ section: 'storage', type: 'error', text: err.message || 'Failed to save storage settings.' });
+    } finally {
+      setAdminLoading(null);
+    }
+  }
+
+  async function testStorage() {
+    setAdminLoading('storage-test');
+    setAdminMsg(null);
+    try {
+      const res = await api.admin.testStorage();
+      setAdminMsg({ section: 'storage', type: 'success', text: res.data.message });
+    } catch (err: any) {
+      setAdminMsg({ section: 'storage', type: 'error', text: err.message || 'Storage test failed.' });
+    } finally {
+      setAdminLoading(null);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -86,7 +165,7 @@ export function SettingsPage() {
         {/* Sidebar */}
         <div className="w-48 shrink-0 hidden md:block">
           <nav className="space-y-1">
-            {TABS.map((t) => (
+            {tabs.map((t) => (
               <button
                 key={t.id}
                 onClick={() => setTab(t.id)}
@@ -251,6 +330,146 @@ export function SettingsPage() {
                 </div>
               </div>
             </Card>
+          )}
+
+          {tab === 'admin' && isOwner && (
+            <div className="space-y-6">
+              {/* SMTP Email Configuration */}
+              <Card className="p-6 space-y-5">
+                <div className="flex items-center gap-2">
+                  <Mail className="w-5 h-5 text-brand-blue" />
+                  <h2 className="text-lg font-heading font-semibold text-neutral-900">SMTP Email Configuration</h2>
+                </div>
+                <p className="text-sm text-neutral-500">Configure your own SMTP server for sending emails. Leave empty to use the default email provider.</p>
+
+                {adminMsg?.section === 'smtp' && (
+                  <div className={`flex items-center gap-2 text-sm ${adminMsg.type === 'success' ? 'text-green-700' : 'text-red-600'}`}>
+                    {adminMsg.type === 'success' ? <CheckCircle className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
+                    {adminMsg.text}
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-700 mb-1">SMTP Host</label>
+                    <input value={smtpConfig.smtp_host} onChange={(e) => setSmtpConfig({ ...smtpConfig, smtp_host: e.target.value })}
+                      placeholder="smtp.gmail.com" className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-700 mb-1">SMTP Port</label>
+                    <input value={smtpConfig.smtp_port} onChange={(e) => setSmtpConfig({ ...smtpConfig, smtp_port: e.target.value })}
+                      placeholder="587" className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-700 mb-1">Username</label>
+                    <input value={smtpConfig.smtp_user} onChange={(e) => setSmtpConfig({ ...smtpConfig, smtp_user: e.target.value })}
+                      placeholder="user@example.com" className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-700 mb-1">Password</label>
+                    <input type="password" value={smtpConfig.smtp_pass} onChange={(e) => setSmtpConfig({ ...smtpConfig, smtp_pass: e.target.value })}
+                      placeholder="Enter password" className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-700 mb-1">From Address</label>
+                    <input value={smtpConfig.smtp_from} onChange={(e) => setSmtpConfig({ ...smtpConfig, smtp_from: e.target.value })}
+                      placeholder="App Name <noreply@example.com>" className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-700 mb-1">Secure (TLS)</label>
+                    <select value={smtpConfig.smtp_secure} onChange={(e) => setSmtpConfig({ ...smtpConfig, smtp_secure: e.target.value })}
+                      className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-sm">
+                      <option value="true">Yes (port 465)</option>
+                      <option value="false">No / STARTTLS (port 587)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="flex gap-3">
+                  <Button onClick={() => void saveSmtp()} disabled={adminLoading === 'smtp-save'}>
+                    <Save className="w-4 h-4" /> {adminLoading === 'smtp-save' ? 'Saving...' : 'Save SMTP Settings'}
+                  </Button>
+                  <Button variant="secondary" onClick={() => void testSmtp()} disabled={adminLoading === 'smtp-test'}>
+                    <Mail className="w-4 h-4" /> {adminLoading === 'smtp-test' ? 'Sending...' : 'Send Test Email'}
+                  </Button>
+                </div>
+              </Card>
+
+              {/* Cloud Storage Configuration */}
+              <Card className="p-6 space-y-5">
+                <div className="flex items-center gap-2">
+                  <Cloud className="w-5 h-5 text-brand-blue" />
+                  <h2 className="text-lg font-heading font-semibold text-neutral-900">Cloud Storage (S3-Compatible)</h2>
+                </div>
+                <p className="text-sm text-neutral-500">Configure S3-compatible cloud storage for media uploads. Supports Wasabi and DigitalOcean Spaces.</p>
+
+                {adminMsg?.section === 'storage' && (
+                  <div className={`flex items-center gap-2 text-sm ${adminMsg.type === 'success' ? 'text-green-700' : 'text-red-600'}`}>
+                    {adminMsg.type === 'success' ? <CheckCircle className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
+                    {adminMsg.text}
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700 mb-1">Storage Provider</label>
+                  <select value={storageConfig.storage_provider} onChange={(e) => {
+                    const provider = e.target.value;
+                    const defaults: Record<string, { endpoint: string; region: string }> = {
+                      wasabi: { endpoint: 'https://s3.wasabisys.com', region: 'us-east-1' },
+                      digitalocean: { endpoint: 'https://nyc3.digitaloceanspaces.com', region: 'nyc3' },
+                    };
+                    setStorageConfig({
+                      ...storageConfig,
+                      storage_provider: provider,
+                      storage_endpoint: defaults[provider]?.endpoint || storageConfig.storage_endpoint,
+                      storage_region: defaults[provider]?.region || storageConfig.storage_region,
+                    });
+                  }} className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-sm">
+                    <option value="">Select a provider...</option>
+                    <option value="wasabi">Wasabi</option>
+                    <option value="digitalocean">DigitalOcean Spaces</option>
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-700 mb-1">Endpoint URL</label>
+                    <input value={storageConfig.storage_endpoint} onChange={(e) => setStorageConfig({ ...storageConfig, storage_endpoint: e.target.value })}
+                      placeholder="https://s3.wasabisys.com" className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-700 mb-1">Region</label>
+                    <input value={storageConfig.storage_region} onChange={(e) => setStorageConfig({ ...storageConfig, storage_region: e.target.value })}
+                      placeholder="us-east-1" className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-700 mb-1">Bucket Name</label>
+                    <input value={storageConfig.storage_bucket} onChange={(e) => setStorageConfig({ ...storageConfig, storage_bucket: e.target.value })}
+                      placeholder="my-media-bucket" className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-sm" />
+                  </div>
+                  <div className="hidden sm:block" />
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-700 mb-1">Access Key</label>
+                    <input value={storageConfig.storage_access_key} onChange={(e) => setStorageConfig({ ...storageConfig, storage_access_key: e.target.value })}
+                      placeholder="Enter access key" className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-700 mb-1">Secret Key</label>
+                    <input type="password" value={storageConfig.storage_secret_key} onChange={(e) => setStorageConfig({ ...storageConfig, storage_secret_key: e.target.value })}
+                      placeholder="Enter secret key" className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-sm" />
+                  </div>
+                </div>
+
+                <div className="flex gap-3">
+                  <Button onClick={() => void saveStorage()} disabled={adminLoading === 'storage-save'}>
+                    <Save className="w-4 h-4" /> {adminLoading === 'storage-save' ? 'Saving...' : 'Save Storage Settings'}
+                  </Button>
+                  <Button variant="secondary" onClick={() => void testStorage()} disabled={adminLoading === 'storage-test'}>
+                    <Cloud className="w-4 h-4" /> {adminLoading === 'storage-test' ? 'Testing...' : 'Test Connection'}
+                  </Button>
+                </div>
+              </Card>
+            </div>
           )}
         </div>
       </div>

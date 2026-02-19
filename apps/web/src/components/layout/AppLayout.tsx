@@ -5,6 +5,7 @@ import { Avatar } from '@/components/ui';
 import { useAuthStore } from '@/stores/authStore';
 import { api } from '@/lib/api';
 import { FeedbackWidget } from '@/components/FeedbackWidget';
+import { AIChatbot } from '@/components/AIChatbot';
 import {
   LayoutDashboard,
   PenSquare,
@@ -25,6 +26,8 @@ import {
   Search,
   LogOut,
   HelpCircle,
+  MessageCircle,
+  BookOpen,
 } from 'lucide-react';
 
 const navigation = [
@@ -36,6 +39,8 @@ const navigation = [
   { name: 'Connections', href: '/connections', icon: Link2 },
   { name: 'Templates', href: '/templates', icon: Palette },
   { name: 'AI Assistant', href: '/ai', icon: Sparkles },
+  { name: 'Conversations', href: '/conversations', icon: MessageCircle },
+  { name: 'Knowledge Base', href: '/knowledge-base', icon: BookOpen },
 ];
 
 const bottomNav = [
@@ -201,6 +206,8 @@ export function AppLayout() {
 
       {/* Feedback widget */}
       <FeedbackWidget />
+      {/* AI Chatbot */}
+      <AIChatbot />
     </div>
   );
 }

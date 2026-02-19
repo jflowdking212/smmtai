@@ -16,6 +16,8 @@ import { AIPage } from '@/pages/AIPage';
 import { SettingsPage } from '@/pages/SettingsPage';
 import { BillingPage } from '@/pages/BillingPage';
 import { HelpPage } from '@/pages/HelpPage';
+import { ConversationsPage } from '@/pages/ConversationsPage';
+import { KnowledgeBasePage } from '@/pages/KnowledgeBasePage';
 import { LoginPage } from '@/pages/auth/LoginPage';
 import { RegisterPage } from '@/pages/auth/RegisterPage';
 import { ForgotPasswordPage } from '@/pages/auth/ForgotPasswordPage';
@@ -70,6 +72,8 @@ export default function App() {
             <Route path="/team" element={<SettingsPage />} />
             <Route path="/billing" element={<BillingPage />} />
             <Route path="/help" element={<HelpPage />} />
+            <Route path="/conversations" element={<ConversationsPage />} />
+            <Route path="/knowledge-base" element={<KnowledgeBasePage />} />
           </Route>
               </Routes>
             </BrowserRouter>

@@ -1,4 +1,5 @@
 import { AppError } from '../middleware/errorHandler.js';
+import { getSmtpConfig } from './admin-settings.service.js';
 
 interface SendEmailInput {
   to: string;
@@ -12,6 +13,13 @@ export class EmailService {
   private from = process.env.EMAIL_FROM || 'EE PostMind <no-reply@smmt.local>';
 
   async sendEmail(input: SendEmailInput): Promise<void> {
+    // Try DB-configured SMTP first
+    const smtpCfg = await getSmtpConfig();
+    if (smtpCfg.smtp_host && smtpCfg.smtp_user) {
+      return this.sendViaSmtp(input, smtpCfg);
+    }
+
+    // Fall back to Resend API
     if (!this.resendApiKey) {
       console.log(
         `[EMAIL DEV] To: ${input.to}\nSubject: ${input.subject}\n${input.text}\n`,
@@ -38,6 +46,32 @@ export class EmailService {
       const details = await response.text();
       throw new AppError(
         `Email delivery failed: ${details || response.statusText}`,
+        502,
+        'EMAIL_DELIVERY_FAILED',
+      );
+    }
+  }
+
+  private async sendViaSmtp(input: SendEmailInput, cfg: { smtp_host: string; smtp_port: string; smtp_user: string; smtp_pass: string; smtp_from: string; smtp_secure: string }): Promise<void> {
+    const nodemailer = await import('nodemailer');
+    const transport = nodemailer.default.createTransport({
+      host: cfg.smtp_host,
+      port: parseInt(cfg.smtp_port, 10),
+      secure: cfg.smtp_secure === 'true',
+      auth: { user: cfg.smtp_user, pass: cfg.smtp_pass },
+    });
+
+    try {
+      await transport.sendMail({
+        from: cfg.smtp_from || cfg.smtp_user,
+        to: input.to,
+        subject: input.subject,
+        html: input.html,
+        text: input.text,
+      });
+    } catch (err: any) {
+      throw new AppError(
+        `Email delivery failed: ${err.message}`,
         502,
         'EMAIL_DELIVERY_FAILED',
       );

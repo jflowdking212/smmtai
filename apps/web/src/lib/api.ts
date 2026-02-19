@@ -362,6 +362,60 @@ export const api = {
     list: () =>
       request<{ success: true; data: any[] }>('/feedback'),
   },
+  admin: {
+    getSmtp: () =>
+      request<{ success: true; data: Record<string, string> }>('/admin/settings/smtp'),
+    saveSmtp: (data: Record<string, string>) =>
+      request<{ success: true; data: Record<string, string> }>('/admin/settings/smtp', {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
+    testSmtp: (email: string) =>
+      request<{ success: true; data: { success: boolean; message: string } }>('/admin/settings/smtp/test', {
+        method: 'POST',
+        body: JSON.stringify({ email }),
+      }),
+    getStorage: () =>
+      request<{ success: true; data: Record<string, string> }>('/admin/settings/storage'),
+    saveStorage: (data: Record<string, string>) =>
+      request<{ success: true; data: Record<string, string> }>('/admin/settings/storage', {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
+    testStorage: () =>
+      request<{ success: true; data: { success: boolean; message: string } }>('/admin/settings/storage/test', {
+        method: 'POST',
+      }),
+  },
+  chat: {
+    sendMessage: (data: { message: string; context?: string; sessionId?: string; customerInfo?: { name?: string; email?: string; phone?: string } }) =>
+      request<any>('/chat/message', { method: 'POST', body: JSON.stringify(data) }),
+    getHistory: (sessionId: string) =>
+      request<{ success: boolean; messages: any[]; customerInfo?: any }>(`/chat/conversations/history/${sessionId}`),
+    getConversations: (params?: { status?: string; email?: string }) =>
+      request<{ success: true; data: any[] }>(`/chat/conversations${params ? '?' + new URLSearchParams(params as Record<string, string>) : ''}`),
+    getConversationStats: () =>
+      request<{ success: true; data: { total: number; active: number; transferred: number; ended: number } }>('/chat/conversations/stats'),
+    getConversation: (sessionId: string) =>
+      request<{ success: true; data: any }>(`/chat/conversation/${sessionId}`),
+    deleteConversation: (sessionId: string) =>
+      request<{ success: boolean; message: string }>(`/chat/conversation/${sessionId}`, { method: 'DELETE' }),
+    endConversation: (sessionId: string, summary?: string) =>
+      request<{ success: true; data: any }>('/chat/conversation/end', { method: 'POST', body: JSON.stringify({ sessionId, summary }) }),
+    // Knowledge Base
+    getKnowledge: (params?: { category?: string; isActive?: string }) =>
+      request<{ success: true; data: any[] }>(`/chat/knowledge${params ? '?' + new URLSearchParams(params as Record<string, string>) : ''}`),
+    createKnowledge: (data: { title: string; content: string; category?: string; tags?: string[]; priority?: number }) =>
+      request<{ success: true; data: any }>('/chat/knowledge', { method: 'POST', body: JSON.stringify(data) }),
+    updateKnowledge: (id: string, data: { title?: string; content?: string; category?: string; tags?: string[]; priority?: number }) =>
+      request<{ success: true; data: any }>(`/chat/knowledge/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    deleteKnowledge: (id: string) =>
+      request<{ success: true; data: any }>(`/chat/knowledge/${id}`, { method: 'DELETE' }),
+    bulkImportKnowledge: (entries: Array<{ title: string; content: string; category?: string; tags?: string[] }>) =>
+      request<{ success: true; data: any }>('/chat/knowledge/bulk-import', { method: 'POST', body: JSON.stringify({ entries }) }),
+    searchKnowledge: (query: string, limit?: number) =>
+      request<{ success: true; data: any[] }>('/chat/knowledge/search', { method: 'POST', body: JSON.stringify({ query, limit }) }),
+  },
 };
 
 // Import auth store (circular-safe: only used at runtime)

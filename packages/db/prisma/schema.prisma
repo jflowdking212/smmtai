@@ -338,3 +338,65 @@ model Feedback {
   @@index([userId, createdAt])
   @@map("feedbacks")
 }
+
+// ============================================================
+// System Configuration (admin-managed key-value settings)
+// ============================================================
+
+model SystemConfig {
+  key       String   @id
+  value     String
+  encrypted Boolean  @default(false)
+  updatedAt DateTime @updatedAt
+
+  @@map("system_config")
+}
+
+// ============================================================
+// AI Chat & Knowledge Base
+// ============================================================
+
+enum ConversationStatus {
+  ACTIVE
+  ENDED
+  TRANSFERRED
+}
+
+model ChatConversation {
+  id             String             @id @default(cuid())
+  sessionId      String             @unique
+  customerName   String?
+  customerEmail  String?
+  customerPhone  String?
+  messages       Json
+  summary        String?
+  status         ConversationStatus @default(ACTIVE)
+  transferredTo  String?
+  transferReason String?
+  tags           String[]
+  sentiment      String?
+  startedAt      DateTime           @default(now())
+  endedAt        DateTime?
+  updatedAt      DateTime           @updatedAt
+
+  @@index([customerEmail])
+  @@index([status])
+  @@map("chat_conversations")
+}
+
+model KnowledgeBase {
+  id        String   @id @default(cuid())
+  title     String
+  content   String
+  category  String?
+  tags      String[]
+  embedding Float[]
+  isActive  Boolean  @default(true)
+  priority  Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([category])
+  @@index([isActive])
+  @@map("knowledge_base")
+}
