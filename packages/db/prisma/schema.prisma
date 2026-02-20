@@ -131,7 +131,7 @@ model WorkspaceMember {
 model Subscription {
   id                   String    @id @default(cuid())
   workspaceId          String    @unique
-  tier                 String    @default("free") // free, pro, business, enterprise
+  tier                 String    @default("basic") // basic, pro, business, enterprise
   stripeCustomerId     String?   @unique
   stripeSubscriptionId String?   @unique
   stripePriceId        String?

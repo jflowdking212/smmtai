@@ -39,6 +39,16 @@ function buildXPostText(post: PlatformPostPayload): string {
   return `${text} ${link}`.trim();
 }
 
+function getEnvValue(...keys: string[]): string {
+  for (const key of keys) {
+    const value = process.env[key];
+    if (typeof value === 'string' && value.trim().length > 0) {
+      return value.trim();
+    }
+  }
+  return '';
+}
+
 function inferVideoContentType(mediaUrl: string): string {
   const normalized = mediaUrl.toLowerCase();
   if (normalized.includes('.mov')) return 'video/quicktime';
@@ -141,9 +151,9 @@ const FACEBOOK_GRAPH_OAUTH_SCOPES = 'pages_manage_posts,pages_read_engagement,pa
 
 export class FacebookAdapter implements PlatformAdapter {
   readonly platform: PlatformType = 'facebook';
-  private clientId = process.env.FACEBOOK_APP_ID || '';
-  private clientSecret = process.env.FACEBOOK_APP_SECRET || '';
-  private redirectUri = process.env.FACEBOOK_REDIRECT_URI || 'http://localhost:4016/api/v1/connections/facebook/callback';
+  private clientId = getEnvValue('FACEBOOK_APP_ID', 'FACEBOOK_CLIENT_ID');
+  private clientSecret = getEnvValue('FACEBOOK_APP_SECRET', 'FACEBOOK_CLIENT_SECRET');
+  private redirectUri = getEnvValue('FACEBOOK_REDIRECT_URI', 'FACEBOOK_CALLBACK_URL') || 'http://localhost:4016/api/v1/connections/facebook/callback';
 
   getAuthUrl(state: string): string {
     return `https://www.facebook.com/v18.0/dialog/oauth?client_id=${this.clientId}&redirect_uri=${encodeURIComponent(this.redirectUri)}&scope=${FACEBOOK_GRAPH_OAUTH_SCOPES}&state=${state}&response_type=code`;
@@ -213,9 +223,9 @@ export class FacebookAdapter implements PlatformAdapter {
 
 export class InstagramAdapter implements PlatformAdapter {
   readonly platform: PlatformType = 'instagram';
-  private clientId = process.env.FACEBOOK_APP_ID || '';
-  private clientSecret = process.env.FACEBOOK_APP_SECRET || '';
-  private redirectUri = process.env.INSTAGRAM_REDIRECT_URI || 'http://localhost:4016/api/v1/connections/instagram/callback';
+  private clientId = getEnvValue('FACEBOOK_APP_ID', 'FACEBOOK_CLIENT_ID');
+  private clientSecret = getEnvValue('FACEBOOK_APP_SECRET', 'FACEBOOK_CLIENT_SECRET');
+  private redirectUri = getEnvValue('INSTAGRAM_REDIRECT_URI', 'INSTAGRAM_CALLBACK_URL') || 'http://localhost:4016/api/v1/connections/instagram/callback';
 
   getAuthUrl(state: string): string {
     return `https://www.facebook.com/v18.0/dialog/oauth?client_id=${this.clientId}&redirect_uri=${encodeURIComponent(this.redirectUri)}&scope=${FACEBOOK_GRAPH_OAUTH_SCOPES}&state=${state}&response_type=code`;
@@ -481,9 +491,9 @@ export class TwitterAdapter implements PlatformAdapter {
 
 export class LinkedInAdapter implements PlatformAdapter {
   readonly platform: PlatformType = 'linkedin';
-  private clientId = process.env.LINKEDIN_CLIENT_ID || '';
-  private clientSecret = process.env.LINKEDIN_CLIENT_SECRET || '';
-  private redirectUri = process.env.LINKEDIN_REDIRECT_URI || 'http://localhost:4016/api/v1/connections/linkedin/callback';
+  private clientId = getEnvValue('LINKEDIN_CLIENT_ID', 'LINKEDIN_APP_ID');
+  private clientSecret = getEnvValue('LINKEDIN_CLIENT_SECRET', 'LINKEDIN_APP_SECRET');
+  private redirectUri = getEnvValue('LINKEDIN_REDIRECT_URI', 'LINKEDIN_CALLBACK_URL') || 'http://localhost:4016/api/v1/connections/linkedin/callback';
 
   getAuthUrl(state: string): string {
     return `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${this.clientId}&redirect_uri=${encodeURIComponent(this.redirectUri)}&scope=openid%20profile%20w_member_social&state=${state}`;
@@ -683,28 +693,51 @@ export class LinkedInAdapter implements PlatformAdapter {
 
 export class TikTokAdapter implements PlatformAdapter {
   readonly platform: PlatformType = 'tiktok';
-  private clientKey = process.env.TIKTOK_CLIENT_KEY || '';
-  private clientSecret = process.env.TIKTOK_CLIENT_SECRET || '';
-  private redirectUri = process.env.TIKTOK_REDIRECT_URI || 'http://localhost:4016/api/v1/connections/tiktok/callback';
+  private clientKey = getEnvValue('TIKTOK_CLIENT_KEY', 'TIKTOK_CLIENT_ID');
+  private clientSecret = getEnvValue('TIKTOK_CLIENT_SECRET', 'TIKTOK_APP_SECRET');
+  private redirectUri = getEnvValue('TIKTOK_REDIRECT_URI', 'TIKTOK_CALLBACK_URL') || 'http://localhost:4016/api/v1/connections/tiktok/callback';
+
+  private buildPkceCodeVerifier(state: string): string {
+    return crypto
+      .createHash('sha256')
+      .update(`${state}:${this.clientSecret || this.clientKey}`)
+      .digest('base64url');
+  }
+
+  private buildPkceCodeChallenge(codeVerifier: string): string {
+    return crypto
+      .createHash('sha256')
+      .update(codeVerifier)
+      .digest('base64url');
+  }
 
   getAuthUrl(state: string): string {
+    const codeVerifier = this.buildPkceCodeVerifier(state);
+    const codeChallenge = this.buildPkceCodeChallenge(codeVerifier);
     const params = new URLSearchParams({
       client_key: this.clientKey,
       response_type: 'code',
       scope: 'user.info.basic,video.publish,video.list',
       redirect_uri: this.redirectUri,
       state,
+      code_challenge: codeChallenge,
+      code_challenge_method: 'S256',
     });
     return `https://www.tiktok.com/v2/auth/authorize/?${params.toString()}`;
   }
 
-  async exchangeCode(code: string): Promise<PlatformTokens> {
+  async exchangeCode(code: string, context?: PlatformOAuthContext): Promise<PlatformTokens> {
+    if (!context?.state) {
+      throw new Error('Missing OAuth state for TikTok token exchange');
+    }
+    const codeVerifier = this.buildPkceCodeVerifier(context.state);
     const body = new URLSearchParams({
       client_key: this.clientKey,
       client_secret: this.clientSecret,
       code,
       grant_type: 'authorization_code',
       redirect_uri: this.redirectUri,
+      code_verifier: codeVerifier,
     });
     const res = await fetch('https://open.tiktokapis.com/v2/oauth/token/', {
       method: 'POST',
@@ -825,9 +858,9 @@ export class TikTokAdapter implements PlatformAdapter {
 
 export class YouTubeAdapter implements PlatformAdapter {
   readonly platform: PlatformType = 'youtube';
-  private clientId = process.env.GOOGLE_CLIENT_ID || '';
-  private clientSecret = process.env.GOOGLE_CLIENT_SECRET || '';
-  private redirectUri = process.env.YOUTUBE_REDIRECT_URI || 'http://localhost:4016/api/v1/connections/youtube/callback';
+  private clientId = getEnvValue('GOOGLE_CLIENT_ID', 'YOUTUBE_CLIENT_ID');
+  private clientSecret = getEnvValue('GOOGLE_CLIENT_SECRET', 'YOUTUBE_CLIENT_SECRET');
+  private redirectUri = getEnvValue('YOUTUBE_REDIRECT_URI', 'YOUTUBE_CALLBACK_URL', 'GOOGLE_CALLBACK_URL') || 'http://localhost:4016/api/v1/connections/youtube/callback';
 
   getAuthUrl(state: string): string {
     const scopes = 'https://www.googleapis.com/auth/youtube https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/yt-analytics.readonly';
@@ -998,9 +1031,9 @@ export class YouTubeAdapter implements PlatformAdapter {
 
 export class PinterestAdapter implements PlatformAdapter {
   readonly platform: PlatformType = 'pinterest';
-  private clientId = process.env.PINTEREST_CLIENT_ID || '';
-  private clientSecret = process.env.PINTEREST_CLIENT_SECRET || '';
-  private redirectUri = process.env.PINTEREST_REDIRECT_URI || 'http://localhost:4016/api/v1/connections/pinterest/callback';
+  private clientId = getEnvValue('PINTEREST_CLIENT_ID', 'PINTEREST_APP_ID');
+  private clientSecret = getEnvValue('PINTEREST_CLIENT_SECRET', 'PINTEREST_APP_SECRET');
+  private redirectUri = getEnvValue('PINTEREST_REDIRECT_URI', 'PINTEREST_CALLBACK_URL') || 'http://localhost:4016/api/v1/connections/pinterest/callback';
 
   getAuthUrl(state: string): string {
     const params = new URLSearchParams({

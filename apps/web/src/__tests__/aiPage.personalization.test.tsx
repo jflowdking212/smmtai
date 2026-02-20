@@ -21,6 +21,7 @@ vi.mock('@/lib/api', () => ({ api: mockApi }));
 describe('AIPage personalization', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.sessionStorage.clear();
     mockApi.ai.caption.mockResolvedValue({
       success: true,
       data: { caption: 'Generated caption', character_count: 17, platform_limit: 2200, hashtags: [], cta: null },
@@ -38,13 +39,13 @@ describe('AIPage personalization', () => {
       target: { value: 'witty' },
     });
     fireEvent.change(screen.getByLabelText('Brand Voice Details (optional)'), {
-      target: { value: ' Clever and direct ' },
+      target: { value: 'Clever and direct' },
     });
     fireEvent.change(screen.getByLabelText('Industry (optional)'), {
-      target: { value: ' SaaS ' },
+      target: { value: 'SaaS' },
     });
     fireEvent.change(screen.getByLabelText('Audience Persona (optional)'), {
-      target: { value: ' Startup founders ' },
+      target: { value: 'Startup founders' },
     });
 
     fireEvent.click(screen.getByRole('button', { name: 'Generate' }));
@@ -70,10 +71,10 @@ describe('AIPage personalization', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Trending/i }));
     fireEvent.change(screen.getByLabelText('Industry (optional)'), {
-      target: { value: ' E-commerce ' },
+      target: { value: 'E-commerce' },
     });
     fireEvent.change(screen.getByLabelText('Audience Persona (optional)'), {
-      target: { value: ' First-time store owners ' },
+      target: { value: 'First-time store owners' },
     });
 
     fireEvent.click(screen.getByRole('button', { name: 'Generate' }));
@@ -104,5 +105,34 @@ describe('AIPage personalization', () => {
 
     expect(screen.queryByText('No history yet.')).toBeNull();
     expect(screen.getByRole('button', { name: 'Clear' })).toBeTruthy();
+  });
+
+  it('stores caption output for compose handoff', async () => {
+    mockApi.ai.caption.mockResolvedValue({
+      success: true,
+      data: {
+        caption: 'Ready for compose',
+        character_count: 16,
+        platform_limit: 2200,
+        hashtags: ['product', 'launch'],
+        cta: null,
+      },
+    });
+
+    renderWithRouter(<AIPage />);
+
+    fireEvent.change(screen.getByPlaceholderText('Describe what your post should be about...'), {
+      target: { value: 'Launch update' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Generate' }));
+
+    await waitFor(() => expect(mockApi.ai.caption).toHaveBeenCalled());
+    fireEvent.click(screen.getByRole('button', { name: 'Use in Compose' }));
+
+    expect(JSON.parse(window.sessionStorage.getItem('__postmindComposeSeed') || '{}')).toMatchObject({
+      source: 'ai',
+      content: 'Ready for compose',
+      hashtags: ['product', 'launch'],
+    });
   });
 });

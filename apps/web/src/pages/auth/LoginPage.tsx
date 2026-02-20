@@ -57,7 +57,7 @@ export function LoginPage() {
 
     try {
       const res = await api.auth.login({ email, password });
-      setAuth(res.data.user, res.data.accessToken, res.data.workspaceId);
+      setAuth(res.data.user, res.data.accessToken, res.data.workspaceId, res.data.role || 'viewer', res.data.tier || 'basic');
 
       if (inviteToken && inviteAction !== 'decline') {
         await api.workspaces.acceptInvite(inviteToken);

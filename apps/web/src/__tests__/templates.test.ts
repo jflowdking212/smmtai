@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { TEMPLATES, getCategories, getTemplatesByCategory } from '../lib/templates';
 
 describe('Templates', () => {
-  it('should have 50 templates', () => {
-    expect(TEMPLATES).toHaveLength(50);
+  it('should have 60 templates', () => {
+    expect(TEMPLATES).toHaveLength(60);
   });
 
   it('should have 10 categories', () => {
@@ -18,7 +18,7 @@ describe('Templates', () => {
 
   it('should return all templates when no category', () => {
     const all = getTemplatesByCategory();
-    expect(all).toHaveLength(50);
+    expect(all).toHaveLength(60);
   });
 
   it('each template should have valid JSON', () => {

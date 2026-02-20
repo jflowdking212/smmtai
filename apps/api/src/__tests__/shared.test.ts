@@ -16,16 +16,16 @@ describe('Shared constants', () => {
 
   it('should have 4 subscription tiers', () => {
     expect(Object.keys(SUBSCRIPTION_LIMITS)).toHaveLength(4);
-    expect(SUBSCRIPTION_LIMITS).toHaveProperty('free');
+    expect(SUBSCRIPTION_LIMITS).toHaveProperty('basic');
     expect(SUBSCRIPTION_LIMITS).toHaveProperty('pro');
     expect(SUBSCRIPTION_LIMITS).toHaveProperty('business');
     expect(SUBSCRIPTION_LIMITS).toHaveProperty('enterprise');
   });
 
-  it('should enforce free tier limits', () => {
-    const free = SUBSCRIPTION_LIMITS.free;
-    expect(free.socialAccounts).toBe(3);
-    expect(free.postsPerMonth).toBe(30);
-    expect(free.aiGenerationsPerMonth).toBe(10);
+  it('should enforce basic tier limits', () => {
+    const basic = SUBSCRIPTION_LIMITS.basic;
+    expect(basic.socialAccounts).toBe(4);
+    expect(basic.postsPerMonth).toBe(30);
+    expect(basic.aiGenerationsPerMonth).toBe(5);
   });
 });

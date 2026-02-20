@@ -54,6 +54,8 @@ export class AuthService {
     return {
       user: this.sanitizeUser(user),
       workspaceId: user.workspaceId,
+      role: 'owner' as const,
+      tier: 'basic' as const,
       ...tokens,
     };
   }
@@ -84,9 +86,13 @@ export class AuthService {
 
     await this.storeRefreshToken(user.id, tokens.refreshToken);
 
+    const { role, tier } = await this.getWorkspaceContext(user.id, workspaceId);
+
     return {
       user: this.sanitizeUser(user),
       workspaceId,
+      role,
+      tier,
       ...tokens,
     };
   }
@@ -168,9 +174,13 @@ export class AuthService {
     const tokens = this.generateTokenPair(result.user.id, result.workspaceId);
     await this.storeRefreshToken(result.user.id, tokens.refreshToken);
 
+    const { role, tier } = await this.getWorkspaceContext(result.user.id, result.workspaceId);
+
     return {
       user: this.sanitizeUser(result.user),
       workspaceId: result.workspaceId,
+      role,
+      tier,
       ...tokens,
     };
   }
@@ -290,8 +300,7 @@ export class AuthService {
     await tx.subscription.create({
       data: {
         workspaceId: workspace.id,
-        tier: 'free',
-        status: 'active',
+        tier: 'basic',        status: 'active',
       },
     });
 
@@ -316,6 +325,19 @@ export class AuthService {
       accessToken: generateAccessToken({ userId, workspaceId }),
       refreshToken: generateRefreshToken({ userId, workspaceId }),
     };
+  }
+
+  private async getWorkspaceContext(userId: string, workspaceId?: string): Promise<{ role: string; tier: string }> {
+    let role = 'viewer';
+    let tier = 'basic';
+    if (!workspaceId) return { role, tier };
+    const membership = await prisma.workspaceMember.findUnique({
+      where: { userId_workspaceId: { userId, workspaceId } },
+    });
+    if (membership) role = membership.role;
+    const subscription = await prisma.subscription.findUnique({ where: { workspaceId } });
+    if (subscription) tier = subscription.tier;
+    return { role, tier };
   }
 
   private async storeRefreshToken(userId: string, refreshToken: string) {

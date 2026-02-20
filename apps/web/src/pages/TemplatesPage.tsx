@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, Button, Badge } from '@/components/ui';
+import { TemplatePreview } from '@/components/TemplatePreview';
 import { TEMPLATES, getCategories, getTemplatesByCategory } from '@/lib/templates';
 import { Palette, Search, Grid3X3 } from 'lucide-react';
 
@@ -61,11 +62,14 @@ export function TemplatesPage() {
       {/* Template grid */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
         {filtered.map((t) => (
-          <Card key={t.id} hover className="overflow-hidden cursor-pointer" onClick={() => navigate('/editor')}>
-            <div className="aspect-square flex items-end p-3" style={{ backgroundColor: t.thumbnail }}>
-              <Badge variant="default" className="text-[10px]">
-                {t.width}×{t.height}
-              </Badge>
+          <Card key={t.id} hover className="overflow-hidden cursor-pointer" onClick={() => navigate(`/editor?template=${encodeURIComponent(t.id)}`)}>
+            <div className="relative aspect-square overflow-hidden">
+              <TemplatePreview template={t} className="h-full w-full object-contain bg-neutral-50" alt={`${t.name} template preview`} />
+              <div className="absolute inset-x-0 bottom-0 p-3">
+                <Badge variant="default" className="text-[10px]">
+                  {t.width}×{t.height}
+                </Badge>
+              </div>
             </div>
             <div className="p-3">
               <p className="text-sm font-medium text-neutral-800 truncate">{t.name}</p>

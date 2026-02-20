@@ -91,7 +91,7 @@ describe('StripeService billing webhooks', () => {
     expect(mockPrisma.subscription.update).toHaveBeenCalledWith({
       where: { workspaceId: 'workspace_1' },
       data: {
-        tier: 'free',
+        tier: 'basic',
         status: 'canceled',
         stripeSubscriptionId: null,
         stripePriceId: null,

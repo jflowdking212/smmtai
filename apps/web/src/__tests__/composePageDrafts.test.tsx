@@ -62,6 +62,7 @@ describe('ComposePage draft flows', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     draftStore = [];
+    window.sessionStorage.clear();
 
     mockApi.connections.list.mockResolvedValue({ success: true, data: baseConnection });
     mockApi.posts.create.mockResolvedValue({ success: true, data: { id: 'draft-autosave-1' } });
@@ -147,5 +148,23 @@ describe('ComposePage draft flows', () => {
 
     await waitFor(() => expect(mockApi.posts.delete).toHaveBeenCalledWith('draft-1'));
     expect(await screen.findByText('No drafts yet')).toBeTruthy();
+  });
+
+  it('hydrates composer from AI handoff payload', async () => {
+    window.sessionStorage.setItem('__postmindComposeSeed', JSON.stringify({
+      source: 'ai',
+      content: 'Seeded caption from AI',
+      hashtags: ['launch', 'growth'],
+    }));
+
+    renderWithRouter(<ComposePage />);
+
+    await waitFor(() => {
+      expect((screen.getByPlaceholderText("What do you want to share?") as HTMLTextAreaElement).value)
+        .toBe('Seeded caption from AI');
+    });
+    expect((screen.getByPlaceholderText('launch, growth, product') as HTMLInputElement).value)
+      .toBe('launch, growth');
+    expect(window.sessionStorage.getItem('__postmindComposeSeed')).toBeNull();
   });
 });

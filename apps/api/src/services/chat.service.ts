@@ -42,6 +42,19 @@ function getEffectiveApiKey(chatConfig: { apiKey: string }): string | undefined 
   return key?.trim();
 }
 
+/** Check if any support agent is online (marked online in SystemConfig within last 5 minutes) */
+async function isSupportAgentOnline(): Promise<boolean> {
+  try {
+    const record = await prisma.systemConfig.findUnique({ where: { key: 'support_agents_online' } });
+    if (!record?.value) return false;
+    const data = JSON.parse(record.value);
+    const fiveMinAgo = Date.now() - 5 * 60 * 1000;
+    return Array.isArray(data) && data.some((a: any) => a.lastSeen > fiveMinAgo);
+  } catch {
+    return false;
+  }
+}
+
 export async function chatWithCustomer(message: string, context = 'general', sessionId?: string) {
   try {
     if (sessionId) {
@@ -52,12 +65,31 @@ export async function chatWithCustomer(message: string, context = 'general', ses
     const knowledgeResults = await knowledgeBaseService.searchKnowledge(message, 3);
 
     let contextInfo = '';
-    if (knowledgeResults.length > 0) {
+    const hasKBMatch = knowledgeResults.length > 0;
+    if (hasKBMatch) {
       contextInfo = '\n\n=== KNOWLEDGE BASE (USE THIS TO ANSWER) ===\n';
       knowledgeResults.forEach((kb: any, i: number) => {
         contextInfo += `${i + 1}. ${kb.title}\n${kb.content}\n\n`;
       });
       contextInfo += '=== END KNOWLEDGE BASE ===\n\nIMPORTANT: Answer ONLY using the knowledge base above. Do not make up information.';
+    }
+
+    // If no KB match, check for online support agents
+    if (!hasKBMatch) {
+      const agentOnline = await isSupportAgentOnline();
+      if (agentOnline && sessionId) {
+        // Flag conversation for live agent pickup
+        try {
+          await conversationService.transferToHuman(sessionId);
+        } catch {}
+        return {
+          success: true,
+          response: "I'm connecting you with a support agent who can help you directly. Please wait a moment — someone will be with you shortly.",
+          usedKnowledgeBase: false,
+          sources: [],
+          transferredToAgent: true,
+        };
+      }
     }
 
     const chatConfig = await getChatConfig();
@@ -76,7 +108,7 @@ RULES:
 - Be friendly and conversational
 - If you have knowledge base information, use it to answer accurately
 - Don't make up features or capabilities
-${knowledgeResults.length > 0
+${hasKBMatch
   ? '\nYou HAVE knowledge base information below. ANSWER ONLY USING THAT INFORMATION.'
   : '\nUse your general knowledge about social media management to help.'}
 ${contextInfo}`;

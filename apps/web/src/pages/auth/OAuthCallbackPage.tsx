@@ -40,7 +40,7 @@ export function OAuthCallbackPage() {
     api.auth
       .me()
       .then((res) => {
-        setAuth(res.data.user, accessToken, res.data.workspaceId);
+        setAuth(res.data.user, accessToken, res.data.workspaceId, res.data.role || 'viewer', res.data.tier || 'basic', res.data.usage || {});
         navigate(nextPath, { replace: true });
       })
       .catch((err) => {

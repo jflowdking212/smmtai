@@ -1,4 +1,30 @@
-import 'dotenv/config';
+import { existsSync, readFileSync } from 'fs';
+import { resolve } from 'path';
+import dotenv from 'dotenv';
+
+function loadEnvFile(filePath: string) {
+  if (!existsSync(filePath)) return;
+  const parsed = dotenv.parse(readFileSync(filePath));
+
+  for (const [key, value] of Object.entries(parsed)) {
+    if (process.env[key] === undefined || process.env[key] === '') {
+      process.env[key] = value;
+    }
+  }
+}
+
+const envFileCandidates = [
+  resolve(process.cwd(), '.env'),
+  resolve(process.cwd(), '../.env'),
+  resolve(process.cwd(), '../../.env'),
+];
+
+const seenEnvFiles = new Set<string>();
+for (const envFile of envFileCandidates) {
+  if (seenEnvFiles.has(envFile)) continue;
+  seenEnvFiles.add(envFile);
+  loadEnvFile(envFile);
+}
 
 export const config = {
   port: parseInt(process.env.PORT || '4016', 10),

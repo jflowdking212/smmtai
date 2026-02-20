@@ -618,31 +618,37 @@ export function SettingsPage() {
                   const platform = PLATFORMS[platformId];
                   const creds = platformCreds[platformId] || { access_token: '', server_key: '' };
                   const needsServerKey = platformId === 'entreprenrs' || platformId === 'iohah';
+                  const isWoWonder = platformId === 'entreprenrs';
+                  const accessTokenLabel = isWoWonder ? 'Server Key (API v2)' : 'Access Token';
+                  const accessTokenPlaceholder = isWoWonder ? 'Enter Server Key from API Settings' : 'Enter access token';
                   return (
                     <div key={platformId} className="space-y-3 p-4 border border-neutral-100 rounded-lg">
                       <div className="flex items-center gap-2">
                         <div className="w-6 h-6 rounded-full" style={{ backgroundColor: platform.color }} />
                         <h3 className="text-sm font-semibold text-neutral-800">{platform.name}</h3>
                       </div>
+                      {isWoWonder && (
+                        <p className="text-xs text-neutral-400">Use the Server Key from Manage API → Server Key (API v2) for both fields.</p>
+                      )}
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
-                          <label className="block text-sm font-medium text-neutral-700 mb-1">Access Token</label>
+                          <label className="block text-sm font-medium text-neutral-700 mb-1">{accessTokenLabel}</label>
                           <input
                             type="password"
                             value={creds.access_token}
                             onChange={(e) => setPlatformCreds((prev) => ({ ...prev, [platformId]: { ...creds, access_token: e.target.value } }))}
-                            placeholder="Enter access token"
+                            placeholder={accessTokenPlaceholder}
                             className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-sm"
                           />
                         </div>
                         {needsServerKey && (
                           <div>
-                            <label className="block text-sm font-medium text-neutral-700 mb-1">Server Key</label>
+                            <label className="block text-sm font-medium text-neutral-700 mb-1">{isWoWonder ? 'Server Key (confirm)' : 'Server Key'}</label>
                             <input
                               type="password"
                               value={creds.server_key}
                               onChange={(e) => setPlatformCreds((prev) => ({ ...prev, [platformId]: { ...creds, server_key: e.target.value } }))}
-                              placeholder="Enter server key"
+                              placeholder={isWoWonder ? 'Enter same Server Key' : 'Enter server key'}
                               className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-sm"
                             />
                           </div>

@@ -99,6 +99,28 @@ chatRouter.get('/conversations/stats', authenticate, async (req: AuthRequest, re
   } catch (err) { next(err); }
 });
 
+// Support agent heartbeat — marks agent as online
+chatRouter.post('/agent/heartbeat', authenticate, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { prisma } = await import('../config/database.js');
+    const agentId = req.userId;
+    const record = await prisma.systemConfig.findUnique({ where: { key: 'support_agents_online' } });
+    let agents: Array<{ id: string; lastSeen: number }> = [];
+    if (record?.value) {
+      try { agents = JSON.parse(record.value); } catch {}
+    }
+    const fiveMinAgo = Date.now() - 5 * 60 * 1000;
+    agents = agents.filter((a) => a.lastSeen > fiveMinAgo && a.id !== agentId);
+    agents.push({ id: agentId as string, lastSeen: Date.now() });
+    await prisma.systemConfig.upsert({
+      where: { key: 'support_agents_online' },
+      update: { value: JSON.stringify(agents) },
+      create: { key: 'support_agents_online', value: JSON.stringify(agents), encrypted: false },
+    });
+    res.json({ success: true, onlineAgents: agents.length });
+  } catch (err) { next(err); }
+});
+
 // Knowledge Base endpoints (admin)
 
 chatRouter.post('/knowledge', authenticate, async (req: AuthRequest, res: Response, next: NextFunction) => {

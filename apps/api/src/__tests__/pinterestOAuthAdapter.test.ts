@@ -4,6 +4,9 @@ import { PinterestAdapter } from '../services/platforms/major.js';
 const ORIGINAL_PINTEREST_CLIENT_ID = process.env.PINTEREST_CLIENT_ID;
 const ORIGINAL_PINTEREST_CLIENT_SECRET = process.env.PINTEREST_CLIENT_SECRET;
 const ORIGINAL_PINTEREST_REDIRECT_URI = process.env.PINTEREST_REDIRECT_URI;
+const ORIGINAL_PINTEREST_APP_ID = process.env.PINTEREST_APP_ID;
+const ORIGINAL_PINTEREST_APP_SECRET = process.env.PINTEREST_APP_SECRET;
+const ORIGINAL_PINTEREST_CALLBACK_URL = process.env.PINTEREST_CALLBACK_URL;
 
 describe('PinterestAdapter OAuth', () => {
   const fetchMock = vi.fn<typeof fetch>();
@@ -21,6 +24,9 @@ describe('PinterestAdapter OAuth', () => {
     process.env.PINTEREST_CLIENT_ID = ORIGINAL_PINTEREST_CLIENT_ID;
     process.env.PINTEREST_CLIENT_SECRET = ORIGINAL_PINTEREST_CLIENT_SECRET;
     process.env.PINTEREST_REDIRECT_URI = ORIGINAL_PINTEREST_REDIRECT_URI;
+    process.env.PINTEREST_APP_ID = ORIGINAL_PINTEREST_APP_ID;
+    process.env.PINTEREST_APP_SECRET = ORIGINAL_PINTEREST_APP_SECRET;
+    process.env.PINTEREST_CALLBACK_URL = ORIGINAL_PINTEREST_CALLBACK_URL;
   });
 
   it('builds OAuth URL with configured callback URI', () => {
@@ -31,6 +37,20 @@ describe('PinterestAdapter OAuth', () => {
     expect(authUrl.searchParams.get('client_id')).toBe(process.env.PINTEREST_CLIENT_ID);
     expect(authUrl.searchParams.get('redirect_uri')).toBe(process.env.PINTEREST_REDIRECT_URI);
     expect(authUrl.searchParams.get('response_type')).toBe('code');
+  });
+
+  it('supports legacy Pinterest OAuth env aliases', () => {
+    process.env.PINTEREST_CLIENT_ID = '';
+    process.env.PINTEREST_CLIENT_SECRET = '';
+    process.env.PINTEREST_APP_ID = 'pinterest-app-id';
+    process.env.PINTEREST_APP_SECRET = 'pinterest-app-secret';
+    process.env.PINTEREST_REDIRECT_URI = '';
+    process.env.PINTEREST_CALLBACK_URL = 'https://example.com/connections/pinterest/callback';
+
+    const authUrl = new URL(new PinterestAdapter().getAuthUrl('signed-state-token'));
+
+    expect(authUrl.searchParams.get('client_id')).toBe(process.env.PINTEREST_APP_ID);
+    expect(authUrl.searchParams.get('redirect_uri')).toBe(process.env.PINTEREST_CALLBACK_URL);
   });
 
   it('exchanges auth code using configured callback URI', async () => {

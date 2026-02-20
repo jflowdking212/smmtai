@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useAuthStore } from '@/stores/authStore';
 import { Card, Button } from '@/components/ui';
 import { api } from '@/lib/api';
 import { MessageCircle, Trash2, Search, Filter, BarChart3, Eye, X } from 'lucide-react';
@@ -52,6 +53,22 @@ export function ConversationsPage() {
   };
 
   useEffect(() => { loadData(); }, [statusFilter]);
+
+  // Send heartbeat to mark support agent as online
+  useEffect(() => {
+    const sendHeartbeat = () => {
+      const token = useAuthStore.getState().accessToken;
+      if (!token) return;
+      fetch('/api/v1/chat/agent/heartbeat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        credentials: 'include',
+      }).catch(() => {});
+    };
+    sendHeartbeat();
+    const interval = setInterval(sendHeartbeat, 2 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   const handleDelete = async (sessionId: string) => {
     if (!confirm('Delete this conversation?')) return;

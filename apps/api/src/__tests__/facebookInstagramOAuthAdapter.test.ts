@@ -5,6 +5,10 @@ const ORIGINAL_FACEBOOK_APP_ID = process.env.FACEBOOK_APP_ID;
 const ORIGINAL_FACEBOOK_APP_SECRET = process.env.FACEBOOK_APP_SECRET;
 const ORIGINAL_FACEBOOK_REDIRECT_URI = process.env.FACEBOOK_REDIRECT_URI;
 const ORIGINAL_INSTAGRAM_REDIRECT_URI = process.env.INSTAGRAM_REDIRECT_URI;
+const ORIGINAL_FACEBOOK_CLIENT_ID = process.env.FACEBOOK_CLIENT_ID;
+const ORIGINAL_FACEBOOK_CLIENT_SECRET = process.env.FACEBOOK_CLIENT_SECRET;
+const ORIGINAL_FACEBOOK_CALLBACK_URL = process.env.FACEBOOK_CALLBACK_URL;
+const ORIGINAL_INSTAGRAM_CALLBACK_URL = process.env.INSTAGRAM_CALLBACK_URL;
 
 describe('Facebook and Instagram OAuth adapters', () => {
   const fetchMock = vi.fn<typeof fetch>();
@@ -24,6 +28,10 @@ describe('Facebook and Instagram OAuth adapters', () => {
     process.env.FACEBOOK_APP_SECRET = ORIGINAL_FACEBOOK_APP_SECRET;
     process.env.FACEBOOK_REDIRECT_URI = ORIGINAL_FACEBOOK_REDIRECT_URI;
     process.env.INSTAGRAM_REDIRECT_URI = ORIGINAL_INSTAGRAM_REDIRECT_URI;
+    process.env.FACEBOOK_CLIENT_ID = ORIGINAL_FACEBOOK_CLIENT_ID;
+    process.env.FACEBOOK_CLIENT_SECRET = ORIGINAL_FACEBOOK_CLIENT_SECRET;
+    process.env.FACEBOOK_CALLBACK_URL = ORIGINAL_FACEBOOK_CALLBACK_URL;
+    process.env.INSTAGRAM_CALLBACK_URL = ORIGINAL_INSTAGRAM_CALLBACK_URL;
   });
 
   it('builds OAuth URLs with platform-specific callback URIs', () => {
@@ -35,6 +43,26 @@ describe('Facebook and Instagram OAuth adapters', () => {
     expect(instagramUrl.searchParams.get('state')).toBe(state);
     expect(facebookUrl.searchParams.get('redirect_uri')).toBe(process.env.FACEBOOK_REDIRECT_URI);
     expect(instagramUrl.searchParams.get('redirect_uri')).toBe(process.env.INSTAGRAM_REDIRECT_URI);
+  });
+
+  it('supports Facebook legacy env aliases', () => {
+    process.env.FACEBOOK_APP_ID = '';
+    process.env.FACEBOOK_APP_SECRET = '';
+    process.env.FACEBOOK_CLIENT_ID = 'fb-client-id';
+    process.env.FACEBOOK_CLIENT_SECRET = 'fb-client-secret';
+    process.env.FACEBOOK_REDIRECT_URI = '';
+    process.env.INSTAGRAM_REDIRECT_URI = '';
+    process.env.FACEBOOK_CALLBACK_URL = 'https://example.com/connections/facebook/callback';
+    process.env.INSTAGRAM_CALLBACK_URL = 'https://example.com/connections/instagram/callback';
+
+    const state = 'signed-state-token';
+    const facebookUrl = new URL(new FacebookAdapter().getAuthUrl(state));
+    const instagramUrl = new URL(new InstagramAdapter().getAuthUrl(state));
+
+    expect(facebookUrl.searchParams.get('client_id')).toBe(process.env.FACEBOOK_CLIENT_ID);
+    expect(instagramUrl.searchParams.get('client_id')).toBe(process.env.FACEBOOK_CLIENT_ID);
+    expect(facebookUrl.searchParams.get('redirect_uri')).toBe(process.env.FACEBOOK_CALLBACK_URL);
+    expect(instagramUrl.searchParams.get('redirect_uri')).toBe(process.env.INSTAGRAM_CALLBACK_URL);
   });
 
   it('exchanges Facebook auth code using Facebook callback URI', async () => {

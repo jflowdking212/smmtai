@@ -1,10 +1,33 @@
 """Application configuration from environment variables."""
 
 from functools import lru_cache
+import os
 from pathlib import Path
+from dotenv import dotenv_values
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 ENV_FILE = Path(__file__).resolve().parents[1] / ".env"
+ENV_FILE_CANDIDATES = [
+    ENV_FILE,
+    Path(__file__).resolve().parents[2] / ".env",
+    Path(__file__).resolve().parents[3] / ".env",
+]
+
+
+def _load_env_fallbacks() -> None:
+    for env_file in ENV_FILE_CANDIDATES:
+        if not env_file.exists():
+            continue
+
+        parsed = dotenv_values(env_file)
+        for key, value in parsed.items():
+            if value is None:
+                continue
+            if os.getenv(key) in (None, ""):
+                os.environ[key] = value
+
+
+_load_env_fallbacks()
 
 
 class Settings(BaseSettings):

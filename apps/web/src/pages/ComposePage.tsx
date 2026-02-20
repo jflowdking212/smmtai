@@ -1,12 +1,14 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, Button, Badge } from '@/components/ui';
 import { api } from '@/lib/api';
 import { buildLinkPreviewData, buildPreviewText, parseHashtagsInput } from '@/lib/composePreview';
 import { buildDraftAutosaveSignature, sortDraftsByUpdatedAt, toLocalDateTimeInput } from '@/lib/composeDrafts';
+import { consumeComposeSeed } from '@/lib/composeSeed';
 import { PLATFORMS, type PlatformType } from '@ee-postmind/shared';
 import {
   Send, Save, Clock, Image, X, Check, AlertTriangle,
-  Loader2, Eye, ChevronDown, Trash2,
+  Loader2, Eye, ChevronDown, Trash2, Sparkles, LayoutTemplate,
 } from 'lucide-react';
 
 const CHAR_LIMITS: Record<string, number> = {
@@ -67,6 +69,7 @@ interface DraftPost {
 }
 
 export function ComposePage() {
+  const navigate = useNavigate();
   const [content, setContent] = useState('');
   const [link, setLink] = useState('');
   const [hashtagsInput, setHashtagsInput] = useState('');
@@ -122,6 +125,24 @@ export function ComposePage() {
     api.connections.list().then((res) => setConnections(res.data)).catch(() => {});
     void refreshApprovalQueue();
     void refreshDrafts();
+  }, []);
+
+  useEffect(() => {
+    const seed = consumeComposeSeed();
+    if (!seed) return;
+
+    if (seed.content?.trim()) setContent(seed.content);
+    if (seed.link?.trim()) setLink(seed.link);
+    if (seed.hashtags && seed.hashtags.length > 0) setHashtagsInput(seed.hashtags.join(', '));
+    const seededMedia = seed.media;
+    if (seededMedia && seededMedia.length > 0) setMediaUploads((prev) => [...seededMedia, ...prev]);
+
+    setResult({
+      success: true,
+      message: seed.source === 'editor'
+        ? 'Template design added to composer media.'
+        : 'AI content loaded into composer.',
+    });
   }, []);
 
   function toggleConnection(id: string) {
@@ -586,6 +607,22 @@ export function ComposePage() {
           </p>
         </div>
         <div className="flex gap-2">
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => navigate('/ai')}
+            disabled={uploadingMedia}
+          >
+            <Sparkles className="w-4 h-4" /> AI Assistant
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => navigate('/templates')}
+            disabled={uploadingMedia}
+          >
+            <LayoutTemplate className="w-4 h-4" /> Templates
+          </Button>
           <Button
             variant="ghost"
             size="sm"

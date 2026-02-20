@@ -3,9 +3,12 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { Avatar } from '@/components/ui';
 import { useAuthStore } from '@/stores/authStore';
+import { useSubscription } from '@/hooks/useSubscription';
 import { api } from '@/lib/api';
 import { FeedbackWidget } from '@/components/FeedbackWidget';
 import { AIChatbot } from '@/components/AIChatbot';
+import { useSiteSettings } from '@/hooks/useSiteSettings';
+import type { AppFeature } from '@ee-postmind/shared';
 import {
   LayoutDashboard,
   PenSquare,
@@ -28,26 +31,27 @@ import {
   HelpCircle,
   MessageCircle,
   BookOpen,
+  Lock,
 } from 'lucide-react';
 
-const navigation = [
-  { name: 'Dashboard', href: '/', icon: LayoutDashboard },
-  { name: 'Compose', href: '/compose', icon: PenSquare },
-  { name: 'Post History', href: '/posts', icon: History },
-  { name: 'Calendar', href: '/calendar', icon: Calendar },
-  { name: 'Analytics', href: '/analytics', icon: BarChart3 },
-  { name: 'Connections', href: '/connections', icon: Link2 },
-  { name: 'Templates', href: '/templates', icon: Palette },
-  { name: 'AI Assistant', href: '/ai', icon: Sparkles },
-  { name: 'Conversations', href: '/conversations', icon: MessageCircle },
-  { name: 'Knowledge Base', href: '/knowledge-base', icon: BookOpen },
+const navigation: { name: string; href: string; icon: typeof LayoutDashboard; feature: AppFeature }[] = [
+  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, feature: 'dashboard' },
+  { name: 'Compose', href: '/compose', icon: PenSquare, feature: 'compose' },
+  { name: 'Post History', href: '/posts', icon: History, feature: 'post_history' },
+  { name: 'Calendar', href: '/calendar', icon: Calendar, feature: 'calendar' },
+  { name: 'Analytics', href: '/analytics', icon: BarChart3, feature: 'analytics' },
+  { name: 'Connections', href: '/connections', icon: Link2, feature: 'connections' },
+  { name: 'Templates', href: '/templates', icon: Palette, feature: 'templates' },
+  { name: 'AI Assistant', href: '/ai', icon: Sparkles, feature: 'ai_assistant' },
+  { name: 'Conversations', href: '/conversations', icon: MessageCircle, feature: 'conversations' },
+  { name: 'Knowledge Base', href: '/knowledge-base', icon: BookOpen, feature: 'knowledge_base' },
 ];
 
-const bottomNav = [
-  { name: 'Team', href: '/team', icon: Users },
-  { name: 'Billing', href: '/billing', icon: CreditCard },
-  { name: 'Help', href: '/help', icon: HelpCircle },
-  { name: 'Settings', href: '/settings', icon: Settings },
+const bottomNav: { name: string; href: string; icon: typeof Users; feature: AppFeature; ownerOnly?: boolean }[] = [
+  { name: 'Team', href: '/team', icon: Users, feature: 'team' },
+  { name: 'Billing', href: '/billing', icon: CreditCard, feature: 'billing' },
+  { name: 'Help', href: '/help', icon: HelpCircle, feature: 'billing' },
+  { name: 'Settings', href: '/settings', icon: Settings, feature: 'settings' },
 ];
 
 export function AppLayout() {
@@ -55,6 +59,8 @@ export function AppLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const navigate = useNavigate();
   const { user, logout: clearAuth } = useAuthStore();
+  const { settings: siteSettings } = useSiteSettings();
+  const { canAccess } = useSubscription();
 
   async function handleLogout() {
     try {
@@ -87,12 +93,16 @@ export function AppLayout() {
         {/* Logo */}
         <div className="h-16 flex items-center px-5 border-b border-neutral-100">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-brand-500 rounded-lg flex items-center justify-center">
-              <Sparkles className="w-4 h-4 text-white" />
-            </div>
+            {siteSettings.site_logo ? (
+              <img src={siteSettings.site_logo} alt="" className="w-8 h-8 object-contain rounded-lg" />
+            ) : (
+              <div className="w-8 h-8 bg-brand-500 rounded-lg flex items-center justify-center">
+                <Sparkles className="w-4 h-4 text-white" />
+              </div>
+            )}
             {!collapsed && (
               <span className="font-heading font-bold text-lg text-neutral-900">
-                EE PostMind
+                {siteSettings.site_title || 'EE PostMind'}
               </span>
             )}
           </div>
@@ -100,25 +110,34 @@ export function AppLayout() {
 
         {/* Navigation */}
         <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
-          {navigation.map((item) => (
-            <NavLink
-              key={item.name}
-              to={item.href}
-              onClick={() => setMobileOpen(false)}
-              className={({ isActive }) =>
-                cn(
-                  'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200',
-                  isActive
-                    ? 'bg-brand-50 text-brand-700'
-                    : 'text-neutral-500 hover:text-neutral-800 hover:bg-neutral-100',
-                  collapsed && 'justify-center px-0',
-                )
-              }
-            >
-              <item.icon className="w-5 h-5 flex-shrink-0" />
-              {!collapsed && <span>{item.name}</span>}
-            </NavLink>
-          ))}
+          {navigation.map((item) => {
+            const accessible = canAccess(item.feature);
+            return (
+              <NavLink
+                key={item.name}
+                to={accessible ? item.href : '/billing'}
+                onClick={() => setMobileOpen(false)}
+                className={({ isActive }) =>
+                  cn(
+                    'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200',
+                    !accessible
+                      ? 'text-neutral-300 cursor-default'
+                      : isActive
+                        ? 'bg-brand-50 text-brand-700'
+                        : 'text-neutral-500 hover:text-neutral-800 hover:bg-neutral-100',
+                    collapsed && 'justify-center px-0',
+                  )
+                }
+              >
+                {accessible ? (
+                  <item.icon className="w-5 h-5 flex-shrink-0" />
+                ) : (
+                  <Lock className="w-5 h-5 flex-shrink-0" />
+                )}
+                {!collapsed && <span>{item.name}</span>}
+              </NavLink>
+            );
+          })}
         </nav>
 
         {/* Bottom nav */}
@@ -205,7 +224,7 @@ export function AppLayout() {
       </div>
 
       {/* Feedback widget */}
-      <FeedbackWidget />
+      {/* <FeedbackWidget /> */}
       {/* AI Chatbot */}
       <AIChatbot />
     </div>

@@ -12,6 +12,7 @@ export function useCanvas(canvasId: string, initialSize: CanvasSize) {
   const [canvasReady, setCanvasReady] = useState(false);
   const [history, setHistory] = useState<string[]>([]);
   const [historyIdx, setHistoryIdx] = useState(-1);
+  const clipboardRef = useRef<fabric.FabricObject | null>(null);
 
   useEffect(() => {
     const el = document.getElementById(canvasId) as HTMLCanvasElement;
@@ -27,7 +28,6 @@ export function useCanvas(canvasId: string, initialSize: CanvasSize) {
     canvasRef.current = canvas;
     setCanvasReady(true);
 
-    // Save initial state
     const json = JSON.stringify(canvas.toJSON());
     setHistory([json]);
     setHistoryIdx(0);
@@ -145,6 +145,284 @@ export function useCanvas(canvasId: string, initialSize: CanvasSize) {
     saveState();
   }, [saveState]);
 
+  // ---- Copy / Paste ----
+  const copySelected = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const active = canvas.getActiveObject();
+    if (!active) return;
+    active.clone().then((cloned: fabric.FabricObject) => {
+      clipboardRef.current = cloned;
+    });
+  }, []);
+
+  const pasteClipboard = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || !clipboardRef.current) return;
+    clipboardRef.current.clone().then((cloned: fabric.FabricObject) => {
+      canvas.discardActiveObject();
+      cloned.set({ left: (cloned.left || 0) + 20, top: (cloned.top || 0) + 20, evented: true });
+      if ((cloned as any).type === 'activeselection') {
+        (cloned as any).canvas = canvas;
+        (cloned as any).forEachObject((obj: fabric.FabricObject) => canvas.add(obj));
+        cloned.setCoords();
+      } else {
+        canvas.add(cloned);
+      }
+      // Update clipboard offset for subsequent pastes
+      clipboardRef.current!.set({ left: (clipboardRef.current!.left || 0) + 20, top: (clipboardRef.current!.top || 0) + 20 });
+      canvas.setActiveObject(cloned);
+      canvas.requestRenderAll();
+      saveState();
+    });
+  }, [saveState]);
+
+  // ---- Group / Ungroup ----
+  const groupSelected = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const active = canvas.getActiveObject();
+    if (!active || (active as any).type !== 'activeselection') return;
+    const objects = (active as fabric.ActiveSelection).getObjects();
+    canvas.discardActiveObject();
+    objects.forEach((obj) => canvas.remove(obj));
+    const group = new fabric.Group(objects);
+    canvas.add(group);
+    canvas.setActiveObject(group);
+    canvas.requestRenderAll();
+    saveState();
+  }, [saveState]);
+
+  const ungroupSelected = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const active = canvas.getActiveObject();
+    if (!active || (active as any).type !== 'group') return;
+    const items = (active as fabric.Group).getObjects();
+    const groupLeft = active.left || 0;
+    const groupTop = active.top || 0;
+    canvas.remove(active);
+    items.forEach((obj) => {
+      obj.set({ left: (obj.left || 0) + groupLeft, top: (obj.top || 0) + groupTop });
+      obj.setCoords();
+      canvas.add(obj);
+    });
+    canvas.requestRenderAll();
+    saveState();
+  }, [saveState]);
+
+  // ---- Image Filters ----
+  const applyImageFilter = useCallback((filterType: string, value?: number) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const active = canvas.getActiveObject();
+    if (!active || !(active instanceof fabric.FabricImage)) return;
+
+    if (!active.filters) active.filters = [];
+    // Remove existing filter of same type
+    active.filters = active.filters.filter((f: any) => {
+      const t = f?.type || f?.constructor?.name || '';
+      return t.toLowerCase() !== filterType.toLowerCase();
+    });
+
+    switch (filterType.toLowerCase()) {
+      case 'brightness':
+        if (value !== undefined && value !== 0)
+          active.filters.push(new fabric.filters.Brightness({ brightness: value }));
+        break;
+      case 'contrast':
+        if (value !== undefined && value !== 0)
+          active.filters.push(new fabric.filters.Contrast({ contrast: value }));
+        break;
+      case 'saturation':
+        if (value !== undefined && value !== 0)
+          active.filters.push(new fabric.filters.Saturation({ saturation: value }));
+        break;
+      case 'grayscale':
+        active.filters.push(new fabric.filters.Grayscale());
+        break;
+      case 'sepia':
+        active.filters.push(new fabric.filters.Sepia());
+        break;
+      case 'blur':
+        if (value !== undefined && value > 0)
+          active.filters.push(new fabric.filters.Blur({ blur: value }));
+        break;
+    }
+
+    active.applyFilters();
+    canvas.requestRenderAll();
+    saveState();
+  }, [saveState]);
+
+  const clearImageFilters = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const active = canvas.getActiveObject();
+    if (!active || !(active instanceof fabric.FabricImage)) return;
+    active.filters = [];
+    active.applyFilters();
+    canvas.requestRenderAll();
+    saveState();
+  }, [saveState]);
+
+  // ---- Image Crop / Rotate ----
+  const cropActiveImageToAspect = useCallback((aspectRatio: number) => {
+    const canvas = canvasRef.current;
+    if (!canvas || !Number.isFinite(aspectRatio) || aspectRatio <= 0) return;
+    const active = canvas.getActiveObject();
+    if (!active || !(active instanceof fabric.FabricImage)) return;
+
+    const element = active.getElement() as HTMLImageElement | HTMLCanvasElement | null;
+    const sourceWidth = Number((element as any)?.naturalWidth || active.width || 0);
+    const sourceHeight = Number((element as any)?.naturalHeight || active.height || 0);
+    if (!sourceWidth || !sourceHeight) return;
+
+    const displayWidth = active.getScaledWidth();
+    const displayHeight = active.getScaledHeight();
+
+    const sourceAspect = sourceWidth / sourceHeight;
+    let cropWidth = sourceWidth;
+    let cropHeight = sourceHeight;
+    let cropX = 0;
+    let cropY = 0;
+
+    if (sourceAspect > aspectRatio) {
+      cropWidth = sourceHeight * aspectRatio;
+      cropX = (sourceWidth - cropWidth) / 2;
+    } else if (sourceAspect < aspectRatio) {
+      cropHeight = sourceWidth / aspectRatio;
+      cropY = (sourceHeight - cropHeight) / 2;
+    }
+
+    active.set({
+      cropX,
+      cropY,
+      width: cropWidth,
+      height: cropHeight,
+      scaleX: displayWidth / cropWidth,
+      scaleY: displayHeight / cropHeight,
+    });
+    active.setCoords();
+    canvas.requestRenderAll();
+    saveState();
+  }, [saveState]);
+
+  const resetActiveImageCrop = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const active = canvas.getActiveObject();
+    if (!active || !(active instanceof fabric.FabricImage)) return;
+
+    const element = active.getElement() as HTMLImageElement | HTMLCanvasElement | null;
+    const sourceWidth = Number((element as any)?.naturalWidth || active.width || 0);
+    const sourceHeight = Number((element as any)?.naturalHeight || active.height || 0);
+    if (!sourceWidth || !sourceHeight) return;
+
+    const displayWidth = active.getScaledWidth();
+    const displayHeight = active.getScaledHeight();
+
+    active.set({
+      cropX: 0,
+      cropY: 0,
+      width: sourceWidth,
+      height: sourceHeight,
+      scaleX: displayWidth / sourceWidth,
+      scaleY: displayHeight / sourceHeight,
+    });
+    active.setCoords();
+    canvas.requestRenderAll();
+    saveState();
+  }, [saveState]);
+
+  const rotateSelected = useCallback((deltaDegrees: number) => {
+    const canvas = canvasRef.current;
+    if (!canvas || !Number.isFinite(deltaDegrees)) return;
+    const active = canvas.getActiveObject();
+    if (!active) return;
+    active.rotate((active.angle || 0) + deltaDegrees);
+    active.setCoords();
+    canvas.requestRenderAll();
+    saveState();
+  }, [saveState]);
+
+  // ---- Layer Management ----
+  const getObjects = useCallback((): fabric.FabricObject[] => {
+    const canvas = canvasRef.current;
+    if (!canvas) return [];
+    return canvas.getObjects();
+  }, []);
+
+  const getActiveType = useCallback((): string | null => {
+    const canvas = canvasRef.current;
+    if (!canvas) return null;
+    const obj = canvas.getActiveObject();
+    if (!obj) return null;
+    if (obj instanceof fabric.FabricImage) return 'image';
+    if (obj instanceof fabric.IText || obj instanceof fabric.FabricText) return 'text';
+    if (obj instanceof fabric.Group) return 'group';
+    if ((obj as any).type === 'activeselection') return 'selection';
+    return 'shape';
+  }, []);
+
+  const selectObject = useCallback((obj: fabric.FabricObject) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    canvas.setActiveObject(obj);
+    canvas.requestRenderAll();
+  }, []);
+
+  const bringToFront = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const obj = canvas.getActiveObject();
+    if (obj) { canvas.bringObjectToFront(obj); canvas.requestRenderAll(); saveState(); }
+  }, [saveState]);
+
+  const sendToBack = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const obj = canvas.getActiveObject();
+    if (obj) { canvas.sendObjectToBack(obj); canvas.requestRenderAll(); saveState(); }
+  }, [saveState]);
+
+  const toggleObjectVisibility = useCallback((obj: fabric.FabricObject) => {
+    obj.set('visible', !obj.visible);
+    const canvas = canvasRef.current;
+    if (canvas) { canvas.requestRenderAll(); saveState(); }
+  }, [saveState]);
+
+  const toggleObjectLock = useCallback((obj: fabric.FabricObject) => {
+    const locked = !obj.lockMovementX;
+    obj.set({
+      lockMovementX: locked,
+      lockMovementY: locked,
+      lockScalingX: locked,
+      lockScalingY: locked,
+      lockRotation: locked,
+      selectable: !locked,
+      hasControls: !locked,
+    });
+    const canvas = canvasRef.current;
+    if (canvas) canvas.requestRenderAll();
+  }, []);
+
+  // ---- SVG insertion for icons/frames ----
+  const addSvgString = useCallback((svgString: string) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    fabric.loadSVGFromString(svgString).then((result) => {
+      const group = fabric.util.groupSVGElements(result.objects.filter(Boolean) as fabric.FabricObject[], result.options);
+      group.set({ left: 100, top: 100 });
+      const scale = Math.min(200 / (group.width || 200), 200 / (group.height || 200));
+      group.scale(scale);
+      canvas.add(group);
+      canvas.setActiveObject(group);
+      canvas.requestRenderAll();
+      saveState();
+    });
+  }, [saveState]);
+
   const resizeCanvas = useCallback((size: CanvasSize) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -152,7 +430,6 @@ export function useCanvas(canvasId: string, initialSize: CanvasSize) {
     const oldH = canvas.height!;
     const scaleX = size.width / oldW;
     const scaleY = size.height / oldH;
-    // Proportionally reflow all objects
     canvas.getObjects().forEach((obj) => {
       obj.set({
         left: (obj.left || 0) * scaleX,
@@ -170,7 +447,6 @@ export function useCanvas(canvasId: string, initialSize: CanvasSize) {
   const setBackground = useCallback((color: string) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    // Support gradient strings: "linear(#hex1, #hex2)"
     const gradMatch = color.match(/^linear\((.+),\s*(.+)\)$/);
     if (gradMatch) {
       const grad = new fabric.Gradient({
@@ -244,5 +520,23 @@ export function useCanvas(canvasId: string, initialSize: CanvasSize) {
     sendBackward,
     canUndo: historyIdx > 0,
     canRedo: historyIdx < history.length - 1,
+    // New capabilities
+    copySelected,
+    pasteClipboard,
+    groupSelected,
+    ungroupSelected,
+    applyImageFilter,
+    clearImageFilters,
+    cropActiveImageToAspect,
+    resetActiveImageCrop,
+    rotateSelected,
+    getObjects,
+    getActiveType,
+    selectObject,
+    bringToFront,
+    sendToBack,
+    toggleObjectVisibility,
+    toggleObjectLock,
+    addSvgString,
   };
 }

@@ -3,9 +3,11 @@ import { authenticate, AuthRequest } from '../middleware/auth.js';
 import { checkUsage } from '../middleware/usage.js';
 import { connectionService } from '../services/connection.service.js';
 import { config } from '../config/index.js';
+import { getGlobalCredentialsForPlatform } from '../services/admin-settings.service.js';
 import {
   MANUAL_CONNECTION_PLATFORMS,
   OAUTH_PLATFORMS,
+  GLOBAL_CREDENTIAL_PLATFORMS,
   isPlatformType,
   type PlatformType,
 } from '@ee-postmind/shared';
@@ -13,6 +15,7 @@ import {
 export const connectionRouter = Router();
 const oauthPlatforms = new Set<PlatformType>(OAUTH_PLATFORMS);
 const manualPlatforms = new Set<PlatformType>(MANUAL_CONNECTION_PLATFORMS);
+const globalCredPlatforms = new Set<PlatformType>(GLOBAL_CREDENTIAL_PLATFORMS);
 
 // List all connections
 connectionRouter.get(
@@ -25,6 +28,24 @@ connectionRouter.get(
       }
       const connections = await connectionService.listConnections(req.workspaceId);
       res.json({ success: true, data: connections });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+// Check which custom platforms have global credentials configured
+connectionRouter.get(
+  '/global-platforms',
+  authenticate,
+  async (_req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const available: string[] = [];
+      for (const platform of GLOBAL_CREDENTIAL_PLATFORMS) {
+        const creds = await getGlobalCredentialsForPlatform(platform);
+        if (creds) available.push(platform);
+      }
+      res.json({ success: true, data: available });
     } catch (err) {
       next(err);
     }
@@ -125,7 +146,16 @@ connectionRouter.post(
         });
       }
 
-      const { credentials } = req.body;
+      let { credentials } = req.body;
+
+      // If no credentials provided, try global credentials for custom platforms
+      if ((!credentials || typeof credentials !== 'string') && globalCredPlatforms.has(platform)) {
+        const globalCreds = await getGlobalCredentialsForPlatform(platform);
+        if (globalCreds) {
+          credentials = globalCreds;
+        }
+      }
+
       if (!credentials || typeof credentials !== 'string') {
         return res.status(400).json({ success: false, error: { code: 'MISSING_CREDENTIALS', message: 'Credentials required' } });
       }

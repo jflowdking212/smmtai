@@ -196,6 +196,13 @@ export const MANUAL_CONNECTION_PLATFORMS: PlatformType[] = [
   'iohah',
 ];
 
+// Custom platforms that support owner-configured global credentials
+export const GLOBAL_CREDENTIAL_PLATFORMS: PlatformType[] = [
+  'entreprenrs',
+  'chrxstians',
+  'iohah',
+];
+
 export function isPlatformType(value: string): value is PlatformType {
   return value in PLATFORMS;
 }
@@ -204,7 +211,7 @@ export function isPlatformType(value: string): value is PlatformType {
 // User & Auth Types
 // ============================================================
 
-export type SubscriptionTier = 'free' | 'pro' | 'business' | 'enterprise';
+export type SubscriptionTier = 'basic' | 'pro' | 'business' | 'enterprise';
 
 export type WorkspaceRole = 'owner' | 'admin' | 'editor' | 'viewer';
 
@@ -309,21 +316,24 @@ export const SUBSCRIPTION_LIMITS: Record<
     socialAccounts: number;
     postsPerMonth: number;
     aiGenerationsPerMonth: number;
+    templatesPerMonth: number;
     teamMembers: number;
     analyticsDays: number;
   }
 > = {
-  free: {
-    socialAccounts: 3,
+  basic: {
+    socialAccounts: 4,
     postsPerMonth: 30,
-    aiGenerationsPerMonth: 10,
+    aiGenerationsPerMonth: 5,
+    templatesPerMonth: 10,
     teamMembers: 1,
     analyticsDays: 7,
   },
   pro: {
-    socialAccounts: 10,
-    postsPerMonth: 300,
+    socialAccounts: 8,
+    postsPerMonth: 200,
     aiGenerationsPerMonth: 100,
+    templatesPerMonth: 50,
     teamMembers: 3,
     analyticsDays: 30,
   },
@@ -331,6 +341,7 @@ export const SUBSCRIPTION_LIMITS: Record<
     socialAccounts: 25,
     postsPerMonth: Infinity,
     aiGenerationsPerMonth: 500,
+    templatesPerMonth: Infinity,
     teamMembers: 10,
     analyticsDays: 90,
   },
@@ -338,9 +349,65 @@ export const SUBSCRIPTION_LIMITS: Record<
     socialAccounts: Infinity,
     postsPerMonth: Infinity,
     aiGenerationsPerMonth: Infinity,
+    templatesPerMonth: Infinity,
     teamMembers: Infinity,
     analyticsDays: Infinity,
   },
+};
+
+// Features gated by minimum subscription tier
+export type AppFeature =
+  | 'dashboard'
+  | 'compose'
+  | 'post_history'
+  | 'calendar'
+  | 'analytics'
+  | 'connections'
+  | 'templates'
+  | 'ai_assistant'
+  | 'conversations'
+  | 'knowledge_base'
+  | 'team'
+  | 'billing'
+  | 'settings'
+  | 'editor';
+
+export const PLAN_FEATURES: Record<AppFeature, SubscriptionTier> = {
+  dashboard: 'basic',
+  compose: 'basic',
+  post_history: 'basic',
+  calendar: 'basic',
+  connections: 'basic',
+  templates: 'basic',
+  ai_assistant: 'basic',
+  editor: 'basic',
+  billing: 'basic',
+  settings: 'basic',
+  conversations: 'pro',
+  analytics: 'pro',
+  knowledge_base: 'pro',
+  team: 'pro',
+};
+
+const TIER_ORDER: Record<SubscriptionTier, number> = { basic: 0, pro: 1, business: 2, enterprise: 3 };
+
+export function hasFeatureAccess(userTier: SubscriptionTier, feature: AppFeature): boolean {
+  const requiredTier = PLAN_FEATURES[feature];
+  return TIER_ORDER[userTier] >= TIER_ORDER[requiredTier];
+}
+
+// Platforms available per subscription tier (each tier includes all platforms from tiers below it)
+export const TIER_PLATFORMS: Record<SubscriptionTier, PlatformType[]> = {
+  basic: ['entreprenrs', 'chrxstians', 'iohah', 'facebook'],
+  pro: ['entreprenrs', 'chrxstians', 'iohah', 'facebook', 'instagram', 'twitter', 'youtube', 'pinterest'],
+  business: [
+    'entreprenrs', 'chrxstians', 'iohah', 'facebook', 'instagram', 'twitter', 'youtube',
+    'tiktok', 'linkedin', 'pinterest', 'bluesky', 'mastodon', 'telegram',
+  ],
+  enterprise: [
+    'entreprenrs', 'chrxstians', 'iohah', 'facebook', 'instagram', 'twitter', 'youtube',
+    'tiktok', 'linkedin', 'pinterest', 'bluesky', 'mastodon', 'telegram',
+  ],
 };
 
 // ============================================================

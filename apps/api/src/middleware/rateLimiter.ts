@@ -72,9 +72,13 @@ if (settings.useRedisStore && !shouldUseRedisStore) {
 
 const redisClient = shouldUseRedisStore
   ? new Redis(redisUrl, {
-    lazyConnect: true,
-    maxRetriesPerRequest: 1,
-    enableOfflineQueue: false,
+    lazyConnect: false,
+    maxRetriesPerRequest: 3,
+    enableOfflineQueue: true,
+    retryStrategy(times) {
+      if (times > 5) return null;
+      return Math.min(times * 200, 2000);
+    },
   })
   : null;
 

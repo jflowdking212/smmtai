@@ -49,7 +49,7 @@ export class WorkspaceService {
       });
 
       await tx.subscription.create({
-        data: { workspaceId: ws.id, tier: 'free', status: 'active' },
+        data: { workspaceId: ws.id, tier: 'basic', status: 'active' },
       });
 
       return ws;

@@ -4,6 +4,9 @@ import { LinkedInAdapter } from '../services/platforms/major.js';
 const ORIGINAL_LINKEDIN_CLIENT_ID = process.env.LINKEDIN_CLIENT_ID;
 const ORIGINAL_LINKEDIN_CLIENT_SECRET = process.env.LINKEDIN_CLIENT_SECRET;
 const ORIGINAL_LINKEDIN_REDIRECT_URI = process.env.LINKEDIN_REDIRECT_URI;
+const ORIGINAL_LINKEDIN_APP_ID = process.env.LINKEDIN_APP_ID;
+const ORIGINAL_LINKEDIN_APP_SECRET = process.env.LINKEDIN_APP_SECRET;
+const ORIGINAL_LINKEDIN_CALLBACK_URL = process.env.LINKEDIN_CALLBACK_URL;
 
 describe('LinkedInAdapter OAuth', () => {
   const fetchMock = vi.fn<typeof fetch>();
@@ -21,6 +24,9 @@ describe('LinkedInAdapter OAuth', () => {
     process.env.LINKEDIN_CLIENT_ID = ORIGINAL_LINKEDIN_CLIENT_ID;
     process.env.LINKEDIN_CLIENT_SECRET = ORIGINAL_LINKEDIN_CLIENT_SECRET;
     process.env.LINKEDIN_REDIRECT_URI = ORIGINAL_LINKEDIN_REDIRECT_URI;
+    process.env.LINKEDIN_APP_ID = ORIGINAL_LINKEDIN_APP_ID;
+    process.env.LINKEDIN_APP_SECRET = ORIGINAL_LINKEDIN_APP_SECRET;
+    process.env.LINKEDIN_CALLBACK_URL = ORIGINAL_LINKEDIN_CALLBACK_URL;
   });
 
   it('builds OAuth URL with configured callback URI', () => {
@@ -30,6 +36,20 @@ describe('LinkedInAdapter OAuth', () => {
     expect(authUrl.searchParams.get('state')).toBe(state);
     expect(authUrl.searchParams.get('client_id')).toBe(process.env.LINKEDIN_CLIENT_ID);
     expect(authUrl.searchParams.get('redirect_uri')).toBe(process.env.LINKEDIN_REDIRECT_URI);
+  });
+
+  it('supports legacy LinkedIn OAuth env aliases', () => {
+    process.env.LINKEDIN_CLIENT_ID = '';
+    process.env.LINKEDIN_CLIENT_SECRET = '';
+    process.env.LINKEDIN_APP_ID = 'linkedin-app-id';
+    process.env.LINKEDIN_APP_SECRET = 'linkedin-app-secret';
+    process.env.LINKEDIN_REDIRECT_URI = '';
+    process.env.LINKEDIN_CALLBACK_URL = 'https://example.com/connections/linkedin/callback';
+
+    const authUrl = new URL(new LinkedInAdapter().getAuthUrl('signed-state-token'));
+
+    expect(authUrl.searchParams.get('client_id')).toBe(process.env.LINKEDIN_APP_ID);
+    expect(authUrl.searchParams.get('redirect_uri')).toBe(process.env.LINKEDIN_CALLBACK_URL);
   });
 
   it('exchanges auth code using configured callback URI', async () => {

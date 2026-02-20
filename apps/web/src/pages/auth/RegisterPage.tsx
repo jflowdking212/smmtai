@@ -44,7 +44,7 @@ export function RegisterPage() {
 
     try {
       const res = await api.auth.register({ name, email, password });
-      setAuth(res.data.user, res.data.accessToken, res.data.workspaceId);
+      setAuth(res.data.user, res.data.accessToken, res.data.workspaceId, res.data.role || 'owner', res.data.tier || 'basic');
 
       if (inviteToken && inviteAction !== 'decline') {
         await api.workspaces.acceptInvite(inviteToken);

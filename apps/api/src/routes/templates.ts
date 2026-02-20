@@ -1,5 +1,6 @@
 import { Router, Response, NextFunction } from 'express';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
+import { checkUsage, incrementUsage } from '../middleware/usage.js';
 import { prisma } from '../config/database.js';
 import { cacheResponse } from '../middleware/cache.js';
 
@@ -36,6 +37,7 @@ templateRouter.get(
 templateRouter.post(
   '/',
   authenticate,
+  checkUsage('templates'),
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const { name, category, designData, platforms } = req.body;
@@ -58,6 +60,10 @@ templateRouter.post(
           isPremium: false,
         },
       });
+
+      if (req.workspaceId) {
+        await incrementUsage(req.workspaceId, 'templates');
+      }
 
       res.status(201).json({ success: true, data: template });
     } catch (err) {

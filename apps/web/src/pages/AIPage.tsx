@@ -1,6 +1,8 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, Button, Badge } from '@/components/ui';
 import { api } from '@/lib/api';
+import { saveComposeSeed } from '@/lib/composeSeed';
 import {
   Sparkles, Hash, Image, RefreshCw, Languages, ShieldCheck,
   Clock, TrendingUp, Copy, CheckCircle2, Loader2, Send,
@@ -28,6 +30,132 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
 
 const TONES = ['professional', 'casual', 'witty', 'formal', 'inspirational', 'educational', 'persuasive'];
 const BRAND_VOICE_PROFILES = ['formal', 'casual', 'witty', 'professional'];
+const BRAND_VOICE_DETAILS_OPTIONS = [
+  'Bold and practical',
+  'Clever and direct',
+  'Friendly and conversational',
+  'Authoritative and expert-led',
+  'Data-driven and analytical',
+  'Warm and empathetic',
+  'Minimal and concise',
+  'Storytelling and narrative',
+  'Premium and aspirational',
+  'Playful and humorous',
+  'Confident and motivational',
+  'Community-first and inclusive',
+  'Technical and precise',
+  'Luxury and refined',
+  'Trustworthy and reassuring',
+  'Action-oriented and energetic',
+  'Thought-leadership focused',
+  'Transparent and honest',
+  'Trend-savvy and modern',
+  'Educational and step-by-step',
+];
+const INDUSTRY_OPTIONS = [
+  'SaaS',
+  'Technology',
+  'E-commerce',
+  'Retail',
+  'Fintech',
+  'Banking',
+  'Insurance',
+  'Healthcare',
+  'Pharmaceuticals',
+  'Biotech',
+  'Telecommunications',
+  'Media & Entertainment',
+  'Gaming',
+  'Education',
+  'EdTech',
+  'Real Estate',
+  'Construction',
+  'Hospitality',
+  'Travel & Tourism',
+  'Food & Beverage',
+  'Restaurants',
+  'Agriculture',
+  'Automotive',
+  'Transportation & Logistics',
+  'Manufacturing',
+  'Energy',
+  'Utilities',
+  'Oil & Gas',
+  'Renewables',
+  'Fashion & Apparel',
+  'Beauty & Cosmetics',
+  'Wellness & Fitness',
+  'Sports',
+  'Nonprofit',
+  'Government',
+  'Legal',
+  'HR & Recruiting',
+  'Marketing & Advertising',
+  'Public Relations',
+  'Cybersecurity',
+  'Cloud Computing',
+  'AI & Machine Learning',
+  'Data Analytics',
+  'Blockchain & Web3',
+  'Consumer Electronics',
+  'Home Services',
+  'Professional Services',
+  'Consulting',
+  'Architecture & Design',
+  'Interior Design',
+  'Events & Conferences',
+  'Music',
+  'Film & TV',
+  'Publishing',
+  'Parenting & Family',
+  'Pet Care',
+  'Spirituality & Faith',
+  'Community Development',
+];
+const AUDIENCE_PERSONA_OPTIONS = [
+  'Startup founders',
+  'First-time store owners',
+  'Small business owners',
+  'Enterprise decision-makers',
+  'Marketing managers',
+  'Sales leaders',
+  'Product managers',
+  'Software developers',
+  'IT administrators',
+  'HR professionals',
+  'Finance professionals',
+  'Operations managers',
+  'Creators and influencers',
+  'Freelancers and solopreneurs',
+  'Students and early-career professionals',
+  'Job seekers',
+  'Parents with young children',
+  'Gen Z consumers',
+  'Millennial professionals',
+  'High-income professionals',
+  'Budget-conscious shoppers',
+  'Health-conscious adults',
+  'Fitness enthusiasts',
+  'Beauty enthusiasts',
+  'Gamers',
+  'Travel enthusiasts',
+  'Foodies',
+  'Homeowners',
+  'Real estate investors',
+  'Local community members',
+  'Nonprofit donors',
+  'Faith-based community leaders',
+  'Educators and teachers',
+  'Researchers and analysts',
+  'B2B procurement teams',
+  'Customer support teams',
+  'E-commerce growth teams',
+  'Agency owners',
+  'Content marketers',
+  'Event organizers',
+  'Women entrepreneurs',
+  'First-time buyers',
+];
 const PLATFORMS = ['facebook', 'instagram', 'tiktok', 'linkedin', 'twitter', 'youtube', 'pinterest', 'bluesky', 'mastodon', 'telegram', 'entreprenrs', 'chrxstians', 'iohah'];
 const HISTORY_LIMIT = 12;
 
@@ -60,6 +188,7 @@ function summarizeResult(tab: Tab, value: any): string {
 }
 
 export function AIPage() {
+  const navigate = useNavigate();
   const [tab, setTab] = useState<Tab>('caption');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
@@ -159,6 +288,18 @@ export function AIPage() {
     navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  }
+
+  function handleUseInCompose(payload: { content?: string; hashtags?: string[] }) {
+    const nextContent = payload.content?.trim();
+    const nextHashtags = payload.hashtags?.filter((value): value is string => typeof value === 'string' && value.trim().length > 0);
+
+    saveComposeSeed({
+      source: 'ai',
+      content: nextContent || undefined,
+      hashtags: nextHashtags && nextHashtags.length > 0 ? nextHashtags : undefined,
+    });
+    navigate('/compose');
   }
 
   const needsTopic = ['caption', 'hashtags', 'image-prompt'].includes(tab);
@@ -263,13 +404,19 @@ export function AIPage() {
 
               <div>
                 <label htmlFor="brand-voice-details" className="block text-sm font-medium text-neutral-700 mb-1">Brand Voice Details (optional)</label>
-                <input
+                <select
                   id="brand-voice-details"
                   value={brandVoice}
                   onChange={(e) => setBrandVoice(e.target.value)}
-                  placeholder="e.g. Bold, practical, and data-driven"
                   className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue"
-                />
+                >
+                  <option value="">Select brand voice details</option>
+                  {BRAND_VOICE_DETAILS_OPTIONS.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
               </div>
             </>
           )}
@@ -277,26 +424,38 @@ export function AIPage() {
           {showsIndustry && (
             <div>
               <label htmlFor="industry" className="block text-sm font-medium text-neutral-700 mb-1">Industry (optional)</label>
-              <input
+              <select
                 id="industry"
                 value={industry}
                 onChange={(e) => setIndustry(e.target.value)}
-                placeholder="e.g. Technology, Fitness, Fashion..."
                 className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue"
-              />
+              >
+                <option value="">Select an industry</option>
+                {INDUSTRY_OPTIONS.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
             </div>
           )}
 
           {showsAudiencePersona && (
             <div>
               <label htmlFor="audience-persona" className="block text-sm font-medium text-neutral-700 mb-1">Audience Persona (optional)</label>
-              <input
+              <select
                 id="audience-persona"
                 value={audiencePersona}
                 onChange={(e) => setAudiencePersona(e.target.value)}
-                placeholder="e.g. Small business owners launching their first campaign"
                 className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue"
-              />
+              >
+                <option value="">Select an audience persona</option>
+                {AUDIENCE_PERSONA_OPTIONS.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
             </div>
           )}
 
@@ -388,6 +547,15 @@ export function AIPage() {
               <Button size="sm" variant="secondary" onClick={() => copyToClipboard(result.caption)}>
                 <Copy className="w-3 h-3" /> Copy Caption
               </Button>
+              <Button
+                size="sm"
+                onClick={() => handleUseInCompose({
+                  content: result.caption,
+                  hashtags: Array.isArray(result.hashtags) ? result.hashtags : undefined,
+                })}
+              >
+                <Send className="w-3 h-3" /> Use in Compose
+              </Button>
             </div>
           )}
 
@@ -410,6 +578,14 @@ export function AIPage() {
               )}
               <Button size="sm" variant="secondary" onClick={() => copyToClipboard(result.hashtags.map((h: string) => `#${h}`).join(' '))}>
                 <Copy className="w-3 h-3" /> Copy All
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => handleUseInCompose({
+                  hashtags: Array.isArray(result.hashtags) ? result.hashtags : undefined,
+                })}
+              >
+                <Send className="w-3 h-3" /> Use in Compose
               </Button>
             </div>
           )}
@@ -437,6 +613,9 @@ export function AIPage() {
               <Button size="sm" variant="secondary" onClick={() => copyToClipboard(result.rewritten)}>
                 <Copy className="w-3 h-3" /> Copy
               </Button>
+              <Button size="sm" onClick={() => handleUseInCompose({ content: result.rewritten })}>
+                <Send className="w-3 h-3" /> Use in Compose
+              </Button>
             </div>
           )}
 
@@ -450,6 +629,9 @@ export function AIPage() {
               )}
               <Button size="sm" variant="secondary" onClick={() => copyToClipboard(result.translated)}>
                 <Copy className="w-3 h-3" /> Copy
+              </Button>
+              <Button size="sm" onClick={() => handleUseInCompose({ content: result.translated })}>
+                <Send className="w-3 h-3" /> Use in Compose
               </Button>
             </div>
           )}

@@ -4,11 +4,14 @@ import { api, ApiError } from '@/lib/api';
 import {
   MANUAL_CONNECTION_PLATFORMS,
   OAUTH_PLATFORMS,
+  GLOBAL_CREDENTIAL_PLATFORMS,
+  TIER_PLATFORMS,
   PLATFORMS,
   isPlatformType,
   type PlatformType,
 } from '@ee-postmind/shared';
-import { Plus, Unplug, RefreshCw, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Plus, Unplug, RefreshCw, CheckCircle2, AlertCircle, Lock } from 'lucide-react';
+import { useSubscription } from '@/hooks/useSubscription';
 
 const allPlatforms: PlatformType[] = [...OAUTH_PLATFORMS, ...MANUAL_CONNECTION_PLATFORMS];
 
@@ -121,6 +124,10 @@ export function ConnectionsPage() {
   const [manualPlatform, setManualPlatform] = useState<PlatformType | null>(null);
   const [manualValues, setManualValues] = useState<Record<string, string>>({});
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [globalPlatforms, setGlobalPlatforms] = useState<Set<string>>(new Set());
+  const { tier } = useSubscription();
+
+  const allowedPlatforms = new Set<string>(TIER_PLATFORMS[tier] || TIER_PLATFORMS.basic);
 
   const fetchConnections = useCallback(async () => {
     try {
@@ -132,6 +139,11 @@ export function ConnectionsPage() {
   }, []);
 
   useEffect(() => { fetchConnections(); }, [fetchConnections]);
+  useEffect(() => {
+    api.connections.getGlobalPlatforms()
+      .then((res) => setGlobalPlatforms(new Set(res.data)))
+      .catch(() => { /* ignore */ });
+  }, []);
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const connected = params.get('connected');
@@ -156,6 +168,13 @@ export function ConnectionsPage() {
       if (OAUTH_PLATFORMS.includes(platform)) {
         const res = await api.connections.initiateOAuth(platform);
         window.location.href = res.data.authUrl;
+        return;
+      }
+      // If this platform has global credentials, connect directly without prompting
+      if (globalPlatforms.has(platform)) {
+        await api.connections.manualConnect(platform, '');
+        await fetchConnections();
+        setMessage({ type: 'success', text: `${PLATFORMS[platform].name} connected successfully.` });
         return;
       }
       if (MANUAL_CONNECTION_PLATFORMS.includes(platform)) {
@@ -281,9 +300,10 @@ export function ConnectionsPage() {
           const connection = getConnection(platformId);
           const isConnected = !!connection;
           const needsReconnect = isConnected && (!connection.isActive || connection.tokenExpired);
+          const isLocked = !allowedPlatforms.has(platformId);
 
           return (
-            <Card key={platformId} hover className="p-5">
+            <Card key={platformId} hover className={`p-5 ${isLocked ? 'opacity-60' : ''}`}>
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
                   <div
@@ -355,6 +375,15 @@ export function ConnectionsPage() {
                     <Unplug className="w-4 h-4" /> Disconnect
                   </Button>
                 </div>
+              ) : isLocked ? (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="w-full text-neutral-400"
+                  onClick={() => setMessage({ type: 'error', text: `Upgrade your plan to connect ${platform.name}.` })}
+                >
+                  <Lock className="w-4 h-4" /> Upgrade to Connect
+                </Button>
               ) : (
                 <Button
                   variant="secondary"

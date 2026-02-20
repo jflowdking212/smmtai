@@ -25,6 +25,8 @@ import { templateRouter } from './routes/templates.js';
 import { feedbackRouter } from './routes/feedback.js';
 import { adminRouter } from './routes/admin.js';
 import { chatRouter } from './routes/chat.js';
+import { bgRemoveRouter } from './routes/bgRemove.js';
+import { collaborationRouter } from './routes/collaboration.js';
 import { scheduleAnalyticsIngestion, scheduleAnalyticsDigestReports, scheduleConnectionHealthMonitoring } from './jobs/scheduler.js';
 
 // Initialize Sentry
@@ -71,6 +73,8 @@ app.use('/api/v1/templates', templateRouter);
 app.use('/api/v1/feedback', feedbackRouter);
 app.use('/api/v1/admin', adminRouter);
 app.use('/api/v1/chat', chatRouter);
+app.use('/api/v1/bg-remove', bgRemoveRouter);
+app.use('/api/v1/collaboration', collaborationRouter);
 
 // Sentry error handler (must be before custom errorHandler)
 if (config.sentry.dsn) {

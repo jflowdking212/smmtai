@@ -4,7 +4,7 @@ import { AppError } from './errorHandler.js';
 import { AuthRequest } from './auth.js';
 import { SUBSCRIPTION_LIMITS, type SubscriptionTier } from '@ee-postmind/shared';
 
-type UsageMetric = 'posts' | 'ai_generations' | 'social_accounts';
+type UsageMetric = 'posts' | 'ai_generations' | 'social_accounts' | 'templates';
 type UsageAccessInput = {
   tier: SubscriptionTier;
   status: string;
@@ -27,7 +27,7 @@ export function resolveUsageAccess(
   now: Date = new Date(),
   gracePeriodDays: number = billingGracePeriodDays,
 ): UsageAccessDecision {
-  if (input.tier === 'free') {
+  if (input.tier === 'basic') {
     return { allowed: true };
   }
 
@@ -91,7 +91,13 @@ export function checkUsage(metric: UsageMetric) {
       }
 
       const limits = SUBSCRIPTION_LIMITS[tier];
-      const limit = limits[metric === 'posts' ? 'postsPerMonth' : metric === 'ai_generations' ? 'aiGenerationsPerMonth' : 'socialAccounts'];
+      const limitMap: Record<UsageMetric, number> = {
+        posts: limits.postsPerMonth,
+        ai_generations: limits.aiGenerationsPerMonth,
+        social_accounts: limits.socialAccounts,
+        templates: limits.templatesPerMonth,
+      };
+      const limit = limitMap[metric];
 
       // Unlimited
       if (limit === Infinity) return next();

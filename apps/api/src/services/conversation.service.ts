@@ -63,6 +63,13 @@ export async function transferToAgent(sessionId: string, agentId: string, reason
   });
 }
 
+export async function transferToHuman(sessionId: string) {
+  return prisma.chatConversation.update({
+    where: { sessionId },
+    data: { status: 'TRANSFERRED', transferReason: 'No KB match — routed to live support' },
+  });
+}
+
 export async function getConversation(sessionId: string) {
   return prisma.chatConversation.findUnique({ where: { sessionId } });
 }

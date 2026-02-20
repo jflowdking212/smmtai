@@ -4,6 +4,9 @@ import { YouTubeAdapter } from '../services/platforms/major.js';
 const ORIGINAL_GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const ORIGINAL_GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
 const ORIGINAL_YOUTUBE_REDIRECT_URI = process.env.YOUTUBE_REDIRECT_URI;
+const ORIGINAL_YOUTUBE_CLIENT_ID = process.env.YOUTUBE_CLIENT_ID;
+const ORIGINAL_YOUTUBE_CLIENT_SECRET = process.env.YOUTUBE_CLIENT_SECRET;
+const ORIGINAL_YOUTUBE_CALLBACK_URL = process.env.YOUTUBE_CALLBACK_URL;
 
 describe('YouTubeAdapter OAuth', () => {
   const fetchMock = vi.fn<typeof fetch>();
@@ -21,6 +24,9 @@ describe('YouTubeAdapter OAuth', () => {
     process.env.GOOGLE_CLIENT_ID = ORIGINAL_GOOGLE_CLIENT_ID;
     process.env.GOOGLE_CLIENT_SECRET = ORIGINAL_GOOGLE_CLIENT_SECRET;
     process.env.YOUTUBE_REDIRECT_URI = ORIGINAL_YOUTUBE_REDIRECT_URI;
+    process.env.YOUTUBE_CLIENT_ID = ORIGINAL_YOUTUBE_CLIENT_ID;
+    process.env.YOUTUBE_CLIENT_SECRET = ORIGINAL_YOUTUBE_CLIENT_SECRET;
+    process.env.YOUTUBE_CALLBACK_URL = ORIGINAL_YOUTUBE_CALLBACK_URL;
   });
 
   it('builds OAuth URL with configured callback URI', () => {
@@ -32,6 +38,20 @@ describe('YouTubeAdapter OAuth', () => {
     expect(authUrl.searchParams.get('redirect_uri')).toBe(process.env.YOUTUBE_REDIRECT_URI);
     expect(authUrl.searchParams.get('response_type')).toBe('code');
     expect(authUrl.searchParams.get('scope')).toContain('https://www.googleapis.com/auth/youtube.upload');
+  });
+
+  it('supports legacy YouTube OAuth env aliases', () => {
+    process.env.GOOGLE_CLIENT_ID = '';
+    process.env.GOOGLE_CLIENT_SECRET = '';
+    process.env.YOUTUBE_CLIENT_ID = 'youtube-client-id';
+    process.env.YOUTUBE_CLIENT_SECRET = 'youtube-client-secret';
+    process.env.YOUTUBE_REDIRECT_URI = '';
+    process.env.YOUTUBE_CALLBACK_URL = 'https://example.com/connections/youtube/callback';
+
+    const authUrl = new URL(new YouTubeAdapter().getAuthUrl('signed-state-token'));
+
+    expect(authUrl.searchParams.get('client_id')).toBe(process.env.YOUTUBE_CLIENT_ID);
+    expect(authUrl.searchParams.get('redirect_uri')).toBe(process.env.YOUTUBE_CALLBACK_URL);
   });
 
   it('exchanges auth code using configured callback URI', async () => {

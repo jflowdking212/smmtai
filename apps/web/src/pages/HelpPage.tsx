@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, Badge, Button } from '@/components/ui';
+import { Link } from 'react-router-dom';
+import { api } from '@/lib/api';
 import {
   BookOpen, Search, MessageSquare, Video,
   ChevronRight, ExternalLink, HelpCircle,
   PenSquare, Calendar, BarChart3, Link2,
-  Palette, Sparkles, Shield, Zap,
+  Palette, Sparkles, Shield, Zap, Share2,
 } from 'lucide-react';
 
 interface HelpArticle {
@@ -15,7 +17,7 @@ interface HelpArticle {
   icon: React.ReactNode;
 }
 
-const CATEGORIES = ['Getting Started', 'Features', 'Integrations', 'Account & Billing', 'Troubleshooting'];
+const CATEGORIES = ['Getting Started', 'Features', 'Integrations', 'Social Media Guides', 'Account & Billing', 'Troubleshooting'];
 
 const ARTICLES: HelpArticle[] = [
   { id: 'gs-1', title: 'Quick Start Guide', description: 'Learn the basics of EE PostMind in 5 minutes — connect accounts, create posts, and schedule content.', category: 'Getting Started', icon: <Zap className="w-5 h-5" /> },
@@ -32,6 +34,14 @@ const ARTICLES: HelpArticle[] = [
   { id: 'ab-2', title: 'Team Management', description: 'Invite team members, assign roles (Admin, Editor, Viewer), and manage workspace permissions.', category: 'Account & Billing', icon: <Shield className="w-5 h-5" /> },
   { id: 't-1', title: 'Post Publishing Failures', description: 'Common reasons why posts fail to publish and how to resolve them — token expiry, API limits, media issues.', category: 'Troubleshooting', icon: <HelpCircle className="w-5 h-5" /> },
   { id: 't-2', title: 'Connection Issues', description: 'Steps to reconnect disconnected accounts and troubleshoot OAuth authentication problems.', category: 'Troubleshooting', icon: <HelpCircle className="w-5 h-5" /> },
+  // Social Media Connection Guides
+  { id: 'sm-1', title: 'Connect Facebook & Instagram', description: 'Link your Facebook Page and Instagram Business account via Meta Business Suite. Includes permissions setup and troubleshooting tips.', category: 'Social Media Guides', icon: <Share2 className="w-5 h-5" /> },
+  { id: 'sm-2', title: 'Connect Twitter / X', description: 'Set up Twitter API v2 OAuth credentials, create a developer project, and authorize Postmind to post on your behalf.', category: 'Social Media Guides', icon: <Share2 className="w-5 h-5" /> },
+  { id: 'sm-3', title: 'Connect LinkedIn', description: 'Authorize LinkedIn for personal profiles and company pages. Covers OAuth consent, required scopes, and posting permissions.', category: 'Social Media Guides', icon: <Share2 className="w-5 h-5" /> },
+  { id: 'sm-4', title: 'Connect TikTok', description: 'Register your TikTok developer app, request Content Posting API access, and link your account to Postmind.', category: 'Social Media Guides', icon: <Share2 className="w-5 h-5" /> },
+  { id: 'sm-5', title: 'Connect YouTube', description: 'Enable YouTube Data API, configure OAuth credentials in Google Cloud Console, and authorize video uploads.', category: 'Social Media Guides', icon: <Share2 className="w-5 h-5" /> },
+  { id: 'sm-6', title: 'Connect Pinterest', description: 'Create a Pinterest developer app, set callback URLs, and authorize Postmind to create pins on your boards.', category: 'Social Media Guides', icon: <Share2 className="w-5 h-5" /> },
+  { id: 'sm-7', title: 'Managing Connected Accounts', description: 'Refresh expired tokens, disconnect accounts, switch between profiles, and manage multiple workspaces.', category: 'Social Media Guides', icon: <Link2 className="w-5 h-5" /> },
 ];
 
 const FAQ = [
@@ -40,12 +50,19 @@ const FAQ = [
   { q: 'Can I schedule posts in different time zones?', a: 'Yes! Set your default timezone in Settings or override per-post in the scheduler.' },
   { q: 'Is my data secure?', a: 'All data is encrypted at rest and in transit. OAuth tokens are stored encrypted. We never store your social media passwords.' },
   { q: 'How does the AI assistant work?', a: 'We use OpenAI GPT models to generate captions, hashtags, and content suggestions based on your brand voice and audience.' },
+  { q: 'How do I reconnect an expired social account?', a: 'Go to Connections, click the disconnected account, and follow the re-authorization flow. Tokens refresh automatically when possible.' },
+  { q: 'Can I manage multiple brands or clients?', a: 'Yes! Create separate workspaces for each brand. Business and Enterprise plans support multiple workspaces with team roles.' },
 ];
 
 export function HelpPage() {
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState('Getting Started');
   const [expandedFaq, setExpandedFaq] = useState<number | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    api.admin.getSiteSettings().then(() => setIsAdmin(true)).catch(() => {});
+  }, []);
 
   const filtered = ARTICLES.filter((a) => {
     const matchesCategory = a.category === activeCategory;
@@ -88,6 +105,21 @@ export function HelpPage() {
           </Card>
         ))}
       </div>
+
+      {/* Admin: Knowledge Base link */}
+      {isAdmin && (
+        <Card className="p-4 border-brand-blue/20 bg-brand-blue/5">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-semibold text-neutral-800">Knowledge Base Management</h3>
+              <p className="text-xs text-neutral-500 mt-0.5">Add and manage AI chatbot knowledge articles, FAQs, and guides.</p>
+            </div>
+            <Link to="/knowledge-base">
+              <Button size="sm"><BookOpen className="w-3.5 h-3.5 mr-1" /> Manage KB</Button>
+            </Link>
+          </div>
+        </Card>
+      )}
 
       {/* Category tabs + articles */}
       <div>
@@ -157,8 +189,10 @@ export function HelpPage() {
         <h3 className="text-sm font-semibold text-neutral-800">Still need help?</h3>
         <p className="text-xs text-neutral-500 mt-1">Our support team is available Monday–Friday, 9 AM–6 PM EST.</p>
         <div className="flex justify-center gap-3 mt-3">
-          <Button size="sm"><MessageSquare className="w-3.5 h-3.5" /> Chat with Us</Button>
-          <Button variant="secondary" size="sm"><ExternalLink className="w-3.5 h-3.5" /> Email Support</Button>
+          <Button size="sm" onClick={() => window.dispatchEvent(new Event('open-chatbot'))}><MessageSquare className="w-3.5 h-3.5" /> Chat with Us</Button>
+          <a href="mailto:support@smmt.entreprenreducation.com">
+            <Button variant="secondary" size="sm"><ExternalLink className="w-3.5 h-3.5" /> Email Support</Button>
+          </a>
         </div>
       </Card>
     </div>

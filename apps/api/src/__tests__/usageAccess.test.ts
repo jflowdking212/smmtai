@@ -4,9 +4,9 @@ import { resolveUsageAccess } from '../middleware/usage.js';
 describe('resolveUsageAccess', () => {
   const now = new Date('2026-02-01T12:00:00.000Z');
 
-  it('allows free tier workspaces regardless of subscription status', () => {
+  it('allows basic tier workspaces regardless of subscription status', () => {
     const decision = resolveUsageAccess(
-      { tier: 'free', status: 'canceled', currentPeriodEnd: null },
+      { tier: 'basic', status: 'canceled', currentPeriodEnd: null },
       now,
       7,
     );

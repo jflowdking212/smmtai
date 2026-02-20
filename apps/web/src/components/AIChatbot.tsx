@@ -16,9 +16,35 @@ interface CustomerInfo {
 }
 
 const API_BASE = '/api/v1';
+const CSRF_COOKIE = 'csrfToken';
+
+function getCookieValue(name: string): string | null {
+  const cookies = typeof document !== 'undefined' && document.cookie ? document.cookie.split('; ') : [];
+  for (const cookie of cookies) {
+    const [key, ...rest] = cookie.split('=');
+    if (key === name) {
+      return decodeURIComponent(rest.join('='));
+    }
+  }
+  return null;
+}
+
+function getJsonHeaders(): HeadersInit {
+  const csrfToken = getCookieValue(CSRF_COOKIE);
+  return csrfToken
+    ? { 'Content-Type': 'application/json', 'x-csrf-token': csrfToken }
+    : { 'Content-Type': 'application/json' };
+}
 
 export function AIChatbot() {
   const [isOpen, setIsOpen] = useState(false);
+
+  // Listen for external open requests (e.g., from Help page)
+  useEffect(() => {
+    const handler = () => setIsOpen(true);
+    window.addEventListener('open-chatbot', handler);
+    return () => window.removeEventListener('open-chatbot', handler);
+  }, []);
   const [messages, setMessages] = useState<Message[]>([
     { id: '1', content: "Hi! I'm your Postmind assistant. I can help you with questions about social media management, scheduling, analytics, and more. How can I help?", sender: 'bot', timestamp: new Date() },
   ]);
@@ -75,7 +101,9 @@ export function AIChatbot() {
     e.preventDefault();
     if (!customerInfo.name.trim()) return;
     fetch(`${API_BASE}/chat/message`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      method: 'POST',
+      headers: getJsonHeaders(),
+      credentials: 'include',
       body: JSON.stringify({ message: `My name is ${customerInfo.name}`, sessionId, customerInfo: { name: customerInfo.name } }),
     }).catch(() => {});
     localStorage.setItem('pmChatCustomerInfo', JSON.stringify(customerInfo));
@@ -88,7 +116,9 @@ export function AIChatbot() {
     e.preventDefault();
     if (!customerInfo.email.trim()) return;
     fetch(`${API_BASE}/chat/message`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      method: 'POST',
+      headers: getJsonHeaders(),
+      credentials: 'include',
       body: JSON.stringify({ message: `My email is ${customerInfo.email}`, sessionId, customerInfo }),
     }).catch(() => {});
     localStorage.setItem('pmChatCustomerInfo', JSON.stringify(customerInfo));
@@ -134,7 +164,10 @@ export function AIChatbot() {
       if (isContactSubmitted) requestBody.customerInfo = customerInfo;
 
       const response = await fetch(`${API_BASE}/chat/message`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(requestBody),
+        method: 'POST',
+        headers: getJsonHeaders(),
+        credentials: 'include',
+        body: JSON.stringify(requestBody),
       });
       if (!response.ok) throw new Error(`Failed: ${response.status}`);
       const data = await response.json();
@@ -169,7 +202,7 @@ export function AIChatbot() {
       {/* Floating Chat Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-50 w-14 h-14 bg-brand-blue rounded-full shadow-2xl hover:shadow-3xl transition-all duration-300 flex items-center justify-center hover:scale-110 active:scale-95"
+        className="fixed bottom-6 right-4 sm:bottom-6 sm:right-6 z-50 w-14 h-14 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-full shadow-lg shadow-blue-600/30 hover:shadow-xl hover:shadow-blue-600/40 transition-all duration-300 flex items-center justify-center hover:scale-110 active:scale-95"
         aria-label="Open AI Chat"
       >
         {isOpen ? <X className="w-6 h-6 text-white" /> : <MessageCircle className="w-6 h-6 text-white" />}
@@ -177,7 +210,7 @@ export function AIChatbot() {
 
       {/* Chat Window */}
       {isOpen && (
-        <div className="fixed bottom-24 right-4 left-4 sm:left-auto sm:right-6 z-50 sm:w-96 h-[500px] max-h-[70vh] bg-white dark:bg-neutral-900 rounded-2xl shadow-2xl border border-neutral-200 dark:border-neutral-700 flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-200">
+        <div className="fixed bottom-24 right-4 left-4 sm:left-auto sm:right-6 z-50 sm:w-96 h-[500px] max-h-[70vh] bg-blue-50 dark:bg-neutral-900 rounded-2xl shadow-2xl border border-blue-100 dark:border-neutral-700 flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-200">
           {/* Header */}
           <div className="bg-brand-blue text-white p-3 sm:p-4 flex items-center justify-between">
             <div className="flex items-center gap-2 sm:gap-3">
@@ -203,7 +236,7 @@ export function AIChatbot() {
                     <Bot className="w-3 h-3 sm:w-4 sm:h-4 text-white" />
                   </div>
                 )}
-                <div className={`max-w-[85%] sm:max-w-[70%] rounded-2xl px-4 py-2 ${message.sender === 'user' ? 'bg-brand-blue text-white' : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200'}`}>
+                <div className={`max-w-[85%] sm:max-w-[70%] rounded-2xl px-4 py-2 ${message.sender === 'user' ? 'bg-brand-blue text-white' : 'bg-white dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200'}`}>
                   <p className="text-sm leading-relaxed">{message.content}</p>
                   <p className={`text-[10px] sm:text-xs mt-1 ${message.sender === 'user' ? 'text-blue-100' : 'text-neutral-500'}`}>
                     {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}

@@ -78,10 +78,10 @@ async function main(): Promise<void> {
 
   await prisma.subscription.upsert({
     where: { workspaceId: workspace.id },
-    update: { tier: 'free', status: 'active' },
+    update: { tier: 'basic', status: 'active' },
     create: {
       workspaceId: workspace.id,
-      tier: 'free',
+      tier: 'basic',
       status: 'active',
     },
   });

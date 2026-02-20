@@ -199,7 +199,38 @@ authRouter.get(
         });
       }
 
-      res.json({ success: true, data: { user, workspaceId: req.workspaceId } });
+      // Fetch workspace role
+      let role: string = 'viewer';
+      if (req.workspaceId) {
+        const membership = await prisma.workspaceMember.findUnique({
+          where: { userId_workspaceId: { userId: req.userId!, workspaceId: req.workspaceId } },
+        });
+        if (membership) role = membership.role;
+      }
+
+      // Fetch subscription tier and usage
+      let tier: string = 'basic';
+      const usage: Record<string, number> = {};
+      if (req.workspaceId) {
+        const now = new Date();
+        const periodStart = new Date(now.getFullYear(), now.getMonth(), 1);
+        const subscription = await prisma.subscription.findUnique({
+          where: { workspaceId: req.workspaceId },
+          include: {
+            usageRecords: {
+              where: { periodStart },
+            },
+          },
+        });
+        if (subscription) {
+          tier = subscription.tier;
+          for (const record of subscription.usageRecords) {
+            usage[record.metric] = record.count;
+          }
+        }
+      }
+
+      res.json({ success: true, data: { user, workspaceId: req.workspaceId, role, tier, usage } });
     } catch (err) {
       next(err);
     }

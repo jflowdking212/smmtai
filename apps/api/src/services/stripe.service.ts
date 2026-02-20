@@ -22,13 +22,15 @@ const PRICE_IDS: Record<string, string> = {
   pro_yearly: process.env.STRIPE_PRICE_PRO_YEARLY || '',
   business_monthly: process.env.STRIPE_PRICE_BUSINESS_MONTHLY || '',
   business_yearly: process.env.STRIPE_PRICE_BUSINESS_YEARLY || '',
+  enterprise_monthly: process.env.STRIPE_PRICE_ENTERPRISE_MONTHLY || '',
+  enterprise_yearly: process.env.STRIPE_PRICE_ENTERPRISE_YEARLY || '',
 };
 
 const TIER_FROM_PRICE: Record<string, string> = {};
 // Build reverse mapping at startup
 Object.entries(PRICE_IDS).forEach(([key, priceId]) => {
   if (priceId) {
-    const tier = key.split('_')[0]; // pro, business
+    const tier = key.split('_')[0]; // pro, business, enterprise
     TIER_FROM_PRICE[priceId] = tier;
   }
 });
@@ -189,7 +191,7 @@ export class StripeService {
     if (!workspaceId) return;
 
     const priceId = sub.items.data[0]?.price?.id;
-    const tier = priceId ? (TIER_FROM_PRICE[priceId] || 'free') : 'free';
+    const tier = priceId ? (TIER_FROM_PRICE[priceId] || 'basic') : 'basic';
 
     const statusMap: Record<string, string> = {
       active: 'active',
@@ -234,7 +236,7 @@ export class StripeService {
     await prisma.subscription.update({
       where: { workspaceId },
       data: {
-        tier: 'free',
+        tier: 'basic',
         status: 'canceled',
         stripeSubscriptionId: null,
         stripePriceId: null,
