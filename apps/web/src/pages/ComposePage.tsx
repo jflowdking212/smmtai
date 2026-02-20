@@ -7,7 +7,7 @@ import { buildDraftAutosaveSignature, sortDraftsByUpdatedAt, toLocalDateTimeInpu
 import { consumeComposeSeed } from '@/lib/composeSeed';
 import { PLATFORMS, type PlatformType } from '@ee-postmind/shared';
 import {
-  Send, Save, Clock, Image, X, Check, AlertTriangle,
+  Send, Save, Clock, Image, Video, X, Check, AlertTriangle,
   Loader2, Eye, ChevronDown, Trash2, Sparkles, LayoutTemplate,
 } from 'lucide-react';
 
@@ -20,6 +20,66 @@ const HASHTAG_LIMITS: Record<string, number> = {
   instagram: 30,
   linkedin: 5,
 };
+
+type VideoPlatformLimit = {
+  maxSizeMb?: number;
+  maxDuration?: string;
+  formats?: string;
+  recommended?: string;
+  note?: string;
+};
+
+// Guidance-only (platform limits change over time; we still enforce the API upload cap).
+const VIDEO_LIMITS: Partial<Record<PlatformType, VideoPlatformLimit>> = {
+  instagram: { maxSizeMb: 1024, maxDuration: 'up to ~15 min', formats: 'MP4/MOV', recommended: '9:16 (1080×1920)' },
+  tiktok: { maxSizeMb: 500, maxDuration: 'up to ~10 min', formats: 'MP4/MOV', recommended: '9:16 (1080×1920)' },
+  youtube: { maxSizeMb: 262144, maxDuration: 'up to ~12 hours', formats: 'MP4/MOV/WebM', recommended: '16:9 (long) or 9:16 (Shorts)' },
+  twitter: { maxSizeMb: 512, maxDuration: 'up to ~2m20s (standard)', formats: 'MP4/MOV' },
+  facebook: { maxSizeMb: 10240, maxDuration: 'up to ~240 min', formats: 'MP4/MOV' },
+  pinterest: { maxSizeMb: 2048, maxDuration: 'up to ~15 min', formats: 'MP4/MOV' },
+  mastodon: { note: 'Varies by server instance limits' },
+  telegram: { note: 'Varies (Bot/API limits can be stricter)' },
+  entreprenrs: { note: 'Varies by platform instance' },
+  chrxstians: { note: 'Varies by platform instance' },
+  iohah: { note: 'Varies by platform instance' },
+};
+const VIDEO_PLATFORM_IDS: PlatformType[] = [
+  'facebook',
+  'instagram',
+  'tiktok',
+  'twitter',
+  'youtube',
+  'pinterest',
+  'mastodon',
+  'telegram',
+  'entreprenrs',
+  'chrxstians',
+  'iohah',
+];
+const SYSTEM_MEDIA_UPLOAD_LIMIT_MB = 250; // server-side cap (can be configured on the API)
+
+function formatBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB'];
+  let value = bytes;
+  let unitIndex = 0;
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
+  }
+  return `${value.toFixed(unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
+}
+
+function formatVideoLimit(limit?: VideoPlatformLimit): string {
+  if (!limit) return 'Video supported';
+  const parts: string[] = [];
+  if (limit.maxDuration) parts.push(limit.maxDuration);
+  if (limit.maxSizeMb) parts.push(`max ${limit.maxSizeMb}MB`);
+  if (limit.formats) parts.push(limit.formats);
+  if (limit.recommended) parts.push(limit.recommended);
+  if (limit.note) parts.push(limit.note);
+  return parts.join(' • ') || 'Video supported';
+}
 const PLATFORM_CAPTION_MAP_KEY = '__postmindPlatformCaptions';
 const PUBLISH_PAYLOAD_MAP_KEY = '__postmindPublishPayload';
 
@@ -95,7 +155,9 @@ export function ComposePage() {
   const [approvalPostId, setApprovalPostId] = useState('');
   const [pendingApprovals, setPendingApprovals] = useState<PendingApprovalPost[]>([]);
   const [approvalActionLoading, setApprovalActionLoading] = useState<string | null>(null);
-  const mediaFileInputRef = useRef<HTMLInputElement | null>(null);
+  const imageFileInputRef = useRef<HTMLInputElement | null>(null);
+  const videoFileInputRef = useRef<HTMLInputElement | null>(null);
+  const [showVideoLimits, setShowVideoLimits] = useState(false);
   const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastAutosaveSignatureRef = useRef<string>('');
 
@@ -228,9 +290,8 @@ export function ComposePage() {
       setResult({ success: false, message: err.message || 'Failed to upload media' });
     } finally {
       setUploadingMedia(false);
-      if (mediaFileInputRef.current) {
-        mediaFileInputRef.current.value = '';
-      }
+      if (imageFileInputRef.current) imageFileInputRef.current.value = '';
+      if (videoFileInputRef.current) videoFileInputRef.current.value = '';
     }
   }
 
@@ -672,17 +733,40 @@ export function ComposePage() {
               <div className="flex gap-2">
                 <button
                   type="button"
-                  onClick={() => mediaFileInputRef.current?.click()}
+                  onClick={() => {
+                    setShowVideoLimits(false);
+                    imageFileInputRef.current?.click();
+                  }}
                   className="p-2 rounded-lg hover:bg-neutral-100 text-neutral-400 hover:text-neutral-600 disabled:opacity-50"
                   disabled={uploadingMedia}
                 >
                   <Image className="w-5 h-5" />
                 </button>
                 <input
-                  ref={mediaFileInputRef}
+                  ref={imageFileInputRef}
                   type="file"
                   multiple
-                  accept="image/*,video/*"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(event) => void handleMediaFileSelection(event.target.files)}
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowVideoLimits(true);
+                    videoFileInputRef.current?.click();
+                  }}
+                  className="p-2 rounded-lg hover:bg-neutral-100 text-neutral-400 hover:text-neutral-600 disabled:opacity-50"
+                  disabled={uploadingMedia}
+                  aria-label="Upload video"
+                >
+                  <Video className="w-5 h-5" />
+                </button>
+                <input
+                  ref={videoFileInputRef}
+                  type="file"
+                  multiple
+                  accept="video/*"
                   className="hidden"
                   onChange={(event) => void handleMediaFileSelection(event.target.files)}
                 />
@@ -695,13 +779,32 @@ export function ComposePage() {
               </div>
               <span className="text-xs text-neutral-400">{content.length} characters</span>
             </div>
+            {showVideoLimits && (
+              <div className="mt-2 rounded-lg border border-neutral-200 bg-neutral-50 p-3">
+                <p className="text-[11px] font-medium text-neutral-600">Video platforms & limits (guidance)</p>
+                <p className="text-[11px] text-neutral-500 mt-0.5">
+                  Uploads are stored as-is (no transcoding). Platform limits can vary by account and may change.
+                </p>
+                <p className="text-[11px] text-neutral-500 mt-0.5">
+                  System upload cap: ~{SYSTEM_MEDIA_UPLOAD_LIMIT_MB}MB per file.
+                </p>
+                <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {VIDEO_PLATFORM_IDS.map((platformId) => (
+                    <div key={platformId} className="text-[11px] text-neutral-600">
+                      <span className="font-medium">{PLATFORMS[platformId].name}</span>
+                      <span className="text-neutral-500"> — {formatVideoLimit(VIDEO_LIMITS[platformId])}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             {mediaUploads.length > 0 && (
               <div className="mt-3 space-y-2">
                 {mediaUploads.map((media, index) => (
                   <div key={`${media.url}-${index}`} className="flex items-center justify-between rounded-lg border border-neutral-200 px-3 py-2">
                     <div className="min-w-0">
                       <p className="text-xs font-medium text-neutral-700 truncate">{media.fileName}</p>
-                      <p className="text-[11px] text-neutral-400">{media.type} • {(media.size / 1024).toFixed(1)} KB</p>
+                      <p className="text-[11px] text-neutral-400">{media.type} • {formatBytes(media.size)}</p>
                     </div>
                     <button
                       type="button"

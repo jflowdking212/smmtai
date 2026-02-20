@@ -1,6 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Card, Button, Badge } from '@/components/ui';
 import { api } from '@/lib/api';
+import { useAuthStore } from '@/stores/authStore';
+import { useSubscription } from '@/hooks/useSubscription';
 import { SUBSCRIPTION_LIMITS, TIER_PLATFORMS, PLATFORMS, type SubscriptionTier } from '@ee-postmind/shared';
 import {
   Check,
@@ -91,9 +94,14 @@ function formatPrice(monthlyPrice: number, yearly: boolean, yearlyDiscountPct: n
 }
 
 export function BillingPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [loading, setLoading] = useState<string | null>(null);
   const [yearly, setYearly] = useState(false);
   const [planConfig, setPlanConfig] = useState<Record<string, any>>({});
+  const [billingStatus, setBillingStatus] = useState<any>(null);
+  const autoUpgradeRef = useRef(false);
+  const { tier: storeTier, role } = useSubscription();
+  const setSubscription = useAuthStore((s) => s.setSubscription);
 
   useEffect(() => {
     let active = true;
@@ -103,26 +111,71 @@ export function BillingPage() {
     return () => { active = false; };
   }, []);
 
+  async function refreshStatus() {
+    try {
+      const res = await api.billing.status();
+      setBillingStatus(res.data);
+      setSubscription(res.data.tier || 'basic', role, res.data.usage || {});
+    } catch {
+      // ignore
+    }
+  }
+
+  useEffect(() => {
+    void refreshStatus();
+  }, []);
+
   function getMonthlyPrice(tier: SubscriptionTier): number {
     return planConfig?.pricing?.[tier]?.monthlyPrice ?? DEFAULT_PRICES[tier];
   }
 
-  function getYearlyDiscount(tier: SubscriptionTier): number {
-    return planConfig?.pricing?.[tier]?.yearlyDiscount ?? planConfig?.yearlyDiscount ?? DEFAULT_YEARLY_DISCOUNT;
+  function getYearlyDiscount(): number {
+    return planConfig?.yearlyDiscount ?? DEFAULT_YEARLY_DISCOUNT;
   }
 
-  async function handleUpgrade(priceKey: string) {
-    if (!priceKey) return;
-    setLoading(priceKey);
+  const currentTier = (billingStatus?.tier || storeTier || 'basic') as SubscriptionTier;
+  const tierOrder: Record<SubscriptionTier, number> = useMemo(
+    () => ({ basic: 0, pro: 1, business: 2, enterprise: 3 }),
+    [],
+  );
+
+  async function handlePlanChange(target: { tier: SubscriptionTier; priceKey?: string }) {
+    const isDowngrade = (tierOrder[target.tier] ?? 0) < (tierOrder[currentTier] ?? 0);
+    if (isDowngrade) {
+      const ok = window.confirm(`Downgrade to ${target.tier}? Your data will remain intact, but features will be limited to the ${target.tier} plan.`);
+      if (!ok) return;
+    }
+
+    const loadingKey = target.tier === 'basic' ? 'basic' : (target.priceKey || target.tier);
+    setLoading(loadingKey);
     try {
-      const res = await api.billing.checkout(priceKey);
-      window.location.href = res.data.url;
+      const res = await api.billing.changePlan({
+        tier: target.tier === 'basic' ? 'basic' : undefined,
+        priceKey: target.tier === 'basic' ? undefined : target.priceKey,
+      });
+      if (res.data?.action === 'redirect' && res.data?.url) {
+        window.location.href = res.data.url as string;
+        return;
+      }
+      setBillingStatus(res.data);
+      setSubscription(res.data.tier || currentTier, role, res.data.usage || {});
     } catch (err) {
-      console.error('Checkout error:', err);
+      console.error('Plan change error:', err);
     } finally {
       setLoading(null);
     }
   }
+
+  useEffect(() => {
+    const upgradeKey = searchParams.get('upgrade');
+    if (!upgradeKey || autoUpgradeRef.current) return;
+    autoUpgradeRef.current = true;
+    void handlePlanChange({ tier: upgradeKey.split('_')[0] as SubscriptionTier, priceKey: upgradeKey });
+
+    const next = new URLSearchParams(searchParams);
+    next.delete('upgrade');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams, currentTier]);
 
   async function handleManageBilling() {
     setLoading('portal');
@@ -164,7 +217,7 @@ export function BillingPage() {
           <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${yearly ? 'translate-x-6' : 'translate-x-1'}`} />
         </button>
         <span className={`text-sm font-medium ${yearly ? 'text-neutral-900' : 'text-neutral-400'}`}>
-          Yearly <span className="text-success-600 font-semibold">(Save {getYearlyDiscount('pro')}%)</span>
+          Yearly <span className="text-success-600 font-semibold">(Save {getYearlyDiscount()}%)</span>
         </span>
       </div>
 
@@ -175,7 +228,9 @@ export function BillingPage() {
           const platforms = TIER_PLATFORMS[plan.tier];
           const priceKey = yearly ? plan.priceKeyYearly : plan.priceKeyMonthly;
           const monthlyPrice = getMonthlyPrice(plan.tier);
-          const yearlyDiscount = getYearlyDiscount(plan.tier);
+          const yearlyDiscount = getYearlyDiscount();
+          const isCurrent = plan.tier === currentTier;
+          const isDowngrade = (tierOrder[plan.tier] ?? 0) < (tierOrder[currentTier] ?? 0);
 
           return (
             <Card
@@ -255,22 +310,22 @@ export function BillingPage() {
                 ))}
               </ul>
 
-              {plan.tier === 'basic' ? (
-                <Button variant="secondary" className="w-full" disabled>
-                  Current Plan
-                </Button>
-              ) : plan.custom ? (
+              {plan.custom ? (
                 <Button variant="secondary" className="w-full">
                   Contact Sales
                 </Button>
+              ) : isCurrent ? (
+                <Button variant="secondary" className="w-full" disabled>
+                  Current Plan
+                </Button>
               ) : (
                 <Button
-                  variant={plan.popular ? 'primary' : 'secondary'}
+                  variant={isDowngrade ? 'secondary' : plan.popular ? 'primary' : 'secondary'}
                   className="w-full"
-                  loading={loading === priceKey}
-                  onClick={() => handleUpgrade(priceKey)}
+                  loading={loading === (plan.tier === 'basic' ? 'basic' : priceKey)}
+                  onClick={() => void handlePlanChange(plan.tier === 'basic' ? { tier: 'basic' } : { tier: plan.tier, priceKey })}
                 >
-                  {plan.popular ? 'Start 14-Day Trial' : 'Upgrade'}
+                  {isDowngrade ? 'Downgrade' : plan.popular && currentTier === 'basic' ? 'Start 14-Day Trial' : 'Upgrade'}
                 </Button>
               )}
             </Card>

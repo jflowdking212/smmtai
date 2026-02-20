@@ -1,9 +1,16 @@
-import { useState, FormEvent, useEffect } from 'react';
+import { useState, FormEvent, useEffect, useMemo } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Button, Input } from '@/components/ui';
 import { api, ApiError } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
 import { Sparkles, Chrome, Github, Facebook } from 'lucide-react';
+
+function normalizeNextPath(nextPath: string | null): string {
+  if (!nextPath || !nextPath.startsWith('/') || nextPath.startsWith('//')) {
+    return '/';
+  }
+  return nextPath;
+}
 
 function getOAuthErrorMessage(errorCode: string | null): string | null {
   if (!errorCode) return null;
@@ -37,9 +44,13 @@ export function LoginPage() {
   const inviteToken = searchParams.get('invite_token');
   const inviteAction = searchParams.get('invite_action');
   const oauthError = getOAuthErrorMessage(searchParams.get('oauth_error'));
+  const nextPath = useMemo(
+    () => normalizeNextPath(searchParams.get('next')),
+    [searchParams],
+  );
 
   function startOAuth(provider: 'google' | 'github' | 'facebook') {
-    window.location.href = api.auth.oauthUrl(provider);
+    window.location.href = api.auth.oauthUrl(provider, nextPath);
   }
 
   useEffect(() => {
@@ -63,7 +74,7 @@ export function LoginPage() {
         await api.workspaces.acceptInvite(inviteToken);
       }
 
-      navigate('/');
+      navigate(nextPath, { replace: true });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Something went wrong');
     } finally {

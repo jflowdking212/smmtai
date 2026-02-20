@@ -24,6 +24,7 @@ import {
   User,
   Sun,
   Moon,
+  BookOpen,
 } from 'lucide-react';
 
 const adminNavigation = [
@@ -32,6 +33,7 @@ const adminNavigation = [
   { name: 'Plans', href: '/admin/plans', icon: CreditCard },
   { name: 'Analytics', href: '/admin/analytics', icon: BarChart3 },
   { name: 'Messages', href: '/admin/messages', icon: MessageCircle },
+  { name: 'Knowledge Base', href: '/admin/knowledge-base', icon: BookOpen },
   { name: 'Settings', href: '/admin/settings', icon: Settings },
 ];
 

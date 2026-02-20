@@ -62,3 +62,23 @@ export const createWorkspaceSchema = z.object({
 export const workspaceInviteActionSchema = z.object({
   token: z.string().min(1, 'Invitation token is required'),
 });
+
+export const publicCheckoutSchema = z.object({
+  name: z.string().min(2, 'Name must be at least 2 characters').max(100),
+  email: z.string().email('Invalid email address'),
+  priceKey: z.enum([
+    'pro_monthly',
+    'pro_yearly',
+    'business_monthly',
+    'business_yearly',
+    'enterprise_monthly',
+    'enterprise_yearly',
+  ]),
+});
+
+export const changePlanSchema = z.object({
+  tier: z.enum(['basic', 'pro', 'business', 'enterprise']).optional(),
+  priceKey: z.string().optional(),
+}).refine((value) => Boolean(value.tier || value.priceKey), {
+  message: 'tier or priceKey is required',
+});

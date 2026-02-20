@@ -34,6 +34,17 @@ vi.mock('../services/post.service.js', () => ({
   },
 }));
 
+vi.mock('../services/admin-settings.service.js', () => ({
+  getStorageConfig: vi.fn().mockResolvedValue({
+    storage_provider: '',
+    storage_endpoint: '',
+    storage_region: '',
+    storage_bucket: '',
+    storage_access_key: '',
+    storage_secret_key: '',
+  }),
+}));
+
 vi.mock('../jobs/scheduler.js', () => ({
   schedulePost: vi.fn(),
 }));

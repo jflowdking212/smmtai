@@ -64,9 +64,8 @@ function PricingSection() {
     return planConfig?.pricing?.[tier]?.monthlyPrice ?? DEFAULT_PRICES[planName];
   }
 
-  function getYearlyDiscount(planName: string): number {
-    const tier = TIER_MAP[planName];
-    return planConfig?.pricing?.[tier]?.yearlyDiscount ?? planConfig?.yearlyDiscount ?? DEFAULT_YEARLY_DISCOUNT;
+  function getYearlyDiscount(): number {
+    return planConfig?.yearlyDiscount ?? DEFAULT_YEARLY_DISCOUNT;
   }
 
   function formatPrice(monthlyPrice: number, yearlyDiscountPct: number): { display: string; period: string; originalYearly?: string } {
@@ -103,14 +102,14 @@ function PricingSection() {
           <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${yearly ? 'translate-x-6' : 'translate-x-1'}`} />
         </button>
         <span className={`text-sm font-medium ${yearly ? 'text-neutral-900' : 'text-neutral-400'}`}>
-          Yearly <span className="text-green-600 font-semibold">(Save {getYearlyDiscount('Pro')}%)</span>
+          Yearly <span className="text-green-600 font-semibold">(Save {getYearlyDiscount()}%)</span>
         </span>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8">
         {plans.map((plan) => {
           const monthlyPrice = getMonthlyPrice(plan.name);
-          const yearlyDiscount = getYearlyDiscount(plan.name);
+          const yearlyDiscount = getYearlyDiscount();
 
           return (
           <div key={plan.name}
@@ -161,15 +160,33 @@ function PricingSection() {
                 </li>
               ))}
             </ul>
-            <Link to="/auth/register"
-              className={`block w-full text-center py-2.5 rounded-lg font-medium text-sm transition-all ${
+            {(() => {
+              const tier = TIER_MAP[plan.name] || '';
+              const selectedPriceKey = tier && tier !== 'basic'
+                ? `${tier}_${yearly ? 'yearly' : 'monthly'}`
+                : '';
+              const href = tier === 'basic'
+                ? '/auth/register'
+                : `/checkout?priceKey=${encodeURIComponent(selectedPriceKey)}`;
+              const label = plan.custom ? 'Contact Sales' : tier === 'basic' ? 'Get Started Free' : 'Continue';
+              const className = `block w-full text-center py-2.5 rounded-lg font-medium text-sm transition-all ${
                 plan.popular
                   ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-sm'
                   : 'bg-neutral-100 hover:bg-neutral-200 text-neutral-800'
-              }`}
-            >
-              {plan.custom ? 'Contact Sales' : 'Get Started'}
-            </Link>
+              }`;
+              if (plan.custom) {
+                return (
+                  <a href="#contact" className={className}>
+                    {label}
+                  </a>
+                );
+              }
+              return (
+                <Link to={href} className={className}>
+                  {label}
+                </Link>
+              );
+            })()}
           </div>
           );
         })}

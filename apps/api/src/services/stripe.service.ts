@@ -94,6 +94,67 @@ export class StripeService {
     return session.url!;
   }
 
+  async changePlan(
+    workspaceId: string,
+    input: { tier?: string; priceKey?: string },
+    urls: { checkoutSuccessUrl: string; checkoutCancelUrl: string },
+  ): Promise<{ action: 'redirect'; url: string } | ({ action: 'updated' } & Awaited<ReturnType<StripeService['getSubscriptionStatus']>>)> {
+    const subscription = await prisma.subscription.findUnique({ where: { workspaceId } });
+    if (!subscription) throw new AppError('Subscription not found', 404, 'SUB_NOT_FOUND');
+
+    const targetTier = input.tier?.toLowerCase().trim();
+    if (targetTier === 'basic') {
+      if (subscription.stripeSubscriptionId) {
+        const sub = await getStripe().subscriptions.cancel(subscription.stripeSubscriptionId);
+        await this.handleSubscriptionDeleted(sub);
+      } else {
+        await prisma.subscription.update({
+          where: { workspaceId },
+          data: { tier: 'basic', status: 'active', stripeSubscriptionId: null, stripePriceId: null, cancelAtPeriodEnd: false },
+        });
+      }
+      return { action: 'updated', ...(await this.getSubscriptionStatus(workspaceId)) };
+    }
+
+    const priceKey = (input.priceKey || '').trim();
+    if (!priceKey) {
+      throw new AppError('priceKey is required for paid plan changes', 400, 'MISSING_PRICE');
+    }
+
+    // If workspace has no active Stripe subscription yet, start checkout
+    if (!subscription.stripeSubscriptionId) {
+      const url = await this.createCheckoutSession(
+        workspaceId,
+        priceKey,
+        urls.checkoutSuccessUrl,
+        urls.checkoutCancelUrl,
+      );
+      return { action: 'redirect', url };
+    }
+
+    const priceId = PRICE_IDS[priceKey];
+    if (!priceId) throw new AppError('Invalid price plan', 400, 'INVALID_PRICE');
+
+    const currentTier = (subscription.tier || 'basic').toLowerCase();
+    const nextTier = priceKey.split('_')[0]?.toLowerCase() || currentTier;
+    const tierOrder: Record<string, number> = { basic: 0, pro: 1, business: 2, enterprise: 3 };
+    const isUpgrade = (tierOrder[nextTier] ?? 0) > (tierOrder[currentTier] ?? 0);
+
+    const currentSub = await getStripe().subscriptions.retrieve(subscription.stripeSubscriptionId);
+    const itemId = currentSub.items.data[0]?.id;
+    if (!itemId) throw new AppError('Stripe subscription has no items to update', 400, 'SUBSCRIPTION_INVALID');
+
+    const updated = await getStripe().subscriptions.update(subscription.stripeSubscriptionId, {
+      items: [{ id: itemId, price: priceId }],
+      proration_behavior: isUpgrade ? 'always_invoice' : 'create_prorations',
+      cancel_at_period_end: false,
+      metadata: { ...(currentSub.metadata || {}), workspaceId },
+    });
+
+    await this.handleSubscriptionUpdated(updated);
+    return { action: 'updated', ...(await this.getSubscriptionStatus(workspaceId)) };
+  }
+
   // Create customer portal session for billing management
   async createPortalSession(workspaceId: string, returnUrl: string): Promise<string> {
     const customerId = await this.getOrCreateCustomer(workspaceId);

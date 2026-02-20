@@ -126,6 +126,40 @@ export class EmailService {
     await this.sendEmail({ to: email, subject, text, html });
   }
 
+  async sendWelcomeSetPasswordEmail(input: {
+    email: string;
+    name: string;
+    setPasswordLink: string;
+    loginLink: string;
+    verifyEmailLink?: string;
+  }): Promise<void> {
+    const subject = 'Welcome to EE PostMind — set your password';
+    const verifyLine = input.verifyEmailLink
+      ? `\nVerify email (recommended): ${input.verifyEmailLink}`
+      : '';
+    const verifyHtml = input.verifyEmailLink
+      ? `<p style="margin-top:12px">Verify email (recommended): <a href="${input.verifyEmailLink}">${input.verifyEmailLink}</a></p>`
+      : '';
+    const text = `Hi ${input.name},\n\nWelcome to EE PostMind!\n\nSet your password to access your new account:\n${input.setPasswordLink}\n\nLogin: ${input.loginLink}${verifyLine}\n\nIf you did not request this, you can ignore this email.`;
+    const html = `
+      <div style="font-family:Inter,Arial,sans-serif;line-height:1.5;color:#111827">
+        <p>Hi ${input.name},</p>
+        <p>Welcome to <strong>EE PostMind</strong>! Your account has been created.</p>
+        <p>
+          <a href="${input.setPasswordLink}" style="display:inline-block;background:#2563EB;color:#fff;padding:10px 16px;border-radius:8px;text-decoration:none">
+            Set Password
+          </a>
+        </p>
+        <p>If the button does not work, use this link:</p>
+        <p><a href="${input.setPasswordLink}">${input.setPasswordLink}</a></p>
+        ${verifyHtml}
+        <p style="margin-top:12px">After setting your password, you can sign in here: <a href="${input.loginLink}">${input.loginLink}</a></p>
+      </div>
+    `;
+
+    await this.sendEmail({ to: input.email, subject, text, html });
+  }
+
   async sendWorkspaceInviteEmail(input: {
     email: string;
     workspaceName: string;

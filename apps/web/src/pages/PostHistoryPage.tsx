@@ -54,6 +54,23 @@ function formatDateTime(value: string | null): string {
   return date.toLocaleString();
 }
 
+function buildPlatformPostUrl(platform: PlatformType, platformPostId: string): string | null {
+  const id = platformPostId.trim();
+  if (!id) return null;
+  if (platform === 'facebook') return `https://facebook.com/${id}`;
+  if (platform === 'twitter') return `https://x.com/i/status/${id}`;
+  if (platform === 'youtube') return `https://www.youtube.com/watch?v=${id}`;
+  if (platform === 'linkedin') return `https://www.linkedin.com/feed/update/${encodeURIComponent(id)}/`;
+  if (platform === 'pinterest') return `https://www.pinterest.com/pin/${encodeURIComponent(id)}/`;
+  if (platform === 'bluesky' && id.startsWith('at://')) {
+    const parts = id.replace('at://', '').split('/');
+    const did = parts[0];
+    const rkey = parts[parts.length - 1];
+    if (did && rkey) return `https://bsky.app/profile/${encodeURIComponent(did)}/post/${encodeURIComponent(rkey)}`;
+  }
+  return null;
+}
+
 export function PostHistoryPage() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [posts, setPosts] = useState<PostHistoryItem[]>([]);
@@ -190,6 +207,9 @@ export function PostHistoryPage() {
                     const platform = PLATFORMS[platformPost.platform as PlatformType];
                     const platformName = platform?.name || platformPost.platform;
                     const platformColor = platform?.color || '#6B7280';
+                    const platformUrl = platformPost.platformPostId
+                      ? buildPlatformPostUrl(platformPost.platform as PlatformType, platformPost.platformPostId)
+                      : null;
 
                     return (
                       <div key={platformPost.id} className="rounded-lg border border-neutral-200 bg-white px-3 py-2">
@@ -202,6 +222,23 @@ export function PostHistoryPage() {
                             {formatStatusLabel(platformPost.status)}
                           </Badge>
                         </div>
+                        {platformPost.platformPostId && (
+                          <div className="mt-1 flex items-center justify-between gap-2">
+                            <p className="text-[11px] text-neutral-500 truncate">
+                              Ref: {platformPost.platformPostId}
+                            </p>
+                            {platformUrl && (
+                              <a
+                                href={platformUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-[11px] text-brand-blue hover:underline"
+                              >
+                                View
+                              </a>
+                            )}
+                          </div>
+                        )}
                         {platformPost.error && (
                           <p className="text-[11px] text-red-500 mt-1 break-words">{platformPost.error}</p>
                         )}

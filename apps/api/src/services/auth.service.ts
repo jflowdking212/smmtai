@@ -60,6 +60,48 @@ export class AuthService {
     };
   }
 
+  /**
+   * Provision an account during a public checkout flow.
+   * - No password is set initially; user completes setup via "set password" email.
+   * - Creates a default workspace + basic subscription immediately.
+   */
+  async provisionCheckoutAccount(data: { name: string; email: string }) {
+    const normalizedEmail = data.email.toLowerCase().trim();
+    const existing = await prisma.user.findUnique({ where: { email: normalizedEmail } });
+    if (existing) {
+      throw new AppError('An account with this email already exists. Please log in to continue.', 409, 'EMAIL_EXISTS');
+    }
+
+    const result = await prisma.$transaction(async (tx: any) => {
+      const user = await tx.user.create({
+        data: {
+          name: data.name,
+          email: normalizedEmail,
+        },
+      });
+      const workspaceId = await this.createDefaultWorkspace(tx, user.id, user.name);
+      return { user, workspaceId };
+    });
+
+    const resetToken = await this.createPasswordResetToken(result.user.id);
+    const setPasswordLink = `${config.frontend.url}/auth/reset-password?token=${resetToken}`;
+    const verificationToken = await this.createEmailVerificationToken(result.user.id);
+    const verifyEmailLink = `${config.frontend.url}/auth/verify-email?token=${verificationToken}`;
+
+    await emailService.sendWelcomeSetPasswordEmail({
+      email: result.user.email,
+      name: result.user.name,
+      setPasswordLink,
+      loginLink: `${config.frontend.url}/auth/login`,
+      verifyEmailLink,
+    });
+
+    return {
+      user: this.sanitizeUser(result.user),
+      workspaceId: result.workspaceId,
+    };
+  }
+
   async login(data: { email: string; password: string }) {
     const user = await prisma.user.findUnique({
       where: { email: data.email },

@@ -3,6 +3,7 @@ import { postService } from '../services/post.service.js';
 import { analyticsService } from '../services/analytics.service.js';
 import { notificationService } from '../services/notification.service.js';
 import { connectionService } from '../services/connection.service.js';
+import { purgeExpiredMedia } from '../services/media-retention.service.js';
 import { prisma } from '../config/database.js';
 
 const REDIS_CONNECTION = {
@@ -190,6 +191,15 @@ export const connectionHealthQueue = new Queue('connection-health-monitoring', {
   },
 });
 
+export const mediaRetentionQueue = new Queue('media-retention-cleanup', {
+  connection: REDIS_CONNECTION,
+  defaultJobOptions: {
+    attempts: 1,
+    removeOnComplete: { count: 50 },
+    removeOnFail: { count: 500 },
+  },
+});
+
 // Worker processes scheduled posts
 export const postWorker = new Worker(
   'post-publishing',
@@ -272,6 +282,19 @@ export const connectionHealthWorker = new Worker(
   },
 );
 
+export const mediaRetentionWorker = new Worker(
+  'media-retention-cleanup',
+  async () => {
+    const stats = await purgeExpiredMedia();
+    console.log('[Scheduler] Media retention cleanup run completed', stats);
+    return stats;
+  },
+  {
+    connection: REDIS_CONNECTION,
+    concurrency: 1,
+  },
+);
+
 postWorker.on('completed', (job) => {
   console.log(`[Scheduler] Post ${job.data.postId} published successfully`);
 });
@@ -323,6 +346,10 @@ connectionHealthWorker.on('completed', (job) => {
 connectionHealthWorker.on('failed', (job, err) => {
   const suffix = job?.data?.workspaceId ? ` workspace ${job.data.workspaceId as string}` : '';
   console.error(`[Scheduler] Connection health check failed${suffix}:`, err.message);
+});
+
+mediaRetentionWorker.on('failed', (_job, err) => {
+  console.error('[Scheduler] Media retention cleanup failed:', err.message);
 });
 
 // Schedule a post for future publishing
@@ -448,6 +475,12 @@ function getConnectionHealthIntervalMs(): number {
   return minutes * 60 * 1000;
 }
 
+function getMediaRetentionIntervalMs(): number {
+  const raw = Number.parseInt(process.env.MEDIA_RETENTION_CLEANUP_INTERVAL_HOURS || '24', 10);
+  const hours = Number.isFinite(raw) && raw > 0 ? raw : 24;
+  return hours * 60 * 60 * 1000;
+}
+
 export async function scheduleAnalyticsIngestion() {
   const intervalMs = getAnalyticsIngestionIntervalMs();
   const job = await analyticsQueue.add(
@@ -475,6 +508,22 @@ export async function scheduleConnectionHealthMonitoring() {
     },
   );
 
+  return {
+    jobId: job.id || '',
+    intervalMs,
+  };
+}
+
+export async function scheduleMediaRetentionCleanup() {
+  const intervalMs = getMediaRetentionIntervalMs();
+  const job = await mediaRetentionQueue.add(
+    'purge-expired-media',
+    {},
+    {
+      repeat: { every: intervalMs },
+      jobId: 'media-retention-cleanup',
+    },
+  );
   return {
     jobId: job.id || '',
     intervalMs,

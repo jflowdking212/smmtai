@@ -6,6 +6,7 @@ import { ConnectionsPage } from '../pages/ConnectionsPage';
 const mockApi = vi.hoisted(() => ({
   connections: {
     list: vi.fn(),
+    getGlobalPlatforms: vi.fn(),
     initiateOAuth: vi.fn(),
     manualConnect: vi.fn(),
     healthCheck: vi.fn(),
@@ -18,6 +19,7 @@ vi.mock('@/lib/api', () => ({ api: mockApi, ApiError: class ApiError extends Err
 describe('ConnectionsPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockApi.connections.getGlobalPlatforms.mockResolvedValue({ success: true, data: [] });
   });
 
   it('shows reconnect action for unhealthy connections and opens manual reconnect flow', async () => {

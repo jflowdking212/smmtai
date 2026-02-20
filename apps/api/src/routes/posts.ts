@@ -1,18 +1,20 @@
 import { Router, Response, NextFunction } from 'express';
 import multer from 'multer';
 import { randomUUID } from 'crypto';
-import { mkdir, writeFile } from 'fs/promises';
-import { extname, join, resolve } from 'path';
+import { extname, resolve } from 'path';
 import { authenticate, AuthRequest, requireRole } from '../middleware/auth.js';
 import { checkUsage, incrementUsage } from '../middleware/usage.js';
 import { postService } from '../services/post.service.js';
 import { schedulePost } from '../jobs/scheduler.js';
+import { uploadPublicFile } from '../services/storage.service.js';
 
 export const postRouter = Router();
 const MEDIA_UPLOAD_DIR = resolve(process.env.MEDIA_UPLOAD_DIR || 'uploads');
+const MEDIA_UPLOAD_LIMIT_MB = Number.parseInt(process.env.MEDIA_UPLOAD_LIMIT_MB || '250', 10);
+const MEDIA_UPLOAD_MAX_BYTES = (Number.isFinite(MEDIA_UPLOAD_LIMIT_MB) && MEDIA_UPLOAD_LIMIT_MB > 0 ? MEDIA_UPLOAD_LIMIT_MB : 250) * 1024 * 1024;
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 25 * 1024 * 1024 },
+  limits: { fileSize: MEDIA_UPLOAD_MAX_BYTES },
 });
 
 function inferFileExtension(mimeType: string, originalName: string): string {
@@ -37,7 +39,7 @@ postRouter.post(
       if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
         return res.status(400).json({
           success: false,
-          error: { code: 'FILE_TOO_LARGE', message: 'Media upload size limit is 25MB' },
+          error: { code: 'FILE_TOO_LARGE', message: `Media upload size limit is ${Math.round(MEDIA_UPLOAD_MAX_BYTES / 1024 / 1024)}MB` },
         });
       }
       if (err) return next(err);
@@ -60,18 +62,23 @@ postRouter.post(
         });
       }
 
-      await mkdir(MEDIA_UPLOAD_DIR, { recursive: true });
       const extension = inferFileExtension(file.mimetype, file.originalname);
       const filename = `${Date.now()}-${randomUUID()}${extension}`;
-      await writeFile(join(MEDIA_UPLOAD_DIR, filename), file.buffer);
 
       const mediaType = file.mimetype.startsWith('video/') ? 'video' : 'image';
       const baseUrl = `${req.protocol}://${req.get('host')}`;
+      const uploaded = await uploadPublicFile({
+        buffer: file.buffer,
+        key: filename,
+        contentType: file.mimetype,
+        baseUrl,
+        localUploadDir: MEDIA_UPLOAD_DIR,
+      });
 
       res.status(201).json({
         success: true,
         data: {
-          url: `${baseUrl}/uploads/${filename}`,
+          url: uploaded.url,
           fileName: file.originalname,
           mimeType: file.mimetype,
           size: file.size,

@@ -30,7 +30,6 @@ import {
   LogOut,
   HelpCircle,
   MessageCircle,
-  BookOpen,
   Lock,
   Monitor,
 } from 'lucide-react';
@@ -45,7 +44,6 @@ const navigation: { name: string; href: string; icon: typeof LayoutDashboard; fe
   { name: 'Templates', href: '/templates', icon: Palette, feature: 'templates' },
   { name: 'AI Assistant', href: '/ai', icon: Sparkles, feature: 'ai_assistant' },
   { name: 'Conversations', href: '/conversations', icon: MessageCircle, feature: 'conversations' },
-  { name: 'Knowledge Base', href: '/knowledge-base', icon: BookOpen, feature: 'knowledge_base' },
 ];
 
 const bottomNav: { name: string; href: string; icon: typeof Users; feature: AppFeature; ownerOnly?: boolean }[] = [
