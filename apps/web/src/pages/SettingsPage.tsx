@@ -3,9 +3,11 @@ import { Card, Button } from '@/components/ui';
 import { useAuthStore } from '@/stores/authStore';
 import { useTheme } from '@/components/ThemeProvider';
 import { api } from '@/lib/api';
+import { invalidateSiteSettings } from '@/hooks/useSiteSettings';
 import {
-  User, Bell, Shield, Palette, Key, Trash2, Save, Settings2, Mail, Cloud, CheckCircle, XCircle,
+  User, Bell, Shield, Palette, Key, Trash2, Save, Settings2, Mail, Cloud, CheckCircle, XCircle, Globe,
 } from 'lucide-react';
+import { GLOBAL_CREDENTIAL_PLATFORMS, PLATFORMS, SUBSCRIPTION_LIMITS, TIER_PLATFORMS, type SubscriptionTier, type PlatformType } from '@ee-postmind/shared';
 
 type SettingsTab = 'profile' | 'notifications' | 'security' | 'appearance' | 'admin';
 type NotificationPreferenceKey =
@@ -33,6 +35,9 @@ export function SettingsPage() {
   // Admin state
   const [smtpConfig, setSmtpConfig] = useState({ smtp_host: '', smtp_port: '587', smtp_user: '', smtp_pass: '', smtp_from: '', smtp_secure: 'true' });
   const [storageConfig, setStorageConfig] = useState({ storage_provider: '', storage_endpoint: '', storage_region: '', storage_bucket: '', storage_access_key: '', storage_secret_key: '' });
+  const [siteConfig, setSiteConfig] = useState({ site_title: '', site_tagline: '', site_favicon: '', site_logo: '', seo_meta_title: '', seo_meta_description: '' });
+  const [platformCreds, setPlatformCreds] = useState<Record<string, { access_token: string; server_key: string }>>({});
+  const [planConfig, setPlanConfig] = useState<Record<string, any>>({});
   const [adminMsg, setAdminMsg] = useState<{ section: string; type: 'success' | 'error'; text: string } | null>(null);
   const [adminLoading, setAdminLoading] = useState<string | null>(null);
 
@@ -73,6 +78,29 @@ export function SettingsPage() {
       .then((res) => {
         if (!active) return;
         setStorageConfig((prev) => ({ ...prev, ...res.data, storage_access_key: '', storage_secret_key: '' }));
+      })
+      .catch(() => { /* ignore */ });
+    api.admin.getSiteSettings()
+      .then((res) => {
+        if (!active) return;
+        setSiteConfig((prev) => ({ ...prev, ...res.data }));
+      })
+      .catch(() => { /* ignore */ });
+    api.admin.getPlatforms()
+      .then((res) => {
+        if (!active) return;
+        // Clear sensitive fields for display — keep only masked values
+        const cleaned: Record<string, { access_token: string; server_key: string }> = {};
+        for (const [k, v] of Object.entries(res.data)) {
+          cleaned[k] = { access_token: '', server_key: '' };
+        }
+        setPlatformCreds(cleaned);
+      })
+      .catch(() => { /* ignore */ });
+    api.admin.getPlans()
+      .then((res) => {
+        if (!active) return;
+        setPlanConfig(res.data);
       })
       .catch(() => { /* ignore */ });
     return () => {
@@ -145,10 +173,77 @@ export function SettingsPage() {
     setAdminLoading('storage-test');
     setAdminMsg(null);
     try {
-      const res = await api.admin.testStorage();
+      const res = await api.admin.testStorage(storageConfig);
       setAdminMsg({ section: 'storage', type: 'success', text: res.data.message });
     } catch (err: any) {
       setAdminMsg({ section: 'storage', type: 'error', text: err.message || 'Storage test failed.' });
+    } finally {
+      setAdminLoading(null);
+    }
+  }
+
+  async function saveSiteSettings() {
+    setAdminLoading('site-save');
+    setAdminMsg(null);
+    try {
+      const res = await api.admin.saveSiteSettings(siteConfig);
+      setSiteConfig((prev) => ({ ...prev, ...res.data }));
+      setAdminMsg({ section: 'site', type: 'success', text: 'Site settings saved.' });
+      invalidateSiteSettings();
+    } catch (err: any) {
+      setAdminMsg({ section: 'site', type: 'error', text: err.message || 'Failed to save site settings.' });
+    } finally {
+      setAdminLoading(null);
+    }
+  }
+
+  async function savePlatforms() {
+    setAdminLoading('platforms-save');
+    setAdminMsg(null);
+    try {
+      const res = await api.admin.savePlatforms(platformCreds);
+      const cleaned: Record<string, { access_token: string; server_key: string }> = {};
+      for (const k of Object.keys(res.data)) {
+        cleaned[k] = { access_token: '', server_key: '' };
+      }
+      setPlatformCreds(cleaned);
+      setAdminMsg({ section: 'platforms', type: 'success', text: 'Platform credentials saved.' });
+    } catch (err: any) {
+      setAdminMsg({ section: 'platforms', type: 'error', text: err.message || 'Failed to save platform credentials.' });
+    } finally {
+      setAdminLoading(null);
+    }
+  }
+
+  async function handleLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setAdminLoading('logo-upload');
+    setAdminMsg(null);
+    try {
+      const res = await api.admin.uploadLogo(file);
+      setSiteConfig((prev) => ({ ...prev, site_logo: res.data.url }));
+      setAdminMsg({ section: 'site', type: 'success', text: 'Logo uploaded successfully.' });
+      invalidateSiteSettings();
+    } catch (err: any) {
+      setAdminMsg({ section: 'site', type: 'error', text: err.message || 'Failed to upload logo.' });
+    } finally {
+      setAdminLoading(null);
+    }
+  }
+
+  async function handleFaviconUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setAdminLoading('favicon-upload');
+    setAdminMsg(null);
+    try {
+      const res = await api.admin.uploadFavicon(file);
+      setSiteConfig((prev) => ({ ...prev, site_favicon: res.data.url }));
+      setAdminMsg({ section: 'site', type: 'success', text: 'Favicon uploaded successfully.' });
+      invalidateSiteSettings();
+    } catch (err: any) {
+      setAdminMsg({ section: 'site', type: 'error', text: err.message || 'Failed to upload favicon.' });
     } finally {
       setAdminLoading(null);
     }
@@ -334,6 +429,83 @@ export function SettingsPage() {
 
           {tab === 'admin' && isOwner && (
             <div className="space-y-6">
+              {/* General Site Settings */}
+              <Card className="p-6 space-y-5">
+                <div className="flex items-center gap-2">
+                  <Settings2 className="w-5 h-5 text-brand-blue" />
+                  <h2 className="text-lg font-heading font-semibold text-neutral-900">General Site Settings</h2>
+                </div>
+                <p className="text-sm text-neutral-500">Configure your site branding, logo, and SEO metadata.</p>
+
+                {adminMsg?.section === 'site' && (
+                  <div className={`flex items-center gap-2 text-sm ${adminMsg.type === 'success' ? 'text-green-700' : 'text-red-600'}`}>
+                    {adminMsg.type === 'success' ? <CheckCircle className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
+                    {adminMsg.text}
+                  </div>
+                )}
+
+                {/* Logo Upload */}
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700 mb-2">Site Logo</label>
+                  <div className="flex items-center gap-4">
+                    {siteConfig.site_logo && (
+                      <img src={siteConfig.site_logo} alt="Logo" className="w-16 h-16 object-contain rounded-lg border border-neutral-200" />
+                    )}
+                    <label className="cursor-pointer px-4 py-2 text-sm font-medium bg-neutral-100 hover:bg-neutral-200 rounded-lg transition-colors">
+                      {adminLoading === 'logo-upload' ? 'Uploading…' : 'Upload Logo'}
+                      <input type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" disabled={adminLoading === 'logo-upload'} />
+                    </label>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-700 mb-1">Site Title</label>
+                    <input value={siteConfig.site_title} onChange={(e) => setSiteConfig({ ...siteConfig, site_title: e.target.value })}
+                      placeholder="Postmind" className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-700 mb-1">Tagline</label>
+                    <input value={siteConfig.site_tagline} onChange={(e) => setSiteConfig({ ...siteConfig, site_tagline: e.target.value })}
+                      placeholder="AI-Powered Social Media Management" className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-700 mb-1">Favicon</label>
+                    <div className="flex items-center gap-3">
+                      {siteConfig.site_favicon && (
+                        <img src={siteConfig.site_favicon} alt="Favicon" className="w-8 h-8 object-contain rounded border border-neutral-200" />
+                      )}
+                      <label className="cursor-pointer px-3 py-1.5 text-sm font-medium bg-neutral-100 hover:bg-neutral-200 rounded-lg transition-colors">
+                        {adminLoading === 'favicon-upload' ? 'Uploading…' : 'Upload Favicon'}
+                        <input type="file" accept="image/*" onChange={handleFaviconUpload} className="hidden" disabled={adminLoading === 'favicon-upload'} />
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                <hr className="border-neutral-100" />
+                <h3 className="text-sm font-semibold text-neutral-800">SEO Settings</h3>
+                <div className="grid grid-cols-1 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-700 mb-1">Meta Title</label>
+                    <input value={siteConfig.seo_meta_title} onChange={(e) => setSiteConfig({ ...siteConfig, seo_meta_title: e.target.value })}
+                      placeholder="Postmind — AI Social Media Management" className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-700 mb-1">Meta Description</label>
+                    <textarea value={siteConfig.seo_meta_description} onChange={(e) => setSiteConfig({ ...siteConfig, seo_meta_description: e.target.value })}
+                      placeholder="Create, schedule, and publish social media content with AI…" rows={3}
+                      className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-sm" />
+                  </div>
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <Button onClick={saveSiteSettings} disabled={adminLoading === 'site-save'}>
+                    <Save className="w-4 h-4 mr-2" /> {adminLoading === 'site-save' ? 'Saving…' : 'Save Site Settings'}
+                  </Button>
+                </div>
+              </Card>
+
               {/* SMTP Email Configuration */}
               <Card className="p-6 space-y-5">
                 <div className="flex items-center gap-2">
@@ -469,10 +641,312 @@ export function SettingsPage() {
                   </Button>
                 </div>
               </Card>
+
+              {/* Global Platform Credentials */}
+              <Card className="p-6 space-y-5">
+                <div className="flex items-center gap-2">
+                  <Globe className="w-5 h-5 text-brand-blue" />
+                  <h2 className="text-lg font-heading font-semibold text-neutral-900">Custom Platform Credentials</h2>
+                </div>
+                <p className="text-sm text-neutral-500">
+                  Configure global API credentials for your custom platforms. All users will be able to connect these platforms with a single click.
+                </p>
+
+                {adminMsg?.section === 'platforms' && (
+                  <div className={`flex items-center gap-2 text-sm ${adminMsg.type === 'success' ? 'text-green-700' : 'text-red-600'}`}>
+                    {adminMsg.type === 'success' ? <CheckCircle className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
+                    {adminMsg.text}
+                  </div>
+                )}
+
+                {GLOBAL_CREDENTIAL_PLATFORMS.map((platformId) => {
+                  const platform = PLATFORMS[platformId];
+                  const creds = platformCreds[platformId] || { access_token: '', server_key: '' };
+                  const needsServerKey = platformId === 'entreprenrs' || platformId === 'iohah';
+                  return (
+                    <div key={platformId} className="space-y-3 p-4 border border-neutral-100 rounded-lg">
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-full" style={{ backgroundColor: platform.color }} />
+                        <h3 className="text-sm font-semibold text-neutral-800">{platform.name}</h3>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-neutral-700 mb-1">Access Token</label>
+                          <input
+                            type="password"
+                            value={creds.access_token}
+                            onChange={(e) => setPlatformCreds((prev) => ({ ...prev, [platformId]: { ...creds, access_token: e.target.value } }))}
+                            placeholder="Enter access token"
+                            className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-sm"
+                          />
+                        </div>
+                        {needsServerKey && (
+                          <div>
+                            <label className="block text-sm font-medium text-neutral-700 mb-1">Server Key</label>
+                            <input
+                              type="password"
+                              value={creds.server_key}
+                              onChange={(e) => setPlatformCreds((prev) => ({ ...prev, [platformId]: { ...creds, server_key: e.target.value } }))}
+                              placeholder="Enter server key"
+                              className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-sm"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+
+                <div className="flex gap-3 pt-2">
+                  <Button onClick={() => void savePlatforms()} disabled={adminLoading === 'platforms-save'}>
+                    <Save className="w-4 h-4" /> {adminLoading === 'platforms-save' ? 'Saving...' : 'Save Platform Credentials'}
+                  </Button>
+                </div>
+              </Card>
+
+              {/* Plan Management */}
+              <PlanManagementCard
+                planConfig={planConfig}
+                setPlanConfig={setPlanConfig}
+                adminMsg={adminMsg}
+                setAdminMsg={setAdminMsg}
+                adminLoading={adminLoading}
+                setAdminLoading={setAdminLoading}
+              />
             </div>
           )}
         </div>
       </div>
     </div>
+  );
+}
+
+// ============================================================
+// Plan Management Card (admin-only)
+// ============================================================
+
+const TIERS: SubscriptionTier[] = ['basic', 'pro', 'business', 'enterprise'];
+const TIER_LABELS: Record<SubscriptionTier, string> = { basic: 'Basic', pro: 'Pro', business: 'Business', enterprise: 'Enterprise' };
+const LIMIT_KEYS: { key: string; label: string; isInfinity?: boolean }[] = [
+  { key: 'socialAccounts', label: 'Social Accounts' },
+  { key: 'postsPerMonth', label: 'Posts / Month' },
+  { key: 'aiGenerationsPerMonth', label: 'AI Generations / Month' },
+  { key: 'templatesPerMonth', label: 'Templates / Month' },
+  { key: 'teamMembers', label: 'Team Members' },
+  { key: 'analyticsDays', label: 'Analytics Days' },
+];
+const PRICE_KEYS: { key: string; label: string }[] = [
+  { key: 'monthlyPrice', label: 'Monthly Price ($)' },
+  { key: 'yearlyDiscount', label: 'Yearly Discount (%)' },
+];
+
+const ALL_PLATFORMS: PlatformType[] = [
+  'entreprenrs', 'chrxstians', 'iohah', 'facebook', 'instagram', 'twitter',
+  'youtube', 'pinterest', 'tiktok', 'linkedin', 'bluesky', 'mastodon', 'telegram',
+];
+
+function PlanManagementCard({
+  planConfig, setPlanConfig, adminMsg, setAdminMsg, adminLoading, setAdminLoading,
+}: {
+  planConfig: Record<string, any>;
+  setPlanConfig: (v: Record<string, any>) => void;
+  adminMsg: { section: string; type: 'success' | 'error'; text: string } | null;
+  setAdminMsg: (v: { section: string; type: 'success' | 'error'; text: string } | null) => void;
+  adminLoading: string | null;
+  setAdminLoading: (v: string | null) => void;
+}) {
+  // Merge saved config over defaults
+  function getLimits(tier: SubscriptionTier) {
+    const defaults = SUBSCRIPTION_LIMITS[tier];
+    const saved = planConfig?.limits?.[tier] || {};
+    // Merge, converting __INFINITY__ strings to Infinity for display
+    const merged = { ...defaults, ...saved };
+    for (const key of Object.keys(merged)) {
+      if ((merged as any)[key] === '__INFINITY__') (merged as any)[key] = Infinity;
+    }
+    return merged;
+  }
+
+  function getPricing(tier: SubscriptionTier) {
+    const defaultPrices: Record<SubscriptionTier, number> = { basic: 0, pro: 19, business: 49, enterprise: 0 };
+    const saved = planConfig?.pricing?.[tier] || {};
+    return {
+      monthlyPrice: saved.monthlyPrice ?? defaultPrices[tier],
+      yearlyDiscount: saved.yearlyDiscount ?? planConfig?.yearlyDiscount ?? 30,
+    };
+  }
+
+  function getGlobalDiscount(): number {
+    return planConfig?.yearlyDiscount ?? 30;
+  }
+
+  function updateGlobalDiscount(value: string) {
+    const num = Math.max(0, Math.min(100, Number(value) || 0));
+    setPlanConfig({ ...planConfig, yearlyDiscount: num });
+  }
+
+  function getPlatforms(tier: SubscriptionTier): PlatformType[] {
+    return planConfig?.platforms?.[tier] || TIER_PLATFORMS[tier];
+  }
+
+  function updateLimit(tier: SubscriptionTier, key: string, value: string) {
+    const num = value === '' ? 0 : value.toLowerCase() === 'unlimited' ? Infinity : Number(value);
+    setPlanConfig({
+      ...planConfig,
+      limits: {
+        ...planConfig?.limits,
+        [tier]: { ...getLimits(tier), [key]: isNaN(num) ? 0 : num },
+      },
+    });
+  }
+
+  function updatePricing(tier: SubscriptionTier, key: string, value: string) {
+    const num = Number(value) || 0;
+    setPlanConfig({
+      ...planConfig,
+      pricing: {
+        ...planConfig?.pricing,
+        [tier]: { ...getPricing(tier), [key]: num },
+      },
+    });
+  }
+
+  function togglePlatform(tier: SubscriptionTier, platform: PlatformType) {
+    const current = new Set(getPlatforms(tier));
+    if (current.has(platform)) current.delete(platform); else current.add(platform);
+    setPlanConfig({
+      ...planConfig,
+      platforms: {
+        ...planConfig?.platforms,
+        [tier]: ALL_PLATFORMS.filter((p) => current.has(p)),
+      },
+    });
+  }
+
+  async function savePlans() {
+    setAdminLoading('plans-save');
+    setAdminMsg(null);
+    try {
+      const res = await api.admin.savePlans(planConfig);
+      setPlanConfig(res.data);
+      setAdminMsg({ section: 'plans', type: 'success', text: 'Plan configuration saved.' });
+    } catch (err) {
+      setAdminMsg({ section: 'plans', type: 'error', text: err instanceof Error ? err.message : 'Failed to save.' });
+    } finally {
+      setAdminLoading(null);
+    }
+  }
+
+  return (
+    <Card className="p-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-heading font-semibold text-neutral-900">Plan Management</h2>
+        {adminMsg?.section === 'plans' && (
+          <span className={`text-sm ${adminMsg.type === 'success' ? 'text-emerald-600' : 'text-red-600'}`}>
+            {adminMsg.text}
+          </span>
+        )}
+      </div>
+      <p className="text-sm text-neutral-500">
+        Configure limits, pricing, and available platforms for each subscription tier. Changes are saved to the database and override defaults.
+      </p>
+
+      {/* Global Yearly Discount */}
+      <div className="border rounded-lg p-4 bg-neutral-50">
+        <div className="flex items-center gap-4">
+          <div className="flex-1">
+            <label className="block text-sm font-medium text-neutral-700 mb-1">Yearly Discount (%)</label>
+            <p className="text-xs text-neutral-500">Default discount applied when users choose yearly billing. Each tier can override this below.</p>
+          </div>
+          <div className="w-32">
+            <input
+              type="number"
+              min={0}
+              max={100}
+              value={getGlobalDiscount()}
+              onChange={(e) => updateGlobalDiscount(e.target.value)}
+              className="w-full rounded-lg border border-neutral-200 px-3 py-1.5 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-8">
+        {TIERS.map((tier) => {
+          const limits = getLimits(tier);
+          const pricing = getPricing(tier);
+          const platforms = new Set(getPlatforms(tier));
+
+          return (
+            <div key={tier} className="border rounded-lg p-4 space-y-4">
+              <h3 className="font-semibold text-neutral-800">{TIER_LABELS[tier]}</h3>
+
+              {/* Pricing */}
+              {tier !== 'basic' && tier !== 'enterprise' && (
+                <div className="grid grid-cols-2 gap-3">
+                  {PRICE_KEYS.map((pk) => (
+                    <div key={pk.key}>
+                      <label className="block text-xs font-medium text-neutral-500 mb-1">{pk.label}</label>
+                      <input
+                        type="number"
+                        min={0}
+                        value={pricing[pk.key as keyof typeof pricing]}
+                        onChange={(e) => updatePricing(tier, pk.key, e.target.value)}
+                        className="w-full rounded-lg border border-neutral-200 px-3 py-1.5 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Limits */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {LIMIT_KEYS.map((lk) => {
+                  const val = limits[lk.key as keyof typeof limits];
+                  return (
+                    <div key={lk.key}>
+                      <label className="block text-xs font-medium text-neutral-500 mb-1">{lk.label}</label>
+                      <input
+                        type="text"
+                        value={val === Infinity ? 'Unlimited' : val}
+                        onChange={(e) => updateLimit(tier, lk.key, e.target.value)}
+                        className="w-full rounded-lg border border-neutral-200 px-3 py-1.5 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Platforms */}
+              <div>
+                <label className="block text-xs font-medium text-neutral-500 mb-2">Available Platforms</label>
+                <div className="flex flex-wrap gap-2">
+                  {ALL_PLATFORMS.map((pid) => (
+                    <button
+                      key={pid}
+                      type="button"
+                      onClick={() => togglePlatform(tier, pid)}
+                      className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
+                        platforms.has(pid)
+                          ? 'bg-brand-50 border-brand-300 text-brand-700'
+                          : 'bg-neutral-50 border-neutral-200 text-neutral-400'
+                      }`}
+                    >
+                      {PLATFORMS[pid].name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="flex gap-3 pt-2">
+        <Button onClick={() => void savePlans()} disabled={adminLoading === 'plans-save'}>
+          <Save className="w-4 h-4" /> {adminLoading === 'plans-save' ? 'Saving...' : 'Save Plan Configuration'}
+        </Button>
+      </div>
+    </Card>
   );
 }

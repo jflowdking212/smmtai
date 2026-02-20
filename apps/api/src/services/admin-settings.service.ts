@@ -337,9 +337,7 @@ export function getGlobalCredentialPlatforms(): PlatformType[] {
 export async function getPlanConfig(): Promise<Record<string, any>> {
   const raw = await getConfig('plan_config');
   if (!raw) return {};
-  try {
-    return JSON.parse(raw, (_key, value) => (value === '__INFINITY__' ? Infinity : value));
-  } catch { return {}; }
+  try { return JSON.parse(raw); } catch { return {}; }
 }
 
 export async function savePlanConfig(config: Record<string, any>): Promise<void> {

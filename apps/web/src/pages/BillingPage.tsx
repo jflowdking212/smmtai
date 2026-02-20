@@ -108,7 +108,7 @@ export function BillingPage() {
   }
 
   function getYearlyDiscount(tier: SubscriptionTier): number {
-    return planConfig?.pricing?.[tier]?.yearlyDiscount ?? DEFAULT_YEARLY_DISCOUNT;
+    return planConfig?.pricing?.[tier]?.yearlyDiscount ?? planConfig?.yearlyDiscount ?? DEFAULT_YEARLY_DISCOUNT;
   }
 
   async function handleUpgrade(priceKey: string) {

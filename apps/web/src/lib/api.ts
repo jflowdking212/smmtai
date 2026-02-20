@@ -491,7 +491,7 @@ export const api = {
     savePlans: (data: Record<string, any>) =>
       request<{ success: true; data: Record<string, any> }>('/admin/settings/plans', {
         method: 'PUT',
-        body: JSON.stringify(data),
+        body: JSON.stringify(data, (_k, v) => (v === Infinity ? '__INFINITY__' : v)),
       }),
   },
   chat: {

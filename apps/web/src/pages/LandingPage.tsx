@@ -66,7 +66,7 @@ function PricingSection() {
 
   function getYearlyDiscount(planName: string): number {
     const tier = TIER_MAP[planName];
-    return planConfig?.pricing?.[tier]?.yearlyDiscount ?? DEFAULT_YEARLY_DISCOUNT;
+    return planConfig?.pricing?.[tier]?.yearlyDiscount ?? planConfig?.yearlyDiscount ?? DEFAULT_YEARLY_DISCOUNT;
   }
 
   function formatPrice(monthlyPrice: number, yearlyDiscountPct: number): { display: string; period: string; originalYearly?: string } {
