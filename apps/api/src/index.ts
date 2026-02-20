@@ -27,7 +27,12 @@ import { adminRouter } from './routes/admin.js';
 import { chatRouter } from './routes/chat.js';
 import { bgRemoveRouter } from './routes/bgRemove.js';
 import { collaborationRouter } from './routes/collaboration.js';
-import { scheduleAnalyticsIngestion, scheduleAnalyticsDigestReports, scheduleConnectionHealthMonitoring } from './jobs/scheduler.js';
+import {
+  scheduleAnalyticsIngestion,
+  scheduleAnalyticsDigestReports,
+  scheduleConnectionHealthMonitoring,
+  scheduleMediaRetentionCleanup,
+} from './jobs/scheduler.js';
 
 // Initialize Sentry
 if (config.sentry.dsn) {
@@ -56,7 +61,11 @@ app.use(cookieParser());
 app.use('/uploads', express.static(resolve(process.env.MEDIA_UPLOAD_DIR || 'uploads')));
 app.use(sanitizeRequest);
 app.use(csrfProtection);
-app.use('/api/v1', apiLimiter);
+app.use('/api/v1', (req, res, next) => {
+  // Skip global rate limiter for admin routes (protected by auth + owner role)
+  if (req.path.startsWith('/admin')) return next();
+  return apiLimiter(req, res, next);
+});
 
 // Routes
 app.use('/api/v1/health', healthRouter);
@@ -107,6 +116,13 @@ app.listen(config.port, () => {
     })
     .catch((error) => {
       console.error('   Failed to schedule connection health monitoring:', error instanceof Error ? error.message : error);
+    });
+  void scheduleMediaRetentionCleanup()
+    .then(({ intervalMs }) => {
+      console.log(`   Media retention cleanup scheduled every ${Math.round(intervalMs / 3600000)} hours`);
+    })
+    .catch((error) => {
+      console.error('   Failed to schedule media retention cleanup:', error instanceof Error ? error.message : error);
     });
 });
 
