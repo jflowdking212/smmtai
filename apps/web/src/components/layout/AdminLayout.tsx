@@ -12,6 +12,7 @@ import {
   CreditCard,
   BarChart3,
   MessageCircle,
+  MessagesSquare,
   Settings,
   ChevronLeft,
   ChevronRight,
@@ -33,6 +34,7 @@ const adminNavigation = [
   { name: 'Plans', href: '/admin/plans', icon: CreditCard },
   { name: 'Analytics', href: '/admin/analytics', icon: BarChart3 },
   { name: 'Messages', href: '/admin/messages', icon: MessageCircle },
+  { name: 'Conversations', href: '/admin/conversations', icon: MessagesSquare },
   { name: 'Knowledge Base', href: '/admin/knowledge-base', icon: BookOpen },
   { name: 'Settings', href: '/admin/settings', icon: Settings },
 ];

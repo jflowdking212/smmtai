@@ -127,7 +127,6 @@ export default function App() {
             <Route path="/team" element={<UpgradeGate feature="team"><SettingsPage /></UpgradeGate>} />
             <Route path="/billing" element={<BillingPage />} />
             <Route path="/help" element={<HelpPage />} />
-            <Route path="/conversations" element={<UpgradeGate feature="conversations"><ConversationsPage /></UpgradeGate>} />
           </Route>
 
           {/* Admin routes — separate layout */}
@@ -143,6 +142,7 @@ export default function App() {
             <Route path="/admin/plans" element={<AdminPlansPage />} />
             <Route path="/admin/analytics" element={<AdminAnalyticsPage />} />
             <Route path="/admin/messages" element={<AdminMessagesPage />} />
+            <Route path="/admin/conversations" element={<ConversationsPage />} />
             <Route path="/admin/knowledge-base" element={<KnowledgeBasePage />} />
             <Route path="/admin/settings" element={<AdminSettingsPage />} />
             <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />

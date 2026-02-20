@@ -29,7 +29,6 @@ import {
   Search,
   LogOut,
   HelpCircle,
-  MessageCircle,
   Lock,
   Monitor,
 } from 'lucide-react';
@@ -43,7 +42,6 @@ const navigation: { name: string; href: string; icon: typeof LayoutDashboard; fe
   { name: 'Connections', href: '/connections', icon: Link2, feature: 'connections' },
   { name: 'Templates', href: '/templates', icon: Palette, feature: 'templates' },
   { name: 'AI Assistant', href: '/ai', icon: Sparkles, feature: 'ai_assistant' },
-  { name: 'Conversations', href: '/conversations', icon: MessageCircle, feature: 'conversations' },
 ];
 
 const bottomNav: { name: string; href: string; icon: typeof Users; feature: AppFeature; ownerOnly?: boolean }[] = [
