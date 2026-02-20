@@ -1,9 +1,28 @@
 import { useEffect, useState } from 'react';
-import { Card, Button, Input, Badge } from '@/components/ui';
+import { Card, Button, Badge } from '@/components/ui';
 import { api, ApiError } from '@/lib/api';
 import { useToast } from '@/components/Toast';
 import { SUBSCRIPTION_LIMITS } from '@ee-postmind/shared';
-import { Save, Plus, Trash2, Percent } from 'lucide-react';
+import { Save, Percent } from 'lucide-react';
+
+const LIMIT_FIELDS = [
+  { key: 'socialAccounts', label: 'Social Accounts', icon: '🔗' },
+  { key: 'postsPerMonth', label: 'Posts / Month', icon: '📝' },
+  { key: 'aiGenerationsPerMonth', label: 'AI Generations / Month', icon: '🤖' },
+  { key: 'templatesPerMonth', label: 'Templates / Month', icon: '🎨' },
+  { key: 'teamMembers', label: 'Team Members', icon: '👥' },
+  { key: 'analyticsDays', label: 'Analytics (Days)', icon: '📊' },
+] as const;
+
+function formatValue(val: any): string {
+  if (val === Infinity || val === '__INFINITY__') return 'Unlimited';
+  return String(val ?? '');
+}
+
+function parseValue(val: string): number {
+  if (val.toLowerCase() === 'unlimited') return Infinity;
+  return parseInt(val) || 0;
+}
 
 export function AdminPlansPage() {
   const [planConfig, setPlanConfig] = useState<Record<string, any>>({});
@@ -14,7 +33,6 @@ export function AdminPlansPage() {
   useEffect(() => {
     api.admin.getPlans()
       .then((res) => {
-        // Restore Infinity values
         const data = JSON.parse(JSON.stringify(res.data), (_k, v) => (v === '__INFINITY__' ? Infinity : v));
         setPlanConfig(data);
       })
@@ -26,7 +44,7 @@ export function AdminPlansPage() {
     setSaving(true);
     try {
       await api.admin.savePlans(planConfig);
-      toast.success('Saved', 'Plan configuration saved successfully');
+      toast.success('Saved', 'Plan configuration saved — limits are now active');
     } catch (err) {
       toast.error('Error', err instanceof ApiError ? err.message : 'Failed to save plans');
     } finally {
@@ -57,7 +75,7 @@ export function AdminPlansPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-heading font-bold text-white">Plan Management</h1>
-          <p className="text-sm text-neutral-400 mt-1">Create, edit, and configure subscription plans.</p>
+          <p className="text-sm text-neutral-400 mt-1">Configure subscription plans, limits, and pricing. Changes take effect immediately.</p>
         </div>
         <Button size="sm" onClick={handleSave} loading={saving} className="bg-red-600 hover:bg-red-700 text-white">
           <Save className="w-4 h-4" /> Save All Changes
@@ -109,18 +127,19 @@ export function AdminPlansPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {tiers.map((tier) => {
           const config = planConfig[tier] || {};
-          const limits = SUBSCRIPTION_LIMITS[tier as keyof typeof SUBSCRIPTION_LIMITS];
+          const defaults = SUBSCRIPTION_LIMITS[tier as keyof typeof SUBSCRIPTION_LIMITS];
           return (
             <Card key={tier} className="p-6 bg-neutral-900 border-neutral-800">
-              <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center justify-between mb-5">
                 <h3 className="text-lg font-semibold text-white capitalize">{tier}</h3>
                 <Badge variant={tier === 'enterprise' ? 'brand' : tier === 'business' ? 'success' : tier === 'pro' ? 'warning' : 'default'}>
                   {tier === 'basic' ? 'Free' : 'Paid'}
                 </Badge>
               </div>
               <div className="space-y-3">
+                {/* Price */}
                 <div>
-                  <label className="block text-xs text-neutral-400 mb-1">Monthly Price ($)</label>
+                  <label className="block text-xs text-neutral-400 mb-1">💰 Monthly Price ($)</label>
                   <input
                     type="number"
                     min={0}
@@ -129,33 +148,21 @@ export function AdminPlansPage() {
                     className="w-full px-3 py-2 rounded-lg border border-neutral-700 bg-neutral-800 text-white text-sm focus:outline-none focus:ring-1 focus:ring-red-500"
                   />
                 </div>
-                <div>
-                  <label className="block text-xs text-neutral-400 mb-1">Post Limit</label>
-                  <input
-                    type="text"
-                    value={config.postLimit ?? (limits?.postsPerMonth === Infinity ? 'Unlimited' : limits?.postsPerMonth ?? 30)}
-                    onChange={(e) => updatePlan(tier, 'postLimit', e.target.value === 'Unlimited' ? Infinity : parseInt(e.target.value) || 0)}
-                    className="w-full px-3 py-2 rounded-lg border border-neutral-700 bg-neutral-800 text-white text-sm focus:outline-none focus:ring-1 focus:ring-red-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-neutral-400 mb-1">Social Accounts</label>
-                  <input
-                    type="text"
-                    value={config.socialAccounts ?? (limits?.socialAccounts === Infinity ? 'Unlimited' : limits?.socialAccounts ?? 3)}
-                    onChange={(e) => updatePlan(tier, 'socialAccounts', e.target.value === 'Unlimited' ? Infinity : parseInt(e.target.value) || 0)}
-                    className="w-full px-3 py-2 rounded-lg border border-neutral-700 bg-neutral-800 text-white text-sm focus:outline-none focus:ring-1 focus:ring-red-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-neutral-400 mb-1">Team Members</label>
-                  <input
-                    type="text"
-                    value={config.teamMembers ?? (limits?.teamMembers === Infinity ? 'Unlimited' : limits?.teamMembers ?? 1)}
-                    onChange={(e) => updatePlan(tier, 'teamMembers', e.target.value === 'Unlimited' ? Infinity : parseInt(e.target.value) || 0)}
-                    className="w-full px-3 py-2 rounded-lg border border-neutral-700 bg-neutral-800 text-white text-sm focus:outline-none focus:ring-1 focus:ring-red-500"
-                  />
-                </div>
+
+                {/* All limit fields */}
+                {LIMIT_FIELDS.map(({ key, label, icon }) => (
+                  <div key={key}>
+                    <label className="block text-xs text-neutral-400 mb-1">{icon} {label}</label>
+                    <input
+                      type="text"
+                      value={formatValue(config[key] ?? defaults[key])}
+                      onChange={(e) => updatePlan(tier, key, parseValue(e.target.value))}
+                      placeholder={formatValue(defaults[key])}
+                      className="w-full px-3 py-2 rounded-lg border border-neutral-700 bg-neutral-800 text-white text-sm focus:outline-none focus:ring-1 focus:ring-red-500"
+                    />
+                    <p className="text-[10px] text-neutral-600 mt-0.5">Default: {formatValue(defaults[key])}</p>
+                  </div>
+                ))}
               </div>
             </Card>
           );

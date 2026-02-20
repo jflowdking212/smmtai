@@ -240,6 +240,8 @@ export const api = {
       request<{ success: true; data: { url: string } }>('/billing/portal', {
         method: 'POST',
       }),
+    getLimits: () =>
+      request<{ success: true; data: { socialAccounts: number; postsPerMonth: number; aiGenerationsPerMonth: number; templatesPerMonth: number; teamMembers: number; analyticsDays: number } }>('/billing/limits'),
   },
   connections: {
     list: () =>

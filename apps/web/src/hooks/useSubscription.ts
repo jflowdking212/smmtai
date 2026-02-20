@@ -1,4 +1,6 @@
+import { useEffect, useState } from 'react';
 import { useAuthStore } from '@/stores/authStore';
+import { api } from '@/lib/api';
 import {
   hasFeatureAccess,
   SUBSCRIPTION_LIMITS,
@@ -12,7 +14,19 @@ export function useSubscription() {
   const role = useAuthStore((s) => s.role) as WorkspaceRole;
   const usage = useAuthStore((s) => s.usage);
 
-  const limits = SUBSCRIPTION_LIMITS[tier];
+  const [limits, setLimits] = useState(SUBSCRIPTION_LIMITS[tier]);
+
+  useEffect(() => {
+    api.billing.getLimits()
+      .then((res) => {
+        if (res.data) setLimits(res.data);
+      })
+      .catch(() => {
+        // Fallback to hardcoded limits
+        setLimits(SUBSCRIPTION_LIMITS[tier]);
+      });
+  }, [tier]);
+
   const isOwner = role === 'owner';
   const isAdmin = role === 'owner' || role === 'admin';
 

@@ -5,6 +5,8 @@ import { stripeService } from '../services/stripe.service.js';
 import { authService } from '../services/auth.service.js';
 import { config } from '../config/index.js';
 import { changePlanSchema, publicCheckoutSchema } from '../utils/validators.js';
+import { getEffectiveLimits } from '../services/admin-settings.service.js';
+import { SUBSCRIPTION_LIMITS, type SubscriptionTier } from '@ee-postmind/shared';
 
 export const billingRouter = Router();
 
@@ -43,6 +45,26 @@ billingRouter.get(
       }
       const status = await stripeService.getSubscriptionStatus(req.workspaceId);
       res.json({ success: true, data: status });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+// Get effective plan limits (admin-configurable)
+billingRouter.get(
+  '/limits',
+  authenticate,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      if (!req.workspaceId) {
+        return res.json({ success: true, data: SUBSCRIPTION_LIMITS.basic });
+      }
+      const { prisma } = await import('../config/database.js');
+      const sub = await prisma.subscription.findUnique({ where: { workspaceId: req.workspaceId } });
+      const tier = (sub?.tier || 'basic') as SubscriptionTier;
+      const limits = await getEffectiveLimits(tier);
+      res.json({ success: true, data: limits });
     } catch (err) {
       next(err);
     }

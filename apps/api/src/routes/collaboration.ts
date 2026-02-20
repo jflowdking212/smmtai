@@ -4,6 +4,7 @@ import { SUBSCRIPTION_LIMITS, type SubscriptionTier } from '@ee-postmind/shared'
 import { authenticate, AuthRequest } from '../middleware/auth.js';
 import { AppError } from '../middleware/errorHandler.js';
 import { resolveUsageAccess } from '../middleware/usage.js';
+import { getEffectiveLimits } from '../services/admin-settings.service.js';
 import { prisma } from '../config/database.js';
 import { verifyAccessToken } from '../utils/tokens.js';
 
@@ -124,7 +125,8 @@ async function resolveCollaborator(req: Request): Promise<CollaboratorContext> {
     throw new AppError(access.message, 402, access.code);
   }
 
-  if (SUBSCRIPTION_LIMITS[tier].teamMembers <= 1) {
+  const effectiveLimits = await getEffectiveLimits(tier);
+  if (effectiveLimits.teamMembers <= 1) {
     throw new AppError(
       'Collaborative editing requires a team plan (Pro or higher).',
       403,

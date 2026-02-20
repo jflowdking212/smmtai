@@ -3,6 +3,7 @@ import { prisma } from '../config/database.js';
 import { AppError } from './errorHandler.js';
 import { AuthRequest } from './auth.js';
 import { SUBSCRIPTION_LIMITS, type SubscriptionTier } from '@ee-postmind/shared';
+import { getEffectiveLimits } from '../services/admin-settings.service.js';
 
 type UsageMetric = 'posts' | 'ai_generations' | 'social_accounts' | 'templates';
 type UsageAccessInput = {
@@ -90,7 +91,7 @@ export function checkUsage(metric: UsageMetric) {
         throw new AppError(access.message, 402, access.code);
       }
 
-      const limits = SUBSCRIPTION_LIMITS[tier];
+      const limits = await getEffectiveLimits(tier);
       const limitMap: Record<UsageMetric, number> = {
         posts: limits.postsPerMonth,
         ai_generations: limits.aiGenerationsPerMonth,

@@ -345,7 +345,9 @@ export function getGlobalCredentialPlatforms(): PlatformType[] {
 export async function getPlanConfig(): Promise<Record<string, any>> {
   const raw = await getConfig('plan_config');
   if (!raw) return {};
-  try { return JSON.parse(raw); } catch { return {}; }
+  try {
+    return JSON.parse(raw, (_k, v) => (v === '__INFINITY__' ? Infinity : v));
+  } catch { return {}; }
 }
 
 export async function savePlanConfig(config: Record<string, any>): Promise<void> {
@@ -353,4 +355,32 @@ export async function savePlanConfig(config: Record<string, any>): Promise<void>
     value === Infinity ? '__INFINITY__' : value,
   );
   await setConfig('plan_config', json);
+}
+
+/**
+ * Returns effective limits for a given tier, merging admin-configured
+ * overrides from the DB over the hardcoded SUBSCRIPTION_LIMITS defaults.
+ */
+export async function getEffectiveLimits(tier: string): Promise<{
+  socialAccounts: number;
+  postsPerMonth: number;
+  aiGenerationsPerMonth: number;
+  templatesPerMonth: number;
+  teamMembers: number;
+  analyticsDays: number;
+}> {
+  const { SUBSCRIPTION_LIMITS } = await import('@ee-postmind/shared');
+  const defaults = SUBSCRIPTION_LIMITS[tier as keyof typeof SUBSCRIPTION_LIMITS];
+  const config = await getPlanConfig();
+  const overrides = config[tier];
+  if (!overrides) return { ...defaults };
+
+  return {
+    socialAccounts: overrides.socialAccounts ?? defaults.socialAccounts,
+    postsPerMonth: overrides.postsPerMonth ?? defaults.postsPerMonth,
+    aiGenerationsPerMonth: overrides.aiGenerationsPerMonth ?? defaults.aiGenerationsPerMonth,
+    templatesPerMonth: overrides.templatesPerMonth ?? defaults.templatesPerMonth,
+    teamMembers: overrides.teamMembers ?? defaults.teamMembers,
+    analyticsDays: overrides.analyticsDays ?? defaults.analyticsDays,
+  };
 }
