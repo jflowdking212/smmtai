@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils';
 import { Avatar } from '@/components/ui';
 import { useAuthStore } from '@/stores/authStore';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
+import { useTheme } from '@/components/ThemeProvider';
 import { api } from '@/lib/api';
 import {
   LayoutDashboard,
@@ -21,6 +22,8 @@ import {
   Sparkles,
   Monitor,
   User,
+  Sun,
+  Moon,
 } from 'lucide-react';
 
 const adminNavigation = [
@@ -38,6 +41,7 @@ export function AdminLayout() {
   const navigate = useNavigate();
   const { user, logout: clearAuth } = useAuthStore();
   const { settings: siteSettings } = useSiteSettings();
+  const { theme, setTheme } = useTheme();
 
   async function handleLogout() {
     try {
@@ -111,8 +115,18 @@ export function AdminLayout() {
           ))}
         </nav>
 
-        {/* Mode toggle + logout */}
+        {/* Mode toggle + theme + logout */}
         <div className="py-4 px-3 space-y-1 border-t border-neutral-800">
+          <button
+            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+            className={cn(
+              'flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm font-medium text-neutral-400 hover:text-amber-400 hover:bg-amber-500/10 transition-all duration-200',
+              collapsed && 'justify-center px-0',
+            )}
+          >
+            {theme === 'dark' ? <Sun className="w-5 h-5 flex-shrink-0" /> : <Moon className="w-5 h-5 flex-shrink-0" />}
+            {!collapsed && <span>{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>}
+          </button>
           <button
             onClick={() => navigate('/dashboard')}
             className={cn(
