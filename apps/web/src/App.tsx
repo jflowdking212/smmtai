@@ -22,6 +22,8 @@ import { ConversationsPage } from '@/pages/ConversationsPage';
 import { KnowledgeBasePage } from '@/pages/KnowledgeBasePage';
 import { LandingPage } from '@/pages/LandingPage';
 import { TermsPage } from '@/pages/TermsPage';
+import { PrivacyPolicyPage } from '@/pages/PrivacyPolicyPage';
+import { CookiePolicyPage } from '@/pages/CookiePolicyPage';
 import { CheckoutPage } from '@/pages/CheckoutPage';
 import { CheckoutSuccessPage } from '@/pages/CheckoutSuccessPage';
 import { UpgradeGate } from '@/components/UpgradeGate';
@@ -95,6 +97,8 @@ export default function App() {
            {/* Public routes */}
            <Route path="/" element={<HomePage />} />
            <Route path="/terms" element={<TermsPage />} />
+           <Route path="/privacy" element={<PrivacyPolicyPage />} />
+           <Route path="/cookies" element={<CookiePolicyPage />} />
            <Route path="/checkout" element={<CheckoutPage />} />
            <Route path="/checkout/success" element={<CheckoutSuccessPage />} />
 
