@@ -1,3 +1,5 @@
+import type { SubscriptionTier, WorkspaceRole } from '@ee-postmind/shared';
+
 const API_BASE = '/api/v1';
 const UNSAFE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
@@ -49,6 +51,44 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
   return data;
 }
 
+async function requestBlob(url: string, options?: RequestInit): Promise<Blob> {
+  const token = useAuthStore.getState().accessToken;
+  const method = (options?.method || 'GET').toUpperCase();
+  const csrfToken = UNSAFE_METHODS.has(method) ? getCookieValue('csrfToken') : null;
+  const isFormData = typeof FormData !== 'undefined' && options?.body instanceof FormData;
+
+  const res = await fetch(`${API_BASE}${url}`, {
+    ...options,
+    headers: {
+      ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(csrfToken ? { 'x-csrf-token': csrfToken } : {}),
+      ...options?.headers,
+    },
+    credentials: 'include',
+  });
+
+  if (!res.ok) {
+    if (res.status === 401) {
+      const refreshed = await refreshTokens();
+      if (refreshed) {
+        return requestBlob(url, options);
+      }
+      useAuthStore.getState().logout();
+    }
+
+    const contentType = res.headers.get('content-type') || '';
+    if (contentType.includes('application/json')) {
+      const data = await res.json().catch(() => ({}));
+      throw new ApiError(data.error?.message || 'Request failed', data.error?.code, res.status);
+    }
+
+    throw new ApiError('Request failed', 'UNKNOWN', res.status);
+  }
+
+  return res.blob();
+}
+
 async function refreshTokens(): Promise<boolean> {
   try {
     const csrfToken = getCookieValue('csrfToken');
@@ -82,18 +122,18 @@ export const api = {
     oauthUrl: (provider: 'google' | 'github' | 'facebook', next = '/') =>
       `${API_BASE}/auth/oauth/${provider}?next=${encodeURIComponent(next)}`,
     register: (body: { name: string; email: string; password: string }) =>
-      request<{ success: true; data: { user: any; workspaceId: string; accessToken: string } }>(
+      request<{ success: true; data: { user: any; workspaceId: string; accessToken: string; role?: WorkspaceRole; tier?: SubscriptionTier } }>(
         '/auth/register',
         { method: 'POST', body: JSON.stringify(body) },
       ),
     login: (body: { email: string; password: string }) =>
-      request<{ success: true; data: { user: any; workspaceId: string; accessToken: string } }>(
+      request<{ success: true; data: { user: any; workspaceId: string; accessToken: string; role?: WorkspaceRole; tier?: SubscriptionTier } }>(
         '/auth/login',
         { method: 'POST', body: JSON.stringify(body) },
       ),
     logout: () => request('/auth/logout', { method: 'POST' }),
     me: () =>
-      request<{ success: true; data: { user: any; workspaceId: string } }>('/auth/me'),
+      request<{ success: true; data: { user: any; workspaceId: string; role?: WorkspaceRole; tier?: SubscriptionTier; usage?: Record<string, number> } }>('/auth/me'),
     forgotPassword: (email: string) =>
       request('/auth/forgot-password', {
         method: 'POST',
@@ -194,6 +234,8 @@ export const api = {
   connections: {
     list: () =>
       request<{ success: true; data: any[] }>('/connections'),
+    getGlobalPlatforms: () =>
+      request<{ success: true; data: string[] }>('/connections/global-platforms'),
     initiateOAuth: (platform: string) =>
       request<{ success: true; data: { authUrl: string } }>(`/connections/${platform}/auth`, {
         method: 'POST',
@@ -356,11 +398,38 @@ export const api = {
     delete: (templateId: string) =>
       request('/templates/' + templateId, { method: 'DELETE' }),
   },
+  editor: {
+    removeBackground: (formData: FormData) =>
+      requestBlob('/bg-remove', { method: 'POST', body: formData }),
+    collaborationAccess: () =>
+      request<{ success: true; data: { allowed: boolean; tier: string } }>('/collaboration/access'),
+    collaborationPublish: (roomId: string, clientId: string, payload: unknown) =>
+      request<{ success: true; data: { delivered: number } }>(
+        `/collaboration/${encodeURIComponent(roomId)}/publish`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ clientId, payload }),
+        },
+      ),
+    collaborationStreamUrl: (roomId: string, clientId: string) => {
+      const token = useAuthStore.getState().accessToken;
+      const params = new URLSearchParams();
+      params.set('clientId', clientId);
+      if (token) params.set('token', token);
+      return `${API_BASE}/collaboration/${encodeURIComponent(roomId)}/stream?${params.toString()}`;
+    },
+  },
   feedback: {
     submit: (data: { type: string; message: string; rating: number }) =>
       request<{ success: true; data: { id: string } }>('/feedback', { method: 'POST', body: JSON.stringify(data) }),
     list: () =>
       request<{ success: true; data: any[] }>('/feedback'),
+  },
+  site: {
+    getPublicSettings: () =>
+      request<{ success: true; data: Record<string, string> }>('/admin/settings/site/public'),
+    getPublicPlans: () =>
+      request<{ success: true; data: Record<string, any> }>('/admin/settings/plans/public'),
   },
   admin: {
     getSmtp: () =>
@@ -382,9 +451,47 @@ export const api = {
         method: 'PUT',
         body: JSON.stringify(data),
       }),
-    testStorage: () =>
+    testStorage: (data?: Record<string, string>) =>
       request<{ success: true; data: { success: boolean; message: string } }>('/admin/settings/storage/test', {
         method: 'POST',
+        body: JSON.stringify(data ?? {}),
+      }),
+    getSiteSettings: () =>
+      request<{ success: true; data: Record<string, string> }>('/admin/settings/site'),
+    saveSiteSettings: (data: Record<string, string>) =>
+      request<{ success: true; data: Record<string, string> }>('/admin/settings/site', {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
+    uploadLogo: (file: File) => {
+      const formData = new FormData();
+      formData.append('logo', file);
+      return request<{ success: true; data: { url: string } }>('/admin/settings/site/logo', {
+        method: 'POST',
+        body: formData,
+      });
+    },
+    uploadFavicon: (file: File) => {
+      const formData = new FormData();
+      formData.append('favicon', file);
+      return request<{ success: true; data: { url: string } }>('/admin/settings/site/favicon', {
+        method: 'POST',
+        body: formData,
+      });
+    },
+    getPlatforms: () =>
+      request<{ success: true; data: Record<string, { access_token: string; server_key: string }> }>('/admin/settings/platforms'),
+    savePlatforms: (data: Record<string, { access_token: string; server_key: string }>) =>
+      request<{ success: true; data: Record<string, { access_token: string; server_key: string }> }>('/admin/settings/platforms', {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
+    getPlans: () =>
+      request<{ success: true; data: Record<string, any> }>('/admin/settings/plans'),
+    savePlans: (data: Record<string, any>) =>
+      request<{ success: true; data: Record<string, any> }>('/admin/settings/plans', {
+        method: 'PUT',
+        body: JSON.stringify(data),
       }),
   },
   chat: {

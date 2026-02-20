@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, Button, Badge } from '@/components/ui';
 import { api } from '@/lib/api';
-import { SUBSCRIPTION_LIMITS, type SubscriptionTier } from '@ee-postmind/shared';
+import { SUBSCRIPTION_LIMITS, TIER_PLATFORMS, PLATFORMS, type SubscriptionTier } from '@ee-postmind/shared';
 import {
   Check,
   CreditCard,
@@ -12,54 +12,60 @@ import {
   Loader2,
 } from 'lucide-react';
 
+const DEFAULT_PRICES: Record<SubscriptionTier, number> = { basic: 0, pro: 19, business: 49, enterprise: 0 };
+const DEFAULT_YEARLY_DISCOUNT = 30;
+
 const plans: {
   tier: SubscriptionTier;
   name: string;
-  price: string;
-  priceKey: string;
+  priceKeyMonthly: string;
+  priceKeyYearly: string;
   description: string;
   icon: typeof Zap;
   popular?: boolean;
+  custom?: boolean;
 }[] = [
   {
-    tier: 'free',
-    name: 'Free',
-    price: '$0',
-    priceKey: '',
+    tier: 'basic',
+    name: 'Basic',
+    priceKeyMonthly: '',
+    priceKeyYearly: '',
     description: 'Get started with the basics',
     icon: Zap,
   },
   {
     tier: 'pro',
     name: 'Pro',
-    price: '$19',
-    priceKey: 'pro_monthly',
-    description: 'For growing creators & small teams',
+    priceKeyMonthly: 'pro_monthly',
+    priceKeyYearly: 'pro_yearly',
+    description: 'For growing creators & teams',
     icon: CreditCard,
     popular: true,
   },
   {
     tier: 'business',
     name: 'Business',
-    price: '$49',
-    priceKey: 'business_monthly',
+    priceKeyMonthly: 'business_monthly',
+    priceKeyYearly: 'business_yearly',
     description: 'For agencies & larger teams',
     icon: Building2,
   },
   {
     tier: 'enterprise',
     name: 'Enterprise',
-    price: 'Custom',
-    priceKey: '',
+    priceKeyMonthly: '',
+    priceKeyYearly: '',
     description: 'Dedicated support & custom limits',
     icon: Crown,
+    custom: true,
   },
 ];
 
-const featureLabels: { key: keyof (typeof SUBSCRIPTION_LIMITS)['free']; label: string }[] = [
+const featureLabels: { key: keyof (typeof SUBSCRIPTION_LIMITS)['basic']; label: string }[] = [
   { key: 'socialAccounts', label: 'Social accounts' },
   { key: 'postsPerMonth', label: 'Posts per month' },
   { key: 'aiGenerationsPerMonth', label: 'AI generations per month' },
+  { key: 'templatesPerMonth', label: 'Templates per month' },
   { key: 'teamMembers', label: 'Team members' },
   { key: 'analyticsDays', label: 'Analytics history' },
 ];
@@ -70,8 +76,42 @@ function formatLimit(value: number, isDays = false): string {
   return value.toLocaleString();
 }
 
+function formatPrice(monthlyPrice: number, yearly: boolean, yearlyDiscountPct: number): { display: string; period: string; originalMonthly?: string; yearlyTotal?: string } {
+  if (monthlyPrice === 0) return { display: '$0', period: '' };
+  const discount = yearlyDiscountPct / 100;
+  if (yearly) {
+    const monthlyDiscounted = +(monthlyPrice * (1 - discount)).toFixed(2);
+    const yearlyTotal = +(monthlyDiscounted * 12).toFixed(2);
+    return {
+      display: `$${Number.isInteger(monthlyDiscounted) ? monthlyDiscounted : monthlyDiscounted.toFixed(2)}`,
+      period: '/mo',
+      originalMonthly: `$${monthlyPrice}/mo`,
+      yearlyTotal: `$${Number.isInteger(yearlyTotal) ? yearlyTotal : yearlyTotal.toFixed(2)}/year`,
+    };
+  }
+  return { display: `$${monthlyPrice}`, period: '/month' };
+}
+
 export function BillingPage() {
   const [loading, setLoading] = useState<string | null>(null);
+  const [yearly, setYearly] = useState(false);
+  const [planConfig, setPlanConfig] = useState<Record<string, any>>({});
+
+  useEffect(() => {
+    let active = true;
+    api.site.getPublicPlans()
+      .then((res) => { if (active) setPlanConfig(res.data); })
+      .catch(() => { /* use defaults */ });
+    return () => { active = false; };
+  }, []);
+
+  function getMonthlyPrice(tier: SubscriptionTier): number {
+    return planConfig?.pricing?.[tier]?.monthlyPrice ?? DEFAULT_PRICES[tier];
+  }
+
+  function getYearlyDiscount(tier: SubscriptionTier): number {
+    return planConfig?.pricing?.[tier]?.yearlyDiscount ?? DEFAULT_YEARLY_DISCOUNT;
+  }
 
   async function handleUpgrade(priceKey: string) {
     if (!priceKey) return;
@@ -113,10 +153,32 @@ export function BillingPage() {
         </Button>
       </div>
 
+      {/* Monthly / Yearly Toggle */}
+      <div className="flex items-center justify-center gap-3">
+        <span className={`text-sm font-medium ${!yearly ? 'text-neutral-900' : 'text-neutral-400'}`}>Monthly</span>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={yearly}
+          onClick={() => setYearly(!yearly)}
+          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${yearly ? 'bg-brand-500' : 'bg-neutral-300'}`}
+        >
+          <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${yearly ? 'translate-x-6' : 'translate-x-1'}`} />
+        </button>
+        <span className={`text-sm font-medium ${yearly ? 'text-neutral-900' : 'text-neutral-400'}`}>
+          Yearly <span className="text-success-600 font-semibold">(Save {getYearlyDiscount('pro')}%)</span>
+        </span>
+      </div>
+
       {/* Pricing Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
         {plans.map((plan) => {
           const limits = SUBSCRIPTION_LIMITS[plan.tier];
+          const platforms = TIER_PLATFORMS[plan.tier];
+          const priceKey = yearly ? plan.priceKeyYearly : plan.priceKeyMonthly;
+          const monthlyPrice = getMonthlyPrice(plan.tier);
+          const yearlyDiscount = getYearlyDiscount(plan.tier);
+
           return (
             <Card
               key={plan.tier}
@@ -142,14 +204,51 @@ export function BillingPage() {
                 </div>
               </div>
 
-              <div className="mb-6">
-                <span className="text-3xl font-bold text-neutral-900">{plan.price}</span>
-                {plan.price !== 'Custom' && plan.price !== '$0' && (
-                  <span className="text-sm text-neutral-400">/month</span>
-                )}
+              <div className="mb-4">
+                {plan.custom ? (
+                  <span className="text-3xl font-bold text-neutral-900">Custom</span>
+                ) : (() => {
+                  const price = formatPrice(monthlyPrice, yearly, yearlyDiscount);
+                  return (
+                    <>
+                      <span className="text-3xl font-bold text-neutral-900">{price.display}</span>
+                      {price.period && <span className="text-sm text-neutral-400">{price.period}</span>}
+                      {price.originalMonthly && (
+                        <span className="block text-xs text-neutral-400 line-through mt-0.5">
+                          {price.originalMonthly}
+                        </span>
+                      )}
+                      {price.yearlyTotal && (
+                        <span className="block text-xs text-success-600 font-medium">
+                          {price.yearlyTotal} total
+                        </span>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
 
-              <ul className="space-y-3 mb-6">
+              {/* Platforms */}
+              <div className="mb-4">
+                <p className="text-xs font-medium text-neutral-500 uppercase tracking-wide mb-2">Platforms</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {plan.tier === 'enterprise' ? (
+                    <span className="text-xs text-neutral-600 font-medium">All 13 platforms</span>
+                  ) : (
+                    platforms.map((pid) => (
+                      <span
+                        key={pid}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-neutral-100 text-neutral-700"
+                        style={{ borderLeft: `3px solid ${PLATFORMS[pid].color}` }}
+                      >
+                        {PLATFORMS[pid].name}
+                      </span>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              <ul className="space-y-2.5 mb-6">
                 {featureLabels.map((feature) => (
                   <li key={feature.key} className="flex items-center gap-2 text-sm">
                     <Check className="w-4 h-4 text-success-500 flex-shrink-0" />
@@ -163,11 +262,11 @@ export function BillingPage() {
                 ))}
               </ul>
 
-              {plan.tier === 'free' ? (
+              {plan.tier === 'basic' ? (
                 <Button variant="secondary" className="w-full" disabled>
                   Current Plan
                 </Button>
-              ) : plan.tier === 'enterprise' ? (
+              ) : plan.custom ? (
                 <Button variant="secondary" className="w-full">
                   Contact Sales
                 </Button>
@@ -175,8 +274,8 @@ export function BillingPage() {
                 <Button
                   variant={plan.popular ? 'primary' : 'secondary'}
                   className="w-full"
-                  loading={loading === plan.priceKey}
-                  onClick={() => handleUpgrade(plan.priceKey)}
+                  loading={loading === priceKey}
+                  onClick={() => handleUpgrade(priceKey)}
                 >
                   {plan.popular ? 'Start 14-Day Trial' : 'Upgrade'}
                 </Button>
@@ -214,7 +313,7 @@ export function BillingPage() {
           <div>
             <h4 className="font-medium text-neutral-800 mb-1">Do you offer annual discounts?</h4>
             <p className="text-neutral-500">
-              Yes — annual plans save 20%. Contact us for enterprise pricing.
+              Yes — yearly plans save 30%. Toggle to yearly billing above to see discounted prices.
             </p>
           </div>
         </div>

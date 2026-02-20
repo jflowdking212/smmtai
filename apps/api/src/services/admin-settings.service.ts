@@ -6,6 +6,11 @@ const SENSITIVE_KEYS = new Set([
   'smtp_pass',
   'storage_access_key',
   'storage_secret_key',
+  'platform_entreprenrs_access_token',
+  'platform_entreprenrs_server_key',
+  'platform_chrxstians_access_token',
+  'platform_iohah_access_token',
+  'platform_iohah_server_key',
 ]);
 
 export interface SmtpConfig {
@@ -56,6 +61,23 @@ function maskSecret(value: string | undefined): string {
   if (!value) return '';
   if (value.length <= 4) return '****';
   return '****' + value.slice(-4);
+}
+
+function normalizeValue(value: string | undefined | null): string {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function isMaskedSecret(value: string | undefined): boolean {
+  if (!value) return false;
+  return /^\*{4,}/.test(value.trim());
+}
+
+function firstNonEmpty(...values: Array<string | undefined>): string {
+  for (const value of values) {
+    const normalized = normalizeValue(value);
+    if (normalized) return normalized;
+  }
+  return '';
 }
 
 // ----- SMTP -----
@@ -118,17 +140,57 @@ export async function testSmtpConnection(toEmail: string): Promise<{ success: bo
   }
 }
 
-// ----- Cloud Storage -----
+// ----- Site General Settings -----
+
+export interface SiteSettings {
+  site_title: string;
+  site_tagline: string;
+  site_favicon: string;
+  site_logo: string;
+  seo_meta_title: string;
+  seo_meta_description: string;
+}
+
+export async function getSiteSettings(): Promise<SiteSettings> {
+  const cfg = await getConfigGroup('site_');
+  const seo = await getConfigGroup('seo_');
+  return {
+    site_title: cfg.site_title || '',
+    site_tagline: cfg.site_tagline || '',
+    site_favicon: cfg.site_favicon || '',
+    site_logo: cfg.site_logo || '',
+    seo_meta_title: seo.seo_meta_title || '',
+    seo_meta_description: seo.seo_meta_description || '',
+  };
+}
+
+export async function saveSiteSettings(data: Partial<SiteSettings>): Promise<void> {
+  const allowed = ['site_title', 'site_tagline', 'site_favicon', 'site_logo', 'seo_meta_title', 'seo_meta_description'] as const;
+  for (const key of allowed) {
+    if (data[key] !== undefined) {
+      await setConfig(key, data[key]);
+    }
+  }
+}
 
 export async function getStorageConfig(): Promise<StorageConfig> {
   const cfg = await getConfigGroup('storage_');
+  const configuredAccessKey = normalizeValue(cfg.storage_access_key);
+  const configuredSecretKey = normalizeValue(cfg.storage_secret_key);
+  const accessKey = isMaskedSecret(configuredAccessKey) ? '' : configuredAccessKey;
+  const secretKey = isMaskedSecret(configuredSecretKey) ? '' : configuredSecretKey;
+
   return {
-    storage_provider: cfg.storage_provider || '',
-    storage_endpoint: cfg.storage_endpoint || '',
-    storage_region: cfg.storage_region || '',
-    storage_bucket: cfg.storage_bucket || '',
-    storage_access_key: cfg.storage_access_key || '',
-    storage_secret_key: cfg.storage_secret_key || '',
+    storage_provider: firstNonEmpty(
+      cfg.storage_provider,
+      process.env.STORAGE_PROVIDER,
+      process.env.DO_SPACES_ENDPOINT ? 'digitalocean' : undefined,
+    ),
+    storage_endpoint: firstNonEmpty(cfg.storage_endpoint, process.env.STORAGE_ENDPOINT, process.env.DO_SPACES_ENDPOINT),
+    storage_region: firstNonEmpty(cfg.storage_region, process.env.STORAGE_REGION, process.env.DO_SPACES_REGION, process.env.AWS_S3_REGION),
+    storage_bucket: firstNonEmpty(cfg.storage_bucket, process.env.STORAGE_BUCKET, process.env.DO_SPACES_BUCKET, process.env.AWS_S3_BUCKET),
+    storage_access_key: firstNonEmpty(accessKey, process.env.STORAGE_ACCESS_KEY, process.env.DO_SPACES_ACCESS_KEY_ID, process.env.AWS_ACCESS_KEY_ID),
+    storage_secret_key: firstNonEmpty(secretKey, process.env.STORAGE_SECRET_KEY, process.env.DO_SPACES_SECRET_ACCESS_KEY, process.env.AWS_SECRET_ACCESS_KEY),
   };
 }
 
@@ -144,28 +206,55 @@ export async function getStorageConfigMasked(): Promise<Record<string, string>> 
 export async function saveStorageConfig(data: Partial<StorageConfig>): Promise<void> {
   const allowed = ['storage_provider', 'storage_endpoint', 'storage_region', 'storage_bucket', 'storage_access_key', 'storage_secret_key'] as const;
   for (const key of allowed) {
-    if (data[key] !== undefined && data[key] !== '') {
-      await setConfig(key, data[key]);
-    }
+    if (data[key] === undefined) continue;
+    const normalized = normalizeValue(data[key]);
+    if (!normalized) continue;
+    if ((key === 'storage_access_key' || key === 'storage_secret_key') && isMaskedSecret(normalized)) continue;
+    await setConfig(key, normalized);
   }
 }
 
-export async function testStorageConnection(): Promise<{ success: boolean; message: string }> {
-  const cfg = await getStorageConfig();
+export async function testStorageConnection(overrides: Partial<StorageConfig> = {}): Promise<{ success: boolean; message: string }> {
+  const storedCfg = await getStorageConfig();
+  const overrideAccessKey = normalizeValue(overrides.storage_access_key);
+  const overrideSecretKey = normalizeValue(overrides.storage_secret_key);
+  const cfg: StorageConfig = {
+    storage_provider: firstNonEmpty(overrides.storage_provider, storedCfg.storage_provider),
+    storage_endpoint: firstNonEmpty(overrides.storage_endpoint, storedCfg.storage_endpoint),
+    storage_region: firstNonEmpty(overrides.storage_region, storedCfg.storage_region),
+    storage_bucket: firstNonEmpty(overrides.storage_bucket, storedCfg.storage_bucket),
+    storage_access_key: firstNonEmpty(isMaskedSecret(overrideAccessKey) ? '' : overrideAccessKey, storedCfg.storage_access_key),
+    storage_secret_key: firstNonEmpty(isMaskedSecret(overrideSecretKey) ? '' : overrideSecretKey, storedCfg.storage_secret_key),
+  };
   if (!cfg.storage_endpoint || !cfg.storage_access_key) {
     throw new AppError('Storage is not configured. Save credentials first.', 400, 'STORAGE_NOT_CONFIGURED');
   }
 
   try {
+    const rawEndpoint = cfg.storage_endpoint.startsWith('http://') || cfg.storage_endpoint.startsWith('https://')
+      ? cfg.storage_endpoint
+      : `https://${cfg.storage_endpoint}`;
+    const endpointUrl = new URL(rawEndpoint);
+    const provider = cfg.storage_provider.toLowerCase();
+    const isDigitalOcean = provider === 'digitalocean' || endpointUrl.hostname.includes('digitaloceanspaces.com');
+    if (isDigitalOcean && cfg.storage_bucket) {
+      const hostname = endpointUrl.hostname.toLowerCase();
+      const bucketPrefix = `${cfg.storage_bucket.toLowerCase()}.`;
+      if (hostname.startsWith(bucketPrefix)) {
+        endpointUrl.hostname = endpointUrl.hostname.slice(bucketPrefix.length);
+      }
+    }
+    const endpoint = endpointUrl.toString().replace(/\/$/, '');
+
     const { S3Client, ListObjectsV2Command } = await import('@aws-sdk/client-s3');
     const client = new S3Client({
-      endpoint: cfg.storage_endpoint,
+      endpoint,
       region: cfg.storage_region || 'us-east-1',
       credentials: {
         accessKeyId: cfg.storage_access_key,
         secretAccessKey: cfg.storage_secret_key,
       },
-      forcePathStyle: true,
+      forcePathStyle: !isDigitalOcean,
     });
 
     await client.send(new ListObjectsV2Command({
@@ -177,4 +266,85 @@ export async function testStorageConnection(): Promise<{ success: boolean; messa
   } catch (err: any) {
     throw new AppError(`Storage test failed: ${err.message}`, 400, 'STORAGE_TEST_FAILED');
   }
+}
+
+// ----- Global Platform Credentials -----
+
+import { GLOBAL_CREDENTIAL_PLATFORMS, type PlatformType } from '@ee-postmind/shared';
+
+export interface PlatformCredentialEntry {
+  access_token: string;
+  server_key: string;
+}
+
+export type PlatformCredentials = Record<string, PlatformCredentialEntry>;
+
+export async function getPlatformCredentials(): Promise<PlatformCredentials> {
+  const cfg = await getConfigGroup('platform_');
+  const result: PlatformCredentials = {};
+  for (const platform of GLOBAL_CREDENTIAL_PLATFORMS) {
+    result[platform] = {
+      access_token: cfg[`platform_${platform}_access_token`] || '',
+      server_key: cfg[`platform_${platform}_server_key`] || '',
+    };
+  }
+  return result;
+}
+
+export async function getPlatformCredentialsMasked(): Promise<PlatformCredentials> {
+  const creds = await getPlatformCredentials();
+  const result: PlatformCredentials = {};
+  for (const [platform, entry] of Object.entries(creds)) {
+    result[platform] = {
+      access_token: maskSecret(entry.access_token),
+      server_key: maskSecret(entry.server_key),
+    };
+  }
+  return result;
+}
+
+export async function savePlatformCredentials(data: Record<string, Partial<PlatformCredentialEntry>>): Promise<void> {
+  for (const platform of GLOBAL_CREDENTIAL_PLATFORMS) {
+    const entry = data[platform];
+    if (!entry) continue;
+    for (const field of ['access_token', 'server_key'] as const) {
+      const value = normalizeValue(entry[field]);
+      if (!value || isMaskedSecret(value)) continue;
+      await setConfig(`platform_${platform}_${field}`, value);
+    }
+  }
+}
+
+export async function getGlobalCredentialsForPlatform(platform: PlatformType): Promise<string | null> {
+  if (!GLOBAL_CREDENTIAL_PLATFORMS.includes(platform)) return null;
+  const accessToken = await getConfig(`platform_${platform}_access_token`);
+  if (!accessToken) return null;
+  const serverKey = await getConfig(`platform_${platform}_server_key`);
+  // Build the same JSON credential format the adapters expect
+  const creds: Record<string, string> = { accessToken };
+  if (serverKey) creds.serverKey = serverKey;
+  return JSON.stringify(creds);
+}
+
+export function getGlobalCredentialPlatforms(): PlatformType[] {
+  return [...GLOBAL_CREDENTIAL_PLATFORMS];
+}
+
+// ============================================================
+// Plan Configuration
+// ============================================================
+
+export async function getPlanConfig(): Promise<Record<string, any>> {
+  const raw = await getConfig('plan_config');
+  if (!raw) return {};
+  try {
+    return JSON.parse(raw, (_key, value) => (value === '__INFINITY__' ? Infinity : value));
+  } catch { return {}; }
+}
+
+export async function savePlanConfig(config: Record<string, any>): Promise<void> {
+  const json = JSON.stringify(config, (_key, value) =>
+    value === Infinity ? '__INFINITY__' : value,
+  );
+  await setConfig('plan_config', json);
 }
