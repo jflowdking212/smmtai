@@ -27,7 +27,7 @@ export function AdminSettingsPage() {
   const [smtpConfig, setSmtpConfig] = useState({ smtp_host: '', smtp_port: '587', smtp_user: '', smtp_pass: '', smtp_from: '', smtp_secure: 'true' });
   const [storageConfig, setStorageConfig] = useState({ storage_provider: '', storage_endpoint: '', storage_region: '', storage_bucket: '', storage_access_key: '', storage_secret_key: '' });
   const [siteConfig, setSiteConfig] = useState({ site_title: '', site_tagline: '', site_favicon: '', site_logo: '', seo_meta_title: '', seo_meta_description: '' });
-  const [platformCreds, setPlatformCreds] = useState<Record<string, { access_token: string; server_key: string }>>({});
+  const [platformCreds, setPlatformCreds] = useState<Record<string, { access_token: string; server_key: string; client_id: string; client_secret: string }>>({});
   const [saving, setSaving] = useState<string | null>(null);
 
   useEffect(() => {
@@ -35,8 +35,8 @@ export function AdminSettingsPage() {
     api.admin.getStorage().then((res) => setStorageConfig((prev) => ({ ...prev, ...res.data, storage_access_key: '', storage_secret_key: '' }))).catch(() => {});
     api.admin.getSiteSettings().then((res) => setSiteConfig((prev) => ({ ...prev, ...res.data }))).catch(() => {});
     api.admin.getPlatforms().then((res) => {
-      const cleaned: Record<string, { access_token: string; server_key: string }> = {};
-      for (const k of Object.keys(res.data)) cleaned[k] = { access_token: '', server_key: '' };
+      const cleaned: Record<string, { access_token: string; server_key: string; client_id: string; client_secret: string }> = {};
+      for (const k of Object.keys(res.data)) cleaned[k] = { access_token: '', server_key: '', client_id: '', client_secret: '' };
       setPlatformCreds(cleaned);
     }).catch(() => {});
   }, []);
@@ -94,8 +94,8 @@ export function AdminSettingsPage() {
     setSaving('platforms');
     try {
       const res = await api.admin.savePlatforms(platformCreds);
-      const cleaned: Record<string, { access_token: string; server_key: string }> = {};
-      for (const k of Object.keys(res.data)) cleaned[k] = { access_token: '', server_key: '' };
+      const cleaned: Record<string, { access_token: string; server_key: string; client_id: string; client_secret: string }> = {};
+      for (const k of Object.keys(res.data)) cleaned[k] = { access_token: '', server_key: '', client_id: '', client_secret: '' };
       setPlatformCreds(cleaned);
       toast.success('Saved', 'Platform credentials saved.');
     } catch (err: any) { toast.error('Error', err.message || 'Failed'); }
@@ -259,23 +259,55 @@ export function AdminSettingsPage() {
               <h2 className="text-lg font-semibold text-white">
                 <Key className="w-5 h-5 inline-block mr-2 text-neutral-400" />Platform Credentials
               </h2>
-              <p className="text-sm text-neutral-400">Global OAuth/API credentials for platforms that use server-level authentication.</p>
+              <p className="text-sm text-neutral-400">Configure API/OAuth credentials for all platforms. Credentials are stored securely on the server.</p>
               <div className="space-y-4">
                 {GLOBAL_CREDENTIAL_PLATFORMS.map((platformKey) => {
                   const platform = PLATFORMS[platformKey as PlatformType] || { name: platformKey };
-                  const creds = platformCreds[platformKey] || { access_token: '', server_key: '' };
+                  const creds = platformCreds[platformKey] || { access_token: '', server_key: '', client_id: '', client_secret: '' };
+                  const isWoWonder = ['entreprenrs', 'chrxstians', 'iohah'].includes(platformKey);
+                  const isOAuth = ['facebook', 'instagram', 'tiktok', 'linkedin', 'twitter', 'youtube', 'pinterest'].includes(platformKey);
                   return (
                     <div key={platformKey} className="p-4 rounded-xl bg-neutral-800/50 border border-neutral-700/50 space-y-2">
-                      <h4 className="text-sm font-medium text-neutral-200">{platform.name}</h4>
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: platform.color }} />
+                        <h4 className="text-sm font-medium text-neutral-200">{platform.name}</h4>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-neutral-700 text-neutral-400">{isWoWonder ? 'API Key' : isOAuth ? 'OAuth' : 'Token'}</span>
+                      </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-xs text-neutral-500 mb-1">Access Token</label>
-                          <input type="password" value={creds.access_token} onChange={(e) => setPlatformCreds((prev) => ({ ...prev, [platformKey]: { ...prev[platformKey], access_token: e.target.value } }))} className={inputClass} placeholder="Enter token" />
-                        </div>
-                        <div>
-                          <label className="block text-xs text-neutral-500 mb-1">Server Key</label>
-                          <input type="password" value={creds.server_key} onChange={(e) => setPlatformCreds((prev) => ({ ...prev, [platformKey]: { ...prev[platformKey], server_key: e.target.value } }))} className={inputClass} placeholder="Enter key" />
-                        </div>
+                        {isOAuth ? (
+                          <>
+                            <div>
+                              <label className="block text-xs text-neutral-500 mb-1">Client ID / App ID</label>
+                              <input type="password" value={creds.client_id} onChange={(e) => setPlatformCreds((prev) => ({ ...prev, [platformKey]: { ...prev[platformKey], client_id: e.target.value } }))} className={inputClass} placeholder="Enter client ID" />
+                            </div>
+                            <div>
+                              <label className="block text-xs text-neutral-500 mb-1">Client Secret / App Secret</label>
+                              <input type="password" value={creds.client_secret} onChange={(e) => setPlatformCreds((prev) => ({ ...prev, [platformKey]: { ...prev[platformKey], client_secret: e.target.value } }))} className={inputClass} placeholder="Enter client secret" />
+                            </div>
+                          </>
+                        ) : isWoWonder ? (
+                          <>
+                            <div>
+                              <label className="block text-xs text-neutral-500 mb-1">Server Key (API v2)</label>
+                              <input type="password" value={creds.access_token} onChange={(e) => setPlatformCreds((prev) => ({ ...prev, [platformKey]: { ...prev[platformKey], access_token: e.target.value } }))} className={inputClass} placeholder="Enter server key" />
+                            </div>
+                            <div>
+                              <label className="block text-xs text-neutral-500 mb-1">Server Key (confirm)</label>
+                              <input type="password" value={creds.server_key} onChange={(e) => setPlatformCreds((prev) => ({ ...prev, [platformKey]: { ...prev[platformKey], server_key: e.target.value } }))} className={inputClass} placeholder="Confirm server key" />
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div>
+                              <label className="block text-xs text-neutral-500 mb-1">Access Token / Bot Token</label>
+                              <input type="password" value={creds.access_token} onChange={(e) => setPlatformCreds((prev) => ({ ...prev, [platformKey]: { ...prev[platformKey], access_token: e.target.value } }))} className={inputClass} placeholder="Enter token" />
+                            </div>
+                            <div>
+                              <label className="block text-xs text-neutral-500 mb-1">App Password / Secret</label>
+                              <input type="password" value={creds.server_key} onChange={(e) => setPlatformCreds((prev) => ({ ...prev, [platformKey]: { ...prev[platformKey], server_key: e.target.value } }))} className={inputClass} placeholder="Enter secret (if needed)" />
+                            </div>
+                          </>
+                        )}
                       </div>
                     </div>
                   );

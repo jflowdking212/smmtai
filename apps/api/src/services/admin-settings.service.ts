@@ -275,9 +275,13 @@ import { GLOBAL_CREDENTIAL_PLATFORMS, type PlatformType } from '@ee-postmind/sha
 export interface PlatformCredentialEntry {
   access_token: string;
   server_key: string;
+  client_id: string;
+  client_secret: string;
 }
 
 export type PlatformCredentials = Record<string, PlatformCredentialEntry>;
+
+const CREDENTIAL_FIELDS: (keyof PlatformCredentialEntry)[] = ['access_token', 'server_key', 'client_id', 'client_secret'];
 
 export async function getPlatformCredentials(): Promise<PlatformCredentials> {
   const cfg = await getConfigGroup('platform_');
@@ -286,6 +290,8 @@ export async function getPlatformCredentials(): Promise<PlatformCredentials> {
     result[platform] = {
       access_token: cfg[`platform_${platform}_access_token`] || '',
       server_key: cfg[`platform_${platform}_server_key`] || '',
+      client_id: cfg[`platform_${platform}_client_id`] || '',
+      client_secret: cfg[`platform_${platform}_client_secret`] || '',
     };
   }
   return result;
@@ -298,6 +304,8 @@ export async function getPlatformCredentialsMasked(): Promise<PlatformCredential
     result[platform] = {
       access_token: maskSecret(entry.access_token),
       server_key: maskSecret(entry.server_key),
+      client_id: maskSecret(entry.client_id),
+      client_secret: maskSecret(entry.client_secret),
     };
   }
   return result;
@@ -307,7 +315,7 @@ export async function savePlatformCredentials(data: Record<string, Partial<Platf
   for (const platform of GLOBAL_CREDENTIAL_PLATFORMS) {
     const entry = data[platform];
     if (!entry) continue;
-    for (const field of ['access_token', 'server_key'] as const) {
+    for (const field of CREDENTIAL_FIELDS) {
       const value = normalizeValue(entry[field]);
       if (!value || isMaskedSecret(value)) continue;
       await setConfig(`platform_${platform}_${field}`, value);

@@ -198,6 +198,16 @@ export const MANUAL_CONNECTION_PLATFORMS: PlatformType[] = [
 
 // Custom platforms that support owner-configured global credentials
 export const GLOBAL_CREDENTIAL_PLATFORMS: PlatformType[] = [
+  'facebook',
+  'instagram',
+  'tiktok',
+  'linkedin',
+  'twitter',
+  'youtube',
+  'pinterest',
+  'bluesky',
+  'mastodon',
+  'telegram',
   'entreprenrs',
   'chrxstians',
   'iohah',

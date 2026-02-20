@@ -490,9 +490,9 @@ export const api = {
       });
     },
     getPlatforms: () =>
-      request<{ success: true; data: Record<string, { access_token: string; server_key: string }> }>('/admin/settings/platforms'),
-    savePlatforms: (data: Record<string, { access_token: string; server_key: string }>) =>
-      request<{ success: true; data: Record<string, { access_token: string; server_key: string }> }>('/admin/settings/platforms', {
+      request<{ success: true; data: Record<string, { access_token: string; server_key: string; client_id: string; client_secret: string }> }>('/admin/settings/platforms'),
+    savePlatforms: (data: Record<string, Partial<{ access_token: string; server_key: string; client_id: string; client_secret: string }>>) =>
+      request<{ success: true; data: Record<string, { access_token: string; server_key: string; client_id: string; client_secret: string }> }>('/admin/settings/platforms', {
         method: 'PUT',
         body: JSON.stringify(data),
       }),
