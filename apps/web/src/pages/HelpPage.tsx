@@ -1,7 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Card, Badge, Button } from '@/components/ui';
-import { Link } from 'react-router-dom';
-import { api } from '@/lib/api';
 import {
   BookOpen, Search, MessageSquare, Video,
   ChevronRight, ExternalLink, HelpCircle,
@@ -58,11 +56,7 @@ export function HelpPage() {
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState('Getting Started');
   const [expandedFaq, setExpandedFaq] = useState<number | null>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
 
-  useEffect(() => {
-    api.admin.getSiteSettings().then(() => setIsAdmin(true)).catch(() => {});
-  }, []);
 
   const filtered = ARTICLES.filter((a) => {
     const matchesCategory = a.category === activeCategory;
@@ -106,20 +100,6 @@ export function HelpPage() {
         ))}
       </div>
 
-      {/* Admin: Knowledge Base link */}
-      {isAdmin && (
-        <Card className="p-4 border-brand-blue/20 bg-brand-blue/5">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-sm font-semibold text-neutral-800">Knowledge Base Management</h3>
-              <p className="text-xs text-neutral-500 mt-0.5">Add and manage AI chatbot knowledge articles, FAQs, and guides.</p>
-            </div>
-            <Link to="/knowledge-base">
-              <Button size="sm"><BookOpen className="w-3.5 h-3.5 mr-1" /> Manage KB</Button>
-            </Link>
-          </div>
-        </Card>
-      )}
 
       {/* Category tabs + articles */}
       <div>
