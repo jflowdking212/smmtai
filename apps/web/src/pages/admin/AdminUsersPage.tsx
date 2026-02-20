@@ -165,7 +165,9 @@ export function AdminUsersPage() {
                     </td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-2">
-                        {user.subscriptionStatus === 'suspended' ? (
+                        {user.role === 'owner' ? (
+                          <Badge variant="brand" className="text-xs">Admin</Badge>
+                        ) : user.subscriptionStatus === 'suspended' ? (
                           <Button
                             variant="ghost"
                             size="sm"

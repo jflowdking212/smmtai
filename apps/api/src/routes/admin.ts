@@ -366,6 +366,12 @@ adminRouter.put('/users/:id/status', async (req: AuthRequest, res: Response, nex
       return res.status(404).json({ success: false, error: { message: 'User not found', code: 'NOT_FOUND' } });
     }
 
+    // Prevent suspending admin/owner users
+    const isOwner = user.workspaces.some((wm) => wm.role === 'owner');
+    if (isOwner && action === 'suspend') {
+      return res.status(403).json({ success: false, error: { message: 'Cannot suspend an admin user', code: 'FORBIDDEN' } });
+    }
+
     const workspace = user.workspaces[0]?.workspace;
     if (workspace?.subscription) {
       await prisma.subscription.update({
