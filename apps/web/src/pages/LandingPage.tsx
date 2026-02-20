@@ -69,17 +69,15 @@ function PricingSection() {
     return planConfig?.pricing?.[tier]?.yearlyDiscount ?? DEFAULT_YEARLY_DISCOUNT;
   }
 
-  function formatPrice(monthlyPrice: number, yearlyDiscountPct: number): { display: string; period: string; originalMonthly?: string; yearlyTotal?: string } {
+  function formatPrice(monthlyPrice: number, yearlyDiscountPct: number): { display: string; period: string; originalYearly?: string } {
     if (monthlyPrice === 0) return { display: '$0', period: '/forever' };
-    const discount = yearlyDiscountPct / 100;
     if (yearly) {
-      const monthlyDiscounted = +(monthlyPrice * (1 - discount)).toFixed(2);
-      const yearlyTotal = +(monthlyDiscounted * 12).toFixed(2);
+      const fullYearly = +(monthlyPrice * 12).toFixed(2);
+      const discountedYearly = +(fullYearly * (1 - yearlyDiscountPct / 100)).toFixed(2);
       return {
-        display: `$${Number.isInteger(monthlyDiscounted) ? monthlyDiscounted : monthlyDiscounted.toFixed(2)}`,
-        period: '/mo',
-        originalMonthly: `$${monthlyPrice}/mo`,
-        yearlyTotal: `$${Number.isInteger(yearlyTotal) ? yearlyTotal : yearlyTotal.toFixed(2)}/year`,
+        display: `$${Number.isInteger(discountedYearly) ? discountedYearly : discountedYearly.toFixed(2)}`,
+        period: '/year',
+        originalYearly: `$${Number.isInteger(fullYearly) ? fullYearly : fullYearly.toFixed(2)}/year`,
       };
     }
     return { display: `$${monthlyPrice}`, period: '/month' };
@@ -139,11 +137,8 @@ function PricingSection() {
                   <>
                     <span className="text-4xl font-bold text-neutral-900">{price.display}</span>
                     <span className="text-sm text-neutral-500">{price.period}</span>
-                    {price.originalMonthly && (
-                      <span className="block text-xs text-neutral-400 line-through">{price.originalMonthly}</span>
-                    )}
-                    {price.yearlyTotal && (
-                      <span className="block text-xs text-green-600 font-medium">{price.yearlyTotal} total</span>
+                    {price.originalYearly && (
+                      <span className="block text-xs text-neutral-400 line-through">{price.originalYearly}</span>
                     )}
                   </>
                 );
