@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Card, Button } from '@/components/ui';
 import { useAuthStore } from '@/stores/authStore';
 import { useTheme } from '@/components/ThemeProvider';
+import { useToast } from '@/components/Toast';
 import { api } from '@/lib/api';
 import { invalidateSiteSettings } from '@/hooks/useSiteSettings';
 import {
@@ -31,6 +32,7 @@ export function SettingsPage() {
   const { user } = useAuthStore();
   const { theme, setTheme } = useTheme();
   const [isOwner, setIsOwner] = useState(false);
+  const toast = useToast();
 
   // Admin state
   const [smtpConfig, setSmtpConfig] = useState({ smtp_host: '', smtp_port: '587', smtp_user: '', smtp_pass: '', smtp_from: '', smtp_secure: 'true' });
@@ -38,7 +40,6 @@ export function SettingsPage() {
   const [siteConfig, setSiteConfig] = useState({ site_title: '', site_tagline: '', site_favicon: '', site_logo: '', seo_meta_title: '', seo_meta_description: '' });
   const [platformCreds, setPlatformCreds] = useState<Record<string, { access_token: string; server_key: string }>>({});
   const [planConfig, setPlanConfig] = useState<Record<string, any>>({});
-  const [adminMsg, setAdminMsg] = useState<{ section: string; type: 'success' | 'error'; text: string } | null>(null);
   const [adminLoading, setAdminLoading] = useState<string | null>(null);
 
   // Form states
@@ -53,7 +54,6 @@ export function SettingsPage() {
     monthlyAnalyticsDigest: true,
   });
   const [notificationLoadingKey, setNotificationLoadingKey] = useState<NotificationPreferenceKey | null>(null);
-  const [notificationMessage, setNotificationMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -64,7 +64,7 @@ export function SettingsPage() {
       })
       .catch(() => {
         if (!active) return;
-        setNotificationMessage({ type: 'error', text: 'Unable to load notification preferences.' });
+        toast.error('Load Failed', 'Unable to load notification preferences.');
       });
     // Check if user is owner by trying to load admin settings
     api.admin.getSmtp()
@@ -111,16 +111,12 @@ export function SettingsPage() {
   async function toggleNotificationPreference(key: NotificationPreferenceKey) {
     const nextValue = !notificationPrefs[key];
     setNotificationLoadingKey(key);
-    setNotificationMessage(null);
     try {
       const res = await api.users.updateNotificationPreferences({ [key]: nextValue });
       setNotificationPrefs(res.data);
-      setNotificationMessage({ type: 'success', text: 'Notification preferences updated.' });
+      toast.success('Preferences Updated', 'Notification preferences updated.');
     } catch (error) {
-      setNotificationMessage({
-        type: 'error',
-        text: error instanceof Error ? error.message : 'Unable to update notification preferences.',
-      });
+      toast.error('Update Failed', error instanceof Error ? error.message : 'Unable to update notification preferences.');
     } finally {
       setNotificationLoadingKey(null);
     }
@@ -130,13 +126,12 @@ export function SettingsPage() {
 
   async function saveSmtp() {
     setAdminLoading('smtp-save');
-    setAdminMsg(null);
     try {
       const res = await api.admin.saveSmtp(smtpConfig);
       setSmtpConfig((prev) => ({ ...prev, ...res.data, smtp_pass: '' }));
-      setAdminMsg({ section: 'smtp', type: 'success', text: 'SMTP settings saved.' });
+      toast.success('SMTP Saved', 'SMTP settings saved successfully.');
     } catch (err: any) {
-      setAdminMsg({ section: 'smtp', type: 'error', text: err.message || 'Failed to save SMTP settings.' });
+      toast.error('SMTP Save Failed', err.message || 'Failed to save SMTP settings.');
     } finally {
       setAdminLoading(null);
     }
@@ -144,12 +139,11 @@ export function SettingsPage() {
 
   async function testSmtp() {
     setAdminLoading('smtp-test');
-    setAdminMsg(null);
     try {
       const res = await api.admin.testSmtp(user?.email || '');
-      setAdminMsg({ section: 'smtp', type: 'success', text: res.data.message });
+      toast.success('SMTP Test Passed', res.data.message);
     } catch (err: any) {
-      setAdminMsg({ section: 'smtp', type: 'error', text: err.message || 'SMTP test failed.' });
+      toast.error('SMTP Test Failed', err.message || 'SMTP test failed.');
     } finally {
       setAdminLoading(null);
     }
@@ -157,13 +151,12 @@ export function SettingsPage() {
 
   async function saveStorage() {
     setAdminLoading('storage-save');
-    setAdminMsg(null);
     try {
       const res = await api.admin.saveStorage(storageConfig);
       setStorageConfig((prev) => ({ ...prev, ...res.data, storage_access_key: '', storage_secret_key: '' }));
-      setAdminMsg({ section: 'storage', type: 'success', text: 'Storage settings saved.' });
+      toast.success('Storage Saved', 'Storage settings saved successfully.');
     } catch (err: any) {
-      setAdminMsg({ section: 'storage', type: 'error', text: err.message || 'Failed to save storage settings.' });
+      toast.error('Storage Save Failed', err.message || 'Failed to save storage settings.');
     } finally {
       setAdminLoading(null);
     }
@@ -171,12 +164,11 @@ export function SettingsPage() {
 
   async function testStorage() {
     setAdminLoading('storage-test');
-    setAdminMsg(null);
     try {
       const res = await api.admin.testStorage(storageConfig);
-      setAdminMsg({ section: 'storage', type: 'success', text: res.data.message });
+      toast.success('Storage Test Passed', res.data.message);
     } catch (err: any) {
-      setAdminMsg({ section: 'storage', type: 'error', text: err.message || 'Storage test failed.' });
+      toast.error('Storage Test Failed', err.message || 'Storage test failed.');
     } finally {
       setAdminLoading(null);
     }
@@ -184,14 +176,13 @@ export function SettingsPage() {
 
   async function saveSiteSettings() {
     setAdminLoading('site-save');
-    setAdminMsg(null);
     try {
       const res = await api.admin.saveSiteSettings(siteConfig);
       setSiteConfig((prev) => ({ ...prev, ...res.data }));
-      setAdminMsg({ section: 'site', type: 'success', text: 'Site settings saved.' });
+      toast.success('Site Settings Saved', 'Site settings saved successfully.');
       invalidateSiteSettings();
     } catch (err: any) {
-      setAdminMsg({ section: 'site', type: 'error', text: err.message || 'Failed to save site settings.' });
+      toast.error('Save Failed', err.message || 'Failed to save site settings.');
     } finally {
       setAdminLoading(null);
     }
@@ -199,7 +190,6 @@ export function SettingsPage() {
 
   async function savePlatforms() {
     setAdminLoading('platforms-save');
-    setAdminMsg(null);
     try {
       const res = await api.admin.savePlatforms(platformCreds);
       const cleaned: Record<string, { access_token: string; server_key: string }> = {};
@@ -207,9 +197,9 @@ export function SettingsPage() {
         cleaned[k] = { access_token: '', server_key: '' };
       }
       setPlatformCreds(cleaned);
-      setAdminMsg({ section: 'platforms', type: 'success', text: 'Platform credentials saved.' });
+      toast.success('Platforms Saved', 'Platform credentials saved successfully.');
     } catch (err: any) {
-      setAdminMsg({ section: 'platforms', type: 'error', text: err.message || 'Failed to save platform credentials.' });
+      toast.error('Save Failed', err.message || 'Failed to save platform credentials.');
     } finally {
       setAdminLoading(null);
     }
@@ -219,14 +209,13 @@ export function SettingsPage() {
     const file = e.target.files?.[0];
     if (!file) return;
     setAdminLoading('logo-upload');
-    setAdminMsg(null);
     try {
       const res = await api.admin.uploadLogo(file);
       setSiteConfig((prev) => ({ ...prev, site_logo: res.data.url }));
-      setAdminMsg({ section: 'site', type: 'success', text: 'Logo uploaded successfully.' });
+      toast.success('Logo Uploaded', 'Logo uploaded successfully.');
       invalidateSiteSettings();
     } catch (err: any) {
-      setAdminMsg({ section: 'site', type: 'error', text: err.message || 'Failed to upload logo.' });
+      toast.error('Upload Failed', err.message || 'Failed to upload logo.');
     } finally {
       setAdminLoading(null);
     }
@@ -236,14 +225,13 @@ export function SettingsPage() {
     const file = e.target.files?.[0];
     if (!file) return;
     setAdminLoading('favicon-upload');
-    setAdminMsg(null);
     try {
       const res = await api.admin.uploadFavicon(file);
       setSiteConfig((prev) => ({ ...prev, site_favicon: res.data.url }));
-      setAdminMsg({ section: 'site', type: 'success', text: 'Favicon uploaded successfully.' });
+      toast.success('Favicon Uploaded', 'Favicon uploaded successfully.');
       invalidateSiteSettings();
     } catch (err: any) {
-      setAdminMsg({ section: 'site', type: 'error', text: err.message || 'Failed to upload favicon.' });
+      toast.error('Upload Failed', err.message || 'Failed to upload favicon.');
     } finally {
       setAdminLoading(null);
     }
@@ -322,11 +310,6 @@ export function SettingsPage() {
           {tab === 'notifications' && (
             <Card className="p-6 space-y-5">
               <h2 className="text-lg font-heading font-semibold text-neutral-900">Notifications</h2>
-              {notificationMessage ? (
-                <div className={`text-sm ${notificationMessage.type === 'success' ? 'text-green-700' : 'text-red-600'}`}>
-                  {notificationMessage.text}
-                </div>
-              ) : null}
 
               <div className="space-y-4">
                 {[
@@ -437,13 +420,6 @@ export function SettingsPage() {
                 </div>
                 <p className="text-sm text-neutral-500">Configure your site branding, logo, and SEO metadata.</p>
 
-                {adminMsg?.section === 'site' && (
-                  <div className={`flex items-center gap-2 text-sm ${adminMsg.type === 'success' ? 'text-green-700' : 'text-red-600'}`}>
-                    {adminMsg.type === 'success' ? <CheckCircle className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
-                    {adminMsg.text}
-                  </div>
-                )}
-
                 {/* Logo Upload */}
                 <div>
                   <label className="block text-sm font-medium text-neutral-700 mb-2">Site Logo</label>
@@ -514,13 +490,6 @@ export function SettingsPage() {
                 </div>
                 <p className="text-sm text-neutral-500">Configure your own SMTP server for sending emails. Leave empty to use the default email provider.</p>
 
-                {adminMsg?.section === 'smtp' && (
-                  <div className={`flex items-center gap-2 text-sm ${adminMsg.type === 'success' ? 'text-green-700' : 'text-red-600'}`}>
-                    {adminMsg.type === 'success' ? <CheckCircle className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
-                    {adminMsg.text}
-                  </div>
-                )}
-
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-neutral-700 mb-1">SMTP Host</label>
@@ -574,13 +543,6 @@ export function SettingsPage() {
                   <h2 className="text-lg font-heading font-semibold text-neutral-900">Cloud Storage (S3-Compatible)</h2>
                 </div>
                 <p className="text-sm text-neutral-500">Configure S3-compatible cloud storage for media uploads. Supports Wasabi and DigitalOcean Spaces.</p>
-
-                {adminMsg?.section === 'storage' && (
-                  <div className={`flex items-center gap-2 text-sm ${adminMsg.type === 'success' ? 'text-green-700' : 'text-red-600'}`}>
-                    {adminMsg.type === 'success' ? <CheckCircle className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
-                    {adminMsg.text}
-                  </div>
-                )}
 
                 <div>
                   <label className="block text-sm font-medium text-neutral-700 mb-1">Storage Provider</label>
@@ -652,13 +614,6 @@ export function SettingsPage() {
                   Configure global API credentials for your custom platforms. All users will be able to connect these platforms with a single click.
                 </p>
 
-                {adminMsg?.section === 'platforms' && (
-                  <div className={`flex items-center gap-2 text-sm ${adminMsg.type === 'success' ? 'text-green-700' : 'text-red-600'}`}>
-                    {adminMsg.type === 'success' ? <CheckCircle className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
-                    {adminMsg.text}
-                  </div>
-                )}
-
                 {GLOBAL_CREDENTIAL_PLATFORMS.map((platformId) => {
                   const platform = PLATFORMS[platformId];
                   const creds = platformCreds[platformId] || { access_token: '', server_key: '' };
@@ -708,8 +663,6 @@ export function SettingsPage() {
               <PlanManagementCard
                 planConfig={planConfig}
                 setPlanConfig={setPlanConfig}
-                adminMsg={adminMsg}
-                setAdminMsg={setAdminMsg}
                 adminLoading={adminLoading}
                 setAdminLoading={setAdminLoading}
               />
@@ -746,15 +699,14 @@ const ALL_PLATFORMS: PlatformType[] = [
 ];
 
 function PlanManagementCard({
-  planConfig, setPlanConfig, adminMsg, setAdminMsg, adminLoading, setAdminLoading,
+  planConfig, setPlanConfig, adminLoading, setAdminLoading,
 }: {
   planConfig: Record<string, any>;
   setPlanConfig: (v: Record<string, any>) => void;
-  adminMsg: { section: string; type: 'success' | 'error'; text: string } | null;
-  setAdminMsg: (v: { section: string; type: 'success' | 'error'; text: string } | null) => void;
   adminLoading: string | null;
   setAdminLoading: (v: string | null) => void;
 }) {
+  const toast = useToast();
   // Merge saved config over defaults
   function getLimits(tier: SubscriptionTier) {
     const defaults = SUBSCRIPTION_LIMITS[tier];
@@ -825,13 +777,12 @@ function PlanManagementCard({
 
   async function savePlans() {
     setAdminLoading('plans-save');
-    setAdminMsg(null);
     try {
       const res = await api.admin.savePlans(planConfig);
       setPlanConfig(res.data);
-      setAdminMsg({ section: 'plans', type: 'success', text: 'Plan configuration saved.' });
+      toast.success('Plans Saved', 'Plan configuration saved successfully.');
     } catch (err) {
-      setAdminMsg({ section: 'plans', type: 'error', text: err instanceof Error ? err.message : 'Failed to save.' });
+      toast.error('Save Failed', err instanceof Error ? err.message : 'Failed to save plan configuration.');
     } finally {
       setAdminLoading(null);
     }
@@ -841,11 +792,6 @@ function PlanManagementCard({
     <Card className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-heading font-semibold text-neutral-900">Plan Management</h2>
-        {adminMsg?.section === 'plans' && (
-          <span className={`text-sm ${adminMsg.type === 'success' ? 'text-emerald-600' : 'text-red-600'}`}>
-            {adminMsg.text}
-          </span>
-        )}
       </div>
       <p className="text-sm text-neutral-500">
         Configure limits, pricing, and available platforms for each subscription tier. Changes are saved to the database and override defaults.
