@@ -226,6 +226,16 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ priceKey }),
       }),
+    checkoutPublic: (body: { name: string; email: string; priceKey: string }) =>
+      request<{ success: true; data: { url: string } }>('/billing/checkout/public', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    changePlan: (body: { tier?: string; priceKey?: string }) =>
+      request<{ success: true; data: any }>('/billing/change-plan', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
     portal: () =>
       request<{ success: true; data: { url: string } }>('/billing/portal', {
         method: 'POST',
@@ -493,6 +503,21 @@ export const api = {
         method: 'PUT',
         body: JSON.stringify(data, (_k, v) => (v === Infinity ? '__INFINITY__' : v)),
       }),
+    // Admin dashboard & management
+    getDashboard: () =>
+      request<{ success: true; data: { totalUsers: number; scheduledPosts: number; activeSubscriptions: number; planBreakdown: Record<string, number> } }>('/admin/dashboard'),
+    getUsers: (params?: { search?: string; page?: string; limit?: string }) =>
+      request<{ success: true; data: { users: any[]; total: number; page: number; limit: number } }>(`/admin/users${params ? '?' + new URLSearchParams(params as Record<string, string>) : ''}`),
+    updateUserStatus: (id: string, action: 'suspend' | 'enable') =>
+      request<{ success: true; data: { message: string } }>(`/admin/users/${id}/status`, { method: 'PUT', body: JSON.stringify({ action }) }),
+    updateUserPlan: (id: string, tier: string) =>
+      request<{ success: true; data: { message: string } }>(`/admin/users/${id}/plan`, { method: 'PUT', body: JSON.stringify({ tier }) }),
+    getAnalytics: () =>
+      request<{ success: true; data: any }>('/admin/analytics'),
+    getMessages: (params?: { status?: string; search?: string; page?: string; limit?: string }) =>
+      request<{ success: true; data: { conversations: any[]; total: number; page: number; limit: number } }>(`/admin/messages${params ? '?' + new URLSearchParams(params as Record<string, string>) : ''}`),
+    getAuditLog: (params?: { page?: string; limit?: string }) =>
+      request<{ success: true; data: { logs: any[]; total: number; page: number; limit: number } }>(`/admin/audit-log${params ? '?' + new URLSearchParams(params as Record<string, string>) : ''}`),
   },
   chat: {
     sendMessage: (data: { message: string; context?: string; sessionId?: string; customerInfo?: { name?: string; email?: string; phone?: string } }) =>

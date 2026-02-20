@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { lazy, Suspense, useEffect } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { AdminLayout } from '@/components/layout/AdminLayout';
 import { ProtectedRoute } from '@/components/layout/ProtectedRoute';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { ToastProvider } from '@/components/Toast';
@@ -20,6 +21,9 @@ import { HelpPage } from '@/pages/HelpPage';
 import { ConversationsPage } from '@/pages/ConversationsPage';
 import { KnowledgeBasePage } from '@/pages/KnowledgeBasePage';
 import { LandingPage } from '@/pages/LandingPage';
+import { TermsPage } from '@/pages/TermsPage';
+import { CheckoutPage } from '@/pages/CheckoutPage';
+import { CheckoutSuccessPage } from '@/pages/CheckoutSuccessPage';
 import { UpgradeGate } from '@/components/UpgradeGate';
 import { useAuthStore } from '@/stores/authStore';
 import { LoginPage } from '@/pages/auth/LoginPage';
@@ -28,6 +32,12 @@ import { ForgotPasswordPage } from '@/pages/auth/ForgotPasswordPage';
 import { ResetPasswordPage } from '@/pages/auth/ResetPasswordPage';
 import { VerifyEmailPage } from '@/pages/auth/VerifyEmailPage';
 import { OAuthCallbackPage } from '@/pages/auth/OAuthCallbackPage';
+import { AdminDashboardPage } from '@/pages/admin/AdminDashboardPage';
+import { AdminUsersPage } from '@/pages/admin/AdminUsersPage';
+import { AdminPlansPage } from '@/pages/admin/AdminPlansPage';
+import { AdminAnalyticsPage } from '@/pages/admin/AdminAnalyticsPage';
+import { AdminMessagesPage } from '@/pages/admin/AdminMessagesPage';
+import { AdminSettingsPage } from '@/pages/admin/AdminSettingsPage';
 
 // Lazy-load heavy pages
 const EditorPage = lazy(() => import('@/pages/EditorPage').then((m) => ({ default: m.EditorPage })));
@@ -82,10 +92,13 @@ export default function App() {
           <QueryClientProvider client={queryClient}>
             <BrowserRouter>
               <Routes>
-          {/* Public routes */}
-          <Route path="/" element={<HomePage />} />
+           {/* Public routes */}
+           <Route path="/" element={<HomePage />} />
+           <Route path="/terms" element={<TermsPage />} />
+           <Route path="/checkout" element={<CheckoutPage />} />
+           <Route path="/checkout/success" element={<CheckoutSuccessPage />} />
 
-          {/* Public auth routes */}
+           {/* Public auth routes */}
           <Route path="/auth/login" element={<LoginPage />} />
           <Route path="/auth/register" element={<RegisterPage />} />
           <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
@@ -116,6 +129,23 @@ export default function App() {
             <Route path="/help" element={<HelpPage />} />
             <Route path="/conversations" element={<UpgradeGate feature="conversations"><ConversationsPage /></UpgradeGate>} />
             <Route path="/knowledge-base" element={<UpgradeGate feature="knowledge_base"><KnowledgeBasePage /></UpgradeGate>} />
+          </Route>
+
+          {/* Admin routes — separate layout */}
+          <Route
+            element={
+              <ProtectedRoute>
+                <AdminLayout />
+              </ProtectedRoute>
+            }
+          >
+            <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
+            <Route path="/admin/users" element={<AdminUsersPage />} />
+            <Route path="/admin/plans" element={<AdminPlansPage />} />
+            <Route path="/admin/analytics" element={<AdminAnalyticsPage />} />
+            <Route path="/admin/messages" element={<AdminMessagesPage />} />
+            <Route path="/admin/settings" element={<AdminSettingsPage />} />
+            <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
           </Route>
               </Routes>
             </BrowserRouter>

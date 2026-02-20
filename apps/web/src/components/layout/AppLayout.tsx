@@ -32,6 +32,7 @@ import {
   MessageCircle,
   BookOpen,
   Lock,
+  Monitor,
 } from 'lucide-react';
 
 const navigation: { name: string; href: string; icon: typeof LayoutDashboard; feature: AppFeature }[] = [
@@ -58,9 +59,10 @@ export function AppLayout() {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const navigate = useNavigate();
-  const { user, logout: clearAuth } = useAuthStore();
+  const { user, role, logout: clearAuth } = useAuthStore();
   const { settings: siteSettings } = useSiteSettings();
   const { canAccess } = useSubscription();
+  const isOwner = role === 'owner';
 
   async function handleLogout() {
     try {
@@ -165,6 +167,18 @@ export function AppLayout() {
 
         {/* Collapse toggle */}
         <div className="px-3 mb-3 space-y-1">
+          {isOwner && (
+            <button
+              onClick={() => navigate('/admin/dashboard')}
+              className={cn(
+                'flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm font-medium text-amber-600 hover:text-amber-500 hover:bg-amber-50 transition-all duration-200',
+                collapsed && 'justify-center px-0',
+              )}
+            >
+              <Monitor className="w-5 h-5 flex-shrink-0" />
+              {!collapsed && <span>Admin Mode</span>}
+            </button>
+          )}
           <button
             onClick={handleLogout}
             className={cn(

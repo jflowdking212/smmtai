@@ -370,7 +370,8 @@ export type AppFeature =
   | 'team'
   | 'billing'
   | 'settings'
-  | 'editor';
+  | 'editor'
+  | 'admin_dashboard';
 
 export const PLAN_FEATURES: Record<AppFeature, SubscriptionTier> = {
   dashboard: 'basic',
@@ -387,6 +388,7 @@ export const PLAN_FEATURES: Record<AppFeature, SubscriptionTier> = {
   analytics: 'pro',
   knowledge_base: 'pro',
   team: 'pro',
+  admin_dashboard: 'basic',
 };
 
 const TIER_ORDER: Record<SubscriptionTier, number> = { basic: 0, pro: 1, business: 2, enterprise: 3 };
