@@ -54,7 +54,7 @@ export class AuthService {
     return {
       user: this.sanitizeUser(user),
       workspaceId: user.workspaceId,
-      role: 'owner' as const,
+      role: 'editor' as const,
       tier: 'basic' as const,
       ...tokens,
     };
@@ -335,7 +335,7 @@ export class AuthService {
       data: {
         userId,
         workspaceId: workspace.id,
-        role: 'owner',
+        role: 'editor',
       },
     });
 
