@@ -27,6 +27,8 @@ import { adminRouter } from './routes/admin.js';
 import { chatRouter } from './routes/chat.js';
 import { bgRemoveRouter } from './routes/bgRemove.js';
 import { collaborationRouter } from './routes/collaboration.js';
+import { facebookRouter } from './routes/facebook.js';
+import { messagingRouter } from './routes/messaging.js';
 import {
   scheduleAnalyticsIngestion,
   scheduleAnalyticsDigestReports,
@@ -84,6 +86,8 @@ app.use('/api/v1/admin', adminRouter);
 app.use('/api/v1/chat', chatRouter);
 app.use('/api/v1/bg-remove', bgRemoveRouter);
 app.use('/api/v1/collaboration', collaborationRouter);
+app.use('/api/v1/facebook', facebookRouter);
+app.use('/api/v1/messaging', messagingRouter);
 
 // Sentry error handler (must be before custom errorHandler)
 if (config.sentry.dsn) {

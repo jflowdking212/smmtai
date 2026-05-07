@@ -50,6 +50,13 @@ interface PublishPayloadMap {
   platformMetadata?: PlatformMetadataMap;
 }
 
+interface ConnectionMeta {
+  token: string;
+  mode?: string;
+  profileUnverified?: boolean;
+  profileError?: string;
+}
+
 function buildCaptionMap(
   platforms: Array<{ connectionId: string; platform: PlatformType; caption?: string }>,
 ): PlatformCaptionMap {
@@ -195,6 +202,36 @@ function resolvePostText(
   return captionMap[`${platform}:${connectionId}`] || baseContent;
 }
 
+function normalizePlatformPublishError(
+  platform: PlatformType,
+  rawError: unknown,
+  connectionMeta?: ConnectionMeta,
+): string {
+  const message = typeof rawError === 'string'
+    ? rawError.trim()
+    : rawError instanceof Error && rawError.message
+      ? rawError.message.trim()
+      : 'Unknown error';
+
+  if (platform !== 'twitter') return message;
+
+  const normalized = message.toLowerCase();
+  if (normalized.includes('service unavailable')) {
+    const base = 'X API returned Service Unavailable. This usually means your X API app lacks active API credits or current plan access for this endpoint.';
+    if (connectionMeta?.profileUnverified) {
+      return `${base} This connection is also unverified in X (profile lookup blocked by project/app entitlement).`;
+    }
+    return base;
+  }
+
+  if (connectionMeta?.profileUnverified) {
+    const detail = connectionMeta.profileError ? ` (${connectionMeta.profileError})` : '';
+    return `X connection is unverified; posting can fail until X app entitlements are fully enabled${detail}`;
+  }
+
+  return message;
+}
+
 function buildValidationText(text: string, hashtags: string[] | undefined, link: string | undefined): string {
   const normalizedText = text.trim();
   const normalizedHashtags = normalizeHashtags(hashtags).map((tag) => `#${tag}`).join(' ');
@@ -237,16 +274,28 @@ function validatePlatformHashtagLimit(platform: PlatformType, hashtags: string[]
 function validatePlatformMediaRules(platform: PlatformType, mediaUrls: string[]) {
   const hasMedia = mediaUrls.length > 0;
   const hasVideo = mediaUrls.some((url) => isVideoMediaUrl(url));
+  const hasImage = mediaUrls.some((url) => !isVideoMediaUrl(url));
 
   if (platform === 'instagram' && !hasMedia) {
     throw new AppError('instagram posts require at least one media attachment', 400, 'PLATFORM_MEDIA_REQUIRED');
   }
-  if ((platform === 'tiktok' || platform === 'youtube')) {
+  if (platform === 'tiktok') {
     if (!hasMedia) {
-      throw new AppError(`${platform} posts require at least one media attachment`, 400, 'PLATFORM_MEDIA_REQUIRED');
+      throw new AppError('tiktok posts require at least one media attachment', 400, 'PLATFORM_MEDIA_REQUIRED');
+    }
+    if (hasVideo && hasImage) {
+      throw new AppError('tiktok posts cannot mix image and video media', 400, 'PLATFORM_MEDIA_TYPE_INVALID');
+    }
+    if (hasVideo && mediaUrls.length > 1) {
+      throw new AppError('tiktok video posts support one video attachment', 400, 'PLATFORM_MEDIA_LIMIT_EXCEEDED');
+    }
+  }
+  if (platform === 'youtube') {
+    if (!hasMedia) {
+      throw new AppError('youtube posts require at least one media attachment', 400, 'PLATFORM_MEDIA_REQUIRED');
     }
     if (!hasVideo) {
-      throw new AppError(`${platform} posts require video media`, 400, 'PLATFORM_MEDIA_TYPE_INVALID');
+      throw new AppError('youtube posts require video media', 400, 'PLATFORM_MEDIA_TYPE_INVALID');
     }
   }
   if (platform === 'pinterest' && !hasMedia) {
@@ -367,9 +416,11 @@ export class PostService {
 
     const results = await Promise.allSettled(
       post.platformPosts.map(async (pp: any) => {
+        let connectionMeta: ConnectionMeta | undefined;
         try {
-          const accessToken = await connectionService.getAccessToken(pp.socialConnectionId);
-          const adapter = getPlatformAdapter(pp.platform as PlatformType);
+          connectionMeta = await connectionService.getConnectionMeta(pp.socialConnectionId);
+          const { token: accessToken, mode } = connectionMeta;
+          const adapter = getPlatformAdapter(pp.platform as PlatformType, mode);
           const text = resolvePostText(
             post.content,
             pp.platform as PlatformType,
@@ -399,20 +450,27 @@ export class PostService {
             data: {
               status: 'published',
               platformPostId: result.platformPostId,
+              url: result.url || null,
               publishedAt: new Date(),
+              error: null,
             },
           });
 
-          return { platform: pp.platform, status: 'published', platformPostId: result.platformPostId };
+          return { platform: pp.platform, status: 'published', platformPostId: result.platformPostId, url: result.url };
         } catch (err: any) {
+          const normalizedError = normalizePlatformPublishError(
+            pp.platform as PlatformType,
+            err,
+            connectionMeta,
+          );
           await prisma.platformPost.update({
             where: { id: pp.id },
             data: {
               status: 'failed',
-              error: err.message || 'Unknown error',
+              error: normalizedError,
             },
           });
-          return { platform: pp.platform, status: 'failed', error: err.message };
+          return { platform: pp.platform, status: 'failed', error: normalizedError };
         }
       }),
     );
@@ -540,6 +598,7 @@ export class PostService {
               platform: true,
               status: true,
               platformPostId: true,
+              url: true,
               publishedAt: true,
               error: true,
             },

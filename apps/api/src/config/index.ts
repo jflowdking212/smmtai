@@ -26,10 +26,21 @@ for (const envFile of envFileCandidates) {
   loadEnvFile(envFile);
 }
 
+const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+const normalizedFrontendUrl = frontendUrl.replace(/\/+$/, '');
+const isDev = process.env.NODE_ENV !== 'production';
+
+function defaultAuthCallback(provider: 'google' | 'github' | 'facebook'): string {
+  if (isDev) {
+    return `http://localhost:4016/api/v1/auth/oauth/${provider}/callback`;
+  }
+  return `${normalizedFrontendUrl}/api/v1/auth/oauth/${provider}/callback`;
+}
+
 export const config = {
   port: parseInt(process.env.PORT || '4016', 10),
   nodeEnv: process.env.NODE_ENV || 'development',
-  isDev: process.env.NODE_ENV !== 'production',
+  isDev,
 
   database: {
     url: process.env.DATABASE_URL!,
@@ -55,22 +66,22 @@ export const config = {
     google: {
       clientId: process.env.GOOGLE_CLIENT_ID || '',
       clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
-      callbackUrl: process.env.GOOGLE_CALLBACK_URL || 'http://localhost:4016/api/v1/auth/oauth/google/callback',
+      callbackUrl: process.env.GOOGLE_CALLBACK_URL || defaultAuthCallback('google'),
     },
     github: {
       clientId: process.env.GITHUB_CLIENT_ID || '',
       clientSecret: process.env.GITHUB_CLIENT_SECRET || '',
-      callbackUrl: process.env.GITHUB_CALLBACK_URL || 'http://localhost:4016/api/v1/auth/oauth/github/callback',
+      callbackUrl: process.env.GITHUB_CALLBACK_URL || defaultAuthCallback('github'),
     },
     facebook: {
       clientId: process.env.FACEBOOK_APP_ID || '',
       clientSecret: process.env.FACEBOOK_APP_SECRET || '',
-      callbackUrl: process.env.FACEBOOK_CALLBACK_URL || 'http://localhost:4016/api/v1/auth/oauth/facebook/callback',
+      callbackUrl: process.env.FACEBOOK_CALLBACK_URL || defaultAuthCallback('facebook'),
     },
   },
 
   frontend: {
-    url: process.env.FRONTEND_URL || 'http://localhost:5173',
+    url: frontendUrl,
   },
 
   sentry: {

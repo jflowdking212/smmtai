@@ -78,6 +78,41 @@ describe('PinterestAdapter publishing', () => {
     });
   });
 
+  it('auto-creates a default board when account has no boards', async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({ items: [] }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({ id: 'board_created' }),
+          { status: 201, headers: { 'Content-Type': 'application/json' } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({ id: 'pin_3' }),
+          { status: 201, headers: { 'Content-Type': 'application/json' } },
+        ),
+      );
+
+    await adapter.publishPost('pinterest-token', {
+      text: 'First pin',
+      mediaUrls: ['https://cdn.example.com/first-pin.jpg'],
+    });
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('https://api.pinterest.com/v5/boards?page_size=1');
+    expect(fetchMock.mock.calls[1]?.[0]).toBe('https://api.pinterest.com/v5/boards');
+    expect(fetchMock.mock.calls[2]?.[0]).toBe('https://api.pinterest.com/v5/pins');
+    const boardPayload = JSON.parse((fetchMock.mock.calls[1]?.[1] as { body?: string })?.body || '{}');
+    expect(boardPayload.name).toBe('EE PostMind');
+    const pinPayload = JSON.parse((fetchMock.mock.calls[2]?.[1] as { body?: string })?.body || '{}');
+    expect(pinPayload.board_id).toBe('board_created');
+  });
+
   it('throws API error messages when publish fails', async () => {
     fetchMock.mockResolvedValue(
       new Response(

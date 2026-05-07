@@ -26,12 +26,14 @@ import {
   Sun,
   Moon,
   BookOpen,
+  Ticket,
 } from 'lucide-react';
 
 const adminNavigation = [
   { name: 'Dashboard', href: '/admin/dashboard', icon: LayoutDashboard },
   { name: 'Users', href: '/admin/users', icon: Users },
   { name: 'Plans', href: '/admin/plans', icon: CreditCard },
+  { name: 'Coupons', href: '/admin/coupons', icon: Ticket },
   { name: 'Analytics', href: '/admin/analytics', icon: BarChart3 },
   { name: 'Messages', href: '/admin/messages', icon: MessageCircle },
   { name: 'Conversations', href: '/admin/conversations', icon: MessagesSquare },

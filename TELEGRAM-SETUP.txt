@@ -1,0 +1,94 @@
+Telegram Setup for EE PostMind (Step by Step)
+
+1) Create bot with BotFather
+- Open Telegram and search for @BotFather.
+- Send: /newbot
+- Enter bot name (example: EE PostMind Bot).
+- Enter bot username ending with "bot" (example: eepostmind_publish_bot).
+- Copy the Bot Token returned (format like 123456789:AA...).
+
+2) Prepare destination channel/group
+- Choose where posts should publish:
+  - Public channel (recommended): create channel and set username, e.g. @eepostmind_updates
+  - Private channel/group: keep private and use numeric chat ID later
+
+3) Add bot and grant permissions
+- Add your bot to the channel/group.
+- Make bot Admin with permission to post/send messages and media.
+
+4) Get Chat ID
+- Public channel: use @channelusername directly as Chat ID.
+- Private channel/group:
+  - Send one test message in the channel/group.
+  - Open:
+    https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getUpdates
+  - Find "chat": { "id": ... } in response.
+  - Use that value as Chat ID (often starts with -100 for channels).
+
+5) Configure global Telegram credentials in EE PostMind
+- Go to: Admin Settings > Platform Credentials > Telegram
+- Fill:
+  - Bot Token = token from BotFather
+  - Default Chat ID / Channel Username = @channelusername OR numeric chat ID
+- Click Save Credentials.
+
+6) Connect Telegram in workspace
+- Go to Connections page.
+- Click Connect Telegram.
+- It should connect using global credentials without asking users to type Telegram token/chat ID.
+
+7) Test publish
+- Send a text-only post first.
+- Then test image and video.
+
+If publish fails, capture and share the exact error message from EE PostMind.
+
+==================================================
+Pinterest Setup for EE PostMind (Step by Step)
+==================================================
+
+1) Create a Pinterest developer app
+- Go to: https://developers.pinterest.com/
+- Log in with your Pinterest account.
+- Open "My apps" and click Create app.
+- Fill app name/description and save.
+
+2) Get credentials
+- In your app dashboard, open app credentials/settings.
+- Copy:
+  - App ID (use as PINTEREST_CLIENT_ID)
+  - App Secret Key (use as PINTEREST_CLIENT_SECRET)
+
+3) Configure Redirect URI (must match exactly)
+- Add this Redirect URI in Pinterest app settings:
+  https://smmt.entreprenreducation.com/api/v1/connections/pinterest/callback
+
+4) Configure required scopes
+- Ensure the app is allowed to request:
+  - boards:read
+  - pins:read
+  - pins:write
+
+5) Save in EE PostMind Admin
+- Go to: Admin Settings > Platform Credentials > Pinterest
+- Set:
+  - Client ID / App ID = your App ID
+  - Client Secret / App Secret = your App Secret
+- Save Credentials.
+
+6) Connect Pinterest as user
+- Go to Connections page.
+- Click Connect on Pinterest.
+- Approve the Pinterest consent screen.
+
+7) Publish test pin
+- Use Compose with at least one image (or supported video) and optional link.
+- If no board is selected in metadata, EE PostMind will try your first available board.
+
+8) Common errors
+- redirect_uri mismatch:
+  - Recheck Redirect URI in Pinterest app settings (must be exact).
+- invalid client / unauthorized:
+  - Recheck Client ID and Secret in Admin Settings.
+- board required / publish failed:
+  - Ensure the connected Pinterest user has at least one board.

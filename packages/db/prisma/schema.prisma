@@ -34,6 +34,8 @@ model User {
   passwordResetTokens     PasswordResetToken[]
   feedbacks      Feedback[]
   adminAuditLogs AdminAuditLog[]
+  createdCoupons Coupon[] @relation("CouponCreator")
+  couponRedemptions CouponRedemption[]
 
   @@map("users")
 }
@@ -165,6 +167,58 @@ model UsageRecord {
   @@map("usage_records")
 }
 
+model Coupon {
+  id                     String   @id @default(cuid())
+  code                   String   @unique
+  name                   String
+  description            String?
+  isActive               Boolean  @default(true)
+  discountPercent        Int?
+  freeDurationDays       Int?
+  discountDurationMonths Int?
+  maxTotalUses           Int?
+  maxUniqueUsers         Int?
+  requireCardForFreeCheckout Boolean @default(true)
+  maxUsesPerUser         Int      @default(1)
+  allowedPriceKeys       String[] @default([])
+  defaultPriceKey        String?
+  startsAt               DateTime?
+  endsAt                 DateTime?
+  redemptionCount        Int      @default(0)
+  createdById            String?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  createdBy   User?              @relation("CouponCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  redemptions CouponRedemption[]
+
+  @@index([isActive, startsAt, endsAt])
+  @@map("coupons")
+}
+
+model CouponRedemption {
+  id                 String   @id @default(cuid())
+  couponId           String
+  userId             String
+  workspaceId        String?
+  priceKey           String
+  status             String   @default("pending") // pending, redeemed, expired
+  checkoutSessionId  String?  @unique
+  reservationExpiresAt DateTime?
+  redeemedAt         DateTime?
+  metadata           Json?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  coupon Coupon @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([couponId, status, reservationExpiresAt])
+  @@index([couponId, userId, status])
+  @@index([workspaceId])
+  @@map("coupon_redemptions")
+}
+
 // ============================================================
 // Social Connections
 // ============================================================
@@ -241,6 +295,7 @@ model PlatformPost {
   socialConnectionId String
   platform           String
   platformPostId     String?   // ID returned by the platform after publishing
+  url                String?
   status             String    @default("pending") // pending, publishing, published, failed
   error              String?
   publishedAt        DateTime?

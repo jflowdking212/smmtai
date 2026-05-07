@@ -1,9 +1,17 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, Button, Badge } from '@/components/ui';
+import { useAuthStore } from '@/stores/authStore';
+import { useToast } from '@/components/Toast';
 import { api } from '@/lib/api';
 import { buildLinkPreviewData, buildPreviewText, parseHashtagsInput } from '@/lib/composePreview';
-import { buildDraftAutosaveSignature, sortDraftsByUpdatedAt, toLocalDateTimeInput } from '@/lib/composeDrafts';
+import {
+  buildDraftAutosaveSignature,
+  sortDraftsByUpdatedAt,
+  toLocalDateTimeInput,
+  toLocalDateTimeInputFromDate,
+  toUtcIsoFromLocalDateTimeInput,
+} from '@/lib/composeDrafts';
 import { consumeComposeSeed } from '@/lib/composeSeed';
 import { PLATFORMS, type PlatformType } from '@ee-postmind/shared';
 import {
@@ -83,11 +91,57 @@ function formatVideoLimit(limit?: VideoPlatformLimit): string {
 const PLATFORM_CAPTION_MAP_KEY = '__postmindPlatformCaptions';
 const PUBLISH_PAYLOAD_MAP_KEY = '__postmindPublishPayload';
 
+function buildPlatformUrl(platform: string, postId: string): string | null {
+  const id = postId.trim();
+  if (!id) return null;
+  if (platform === 'facebook') return `https://facebook.com/${id}`;
+  if (platform === 'instagram') return `https://www.instagram.com/p/${id}/`;
+  if (platform === 'twitter') return `https://x.com/i/status/${id}`;
+  if (platform === 'linkedin') return `https://www.linkedin.com/feed/update/${encodeURIComponent(id)}/`;
+  if (platform === 'youtube') return `https://www.youtube.com/watch?v=${id}`;
+  if (platform === 'pinterest') return `https://www.pinterest.com/pin/${encodeURIComponent(id)}/`;
+  if (platform === 'entreprenrs') return `https://entreprenrs.com/post/${encodeURIComponent(id)}`;
+  if (platform === 'iohah') return `https://iohah.com/posts/${encodeURIComponent(id)}`;
+  if (platform === 'chrxstians') return `https://chrxstians.com/posts/${encodeURIComponent(id)}`;
+  if (platform === 'tiktok' && /^\d+$/.test(id)) return `https://www.tiktok.com/video/${id}`;
+  return null;
+}
+
 interface Connection {
   id: string;
   platform: string;
   accountName: string;
   isActive: boolean;
+}
+
+interface FacebookPage {
+  id: string;
+  name: string;
+  picture: string | null;
+  accessToken: string;
+}
+
+interface EntreprenrsPage {
+  id: string;
+  name: string;
+  description?: string | null;
+  avatar?: string | null;
+}
+
+interface IohahDestinationResource {
+  id: string;
+  name: string;
+  description?: string | null;
+  avatar?: string | null;
+  url?: string | null;
+}
+
+interface PublishResultItem {
+  platform: string;
+  status: string;
+  platformPostId?: string;
+  url?: string;
+  error?: string;
 }
 
 interface PendingApprovalPost {
@@ -128,8 +182,34 @@ interface DraftPost {
   platformPosts: DraftPlatformPost[];
 }
 
+type AiTone = 'professional' | 'casual' | 'witty' | 'formal' | 'inspirational' | 'educational' | 'persuasive';
+
+type InlineAiAction = 'generate' | 'rewrite';
+
+interface InlineAiSuggestion {
+  mode: InlineAiAction;
+  text: string;
+  summary?: string;
+  hashtags?: string[];
+  start?: number;
+  end?: number;
+}
+
+const INLINE_AI_TONES: AiTone[] = [
+  'casual',
+  'professional',
+  'witty',
+  'inspirational',
+  'educational',
+  'formal',
+  'persuasive',
+];
+
 export function ComposePage() {
   const navigate = useNavigate();
+  const toast = useToast();
+  const role = useAuthStore((s) => s.role);
+  const isAdminOrOwner = role === 'owner' || role === 'admin';
   const [content, setContent] = useState('');
   const [link, setLink] = useState('');
   const [hashtagsInput, setHashtagsInput] = useState('');
@@ -140,6 +220,14 @@ export function ComposePage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [perPlatformCaptions, setPerPlatformCaptions] = useState<Record<string, string>>({});
   const [showPerPlatform, setShowPerPlatform] = useState(false);
+  const [showInlineAiPanel, setShowInlineAiPanel] = useState(false);
+  const [inlineAiPrompt, setInlineAiPrompt] = useState('');
+  const [inlineAiInstruction, setInlineAiInstruction] = useState('');
+  const [inlineAiTone, setInlineAiTone] = useState<AiTone>('casual');
+  const [inlineAiAction, setInlineAiAction] = useState<InlineAiAction | null>(null);
+  const [inlineAiError, setInlineAiError] = useState<string | null>(null);
+  const [inlineAiSuggestion, setInlineAiSuggestion] = useState<InlineAiSuggestion | null>(null);
+  const [selectedTextLength, setSelectedTextLength] = useState(0);
   const [publishing, setPublishing] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
   const [uploadingMedia, setUploadingMedia] = useState(false);
@@ -155,8 +243,33 @@ export function ComposePage() {
   const [approvalPostId, setApprovalPostId] = useState('');
   const [pendingApprovals, setPendingApprovals] = useState<PendingApprovalPost[]>([]);
   const [approvalActionLoading, setApprovalActionLoading] = useState<string | null>(null);
+  const [facebookPages, setFacebookPages] = useState<FacebookPage[]>([]);
+  const [loadingFbPages, setLoadingFbPages] = useState(false);
+  const [selectedFacebookPage, setSelectedFacebookPage] = useState<FacebookPage | null>(null);
+  const [fbDestination, setFbDestination] = useState<'timeline' | 'page'>('timeline');
+  const [entreprenrsDestination, setEntreprenrsDestination] = useState<'timeline' | 'page'>('timeline');
+  const [entreprenrsPageId, setEntreprenrsPageId] = useState('');
+  const [chrxstiansDestination, setChrxstiansDestination] = useState<'timeline' | 'page' | 'group'>('timeline');
+  const [chrxstiansPageId, setChrxstiansPageId] = useState('');
+  const [chrxstiansGroupId, setChrxstiansGroupId] = useState('');
+  const [chrxstiansPages, setChrxstiansPages] = useState<IohahDestinationResource[]>([]);
+  const [chrxstiansGroups, setChrxstiansGroups] = useState<IohahDestinationResource[]>([]);
+  const [loadingChrxstiansPages, setLoadingChrxstiansPages] = useState(false);
+  const [loadingChrxstiansGroups, setLoadingChrxstiansGroups] = useState(false);
+  const [iohahDestination, setIohahDestination] = useState<'timeline' | 'page' | 'group'>('timeline');
+  const [iohahPageId, setIohahPageId] = useState('');
+  const [iohahGroupId, setIohahGroupId] = useState('');
+  const [iohahPages, setIohahPages] = useState<IohahDestinationResource[]>([]);
+  const [iohahGroups, setIohahGroups] = useState<IohahDestinationResource[]>([]);
+  const [loadingIohahPages, setLoadingIohahPages] = useState(false);
+  const [loadingIohahGroups, setLoadingIohahGroups] = useState(false);
+  const [entreprenrsPages, setEntreprenrsPages] = useState<EntreprenrsPage[]>([]);
+  const [selectedEntreprenrsPage, setSelectedEntreprenrsPage] = useState<EntreprenrsPage | null>(null);
+  const [loadingEntreprenrsPages, setLoadingEntreprenrsPages] = useState(false);
+  const [publishResults, setPublishResults] = useState<PublishResultItem[]>([]);
   const imageFileInputRef = useRef<HTMLInputElement | null>(null);
   const videoFileInputRef = useRef<HTMLInputElement | null>(null);
+  const contentTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [showVideoLimits, setShowVideoLimits] = useState(false);
   const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastAutosaveSignatureRef = useRef<string>('');
@@ -205,6 +318,7 @@ export function ComposePage() {
         ? 'Template design added to composer media.'
         : 'AI content loaded into composer.',
     });
+    toast.success(seed.source === 'editor' ? 'Template Loaded' : 'AI Content Loaded');
   }, []);
 
   function toggleConnection(id: string) {
@@ -214,6 +328,182 @@ export function ComposePage() {
       return next;
     });
   }
+
+  // Load Facebook Pages when a Facebook connection is selected
+  const selectedFbConnection = useMemo(
+    () => connections.find((c) => c.platform === 'facebook' && selectedIds.has(c.id)),
+    [connections, selectedIds],
+  );
+  const selectedEntreprenrsConnection = useMemo(
+    () => connections.find((c) => c.platform === 'entreprenrs' && selectedIds.has(c.id)),
+    [connections, selectedIds],
+  );
+  const selectedChrxstiansConnection = useMemo(
+    () => connections.find((c) => c.platform === 'chrxstians' && selectedIds.has(c.id)),
+    [connections, selectedIds],
+  );
+  const selectedIohahConnection = useMemo(
+    () => connections.find((c) => c.platform === 'iohah' && selectedIds.has(c.id)),
+    [connections, selectedIds],
+  );
+  const inlineAiPlatform = useMemo<PlatformType>(() => {
+    const selectedConnection = connections.find((connection) => selectedIds.has(connection.id));
+    const fallbackConnection = connections.find((connection) => connection.isActive);
+    const candidate = selectedConnection?.platform || fallbackConnection?.platform || 'facebook';
+    return Object.prototype.hasOwnProperty.call(PLATFORMS, candidate)
+      ? candidate as PlatformType
+      : 'facebook';
+  }, [connections, selectedIds]);
+
+  useEffect(() => {
+    if (!selectedFbConnection) {
+      setFacebookPages([]);
+      setSelectedFacebookPage(null);
+      setFbDestination('page');
+      setLoadingFbPages(false);
+      return;
+    }
+    setLoadingFbPages(true);
+    api.connections.facebookPages(selectedFbConnection.id)
+      .then((res) => {
+        const pages = res.data || [];
+        setFacebookPages(pages);
+        // Auto-select first page
+        if (pages.length > 0) {
+          setSelectedFacebookPage(pages[0]);
+          setFbDestination('page');
+        }
+    })
+      .catch(() => setFacebookPages([]))
+      .finally(() => setLoadingFbPages(false));
+  }, [selectedFbConnection?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!selectedEntreprenrsConnection) {
+      setEntreprenrsPages([]);
+      setSelectedEntreprenrsPage(null);
+      setLoadingEntreprenrsPages(false);
+      return;
+    }
+
+    setLoadingEntreprenrsPages(true);
+    api.connections.entreprenrsPages(selectedEntreprenrsConnection.id)
+      .then((res) => {
+        const pages = res.data || [];
+        setEntreprenrsPages(pages);
+        if (pages.length === 0) {
+          setSelectedEntreprenrsPage(null);
+          return;
+        }
+
+        const matchedPage = pages.find((page) => page.id === entreprenrsPageId.trim()) || pages[0];
+        setSelectedEntreprenrsPage(matchedPage);
+        setEntreprenrsPageId(matchedPage.id);
+      })
+      .catch(() => {
+        setEntreprenrsPages([]);
+        setSelectedEntreprenrsPage(null);
+      })
+      .finally(() => setLoadingEntreprenrsPages(false));
+  }, [selectedEntreprenrsConnection?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!selectedChrxstiansConnection) {
+      setChrxstiansPages([]);
+      setChrxstiansGroups([]);
+      setChrxstiansPageId('');
+      setChrxstiansGroupId('');
+      setLoadingChrxstiansPages(false);
+      setLoadingChrxstiansGroups(false);
+      return;
+    }
+
+    setLoadingChrxstiansPages(true);
+    setLoadingChrxstiansGroups(true);
+
+    api.connections.chrxstiansPages(selectedChrxstiansConnection.id)
+      .then((res) => {
+        const pages = res.data || [];
+        setChrxstiansPages(pages);
+        if (pages.length === 0) {
+          setChrxstiansPageId('');
+          return;
+        }
+        const matchedPage = pages.find((page) => page.id === chrxstiansPageId.trim()) || pages[0];
+        setChrxstiansPageId(matchedPage.id);
+      })
+      .catch(() => {
+        setChrxstiansPages([]);
+        setChrxstiansPageId('');
+      })
+      .finally(() => setLoadingChrxstiansPages(false));
+
+    api.connections.chrxstiansGroups(selectedChrxstiansConnection.id)
+      .then((res) => {
+        const groups = res.data || [];
+        setChrxstiansGroups(groups);
+        if (groups.length === 0) {
+          setChrxstiansGroupId('');
+          return;
+        }
+        const matchedGroup = groups.find((group) => group.id === chrxstiansGroupId.trim()) || groups[0];
+        setChrxstiansGroupId(matchedGroup.id);
+      })
+      .catch(() => {
+        setChrxstiansGroups([]);
+        setChrxstiansGroupId('');
+      })
+      .finally(() => setLoadingChrxstiansGroups(false));
+  }, [selectedChrxstiansConnection?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!selectedIohahConnection) {
+      setIohahPages([]);
+      setIohahGroups([]);
+      setIohahPageId('');
+      setIohahGroupId('');
+      setLoadingIohahPages(false);
+      setLoadingIohahGroups(false);
+      return;
+    }
+
+    setLoadingIohahPages(true);
+    setLoadingIohahGroups(true);
+
+    api.connections.iohahPages(selectedIohahConnection.id)
+      .then((res) => {
+        const pages = res.data || [];
+        setIohahPages(pages);
+        if (pages.length === 0) {
+          setIohahPageId('');
+          return;
+        }
+        const matchedPage = pages.find((page) => page.id === iohahPageId.trim()) || pages[0];
+        setIohahPageId(matchedPage.id);
+      })
+      .catch(() => {
+        setIohahPages([]);
+        setIohahPageId('');
+      })
+      .finally(() => setLoadingIohahPages(false));
+
+    api.connections.iohahGroups(selectedIohahConnection.id)
+      .then((res) => {
+        const groups = res.data || [];
+        setIohahGroups(groups);
+        if (groups.length === 0) {
+          setIohahGroupId('');
+          return;
+        }
+        const matchedGroup = groups.find((group) => group.id === iohahGroupId.trim()) || groups[0];
+        setIohahGroupId(matchedGroup.id);
+      })
+      .catch(() => {
+        setIohahGroups([]);
+        setIohahGroupId('');
+      })
+      .finally(() => setLoadingIohahGroups(false));
+  }, [selectedIohahConnection?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function parsePlatformMetadata(value: string): Record<string, Record<string, unknown>> | undefined {
     const trimmed = value.trim();
@@ -258,11 +548,18 @@ export function ComposePage() {
 
     const mediaCount = mediaUploads.length;
     const hasVideo = mediaUploads.some((media) => media.type === 'video');
+    const hasImage = mediaUploads.some((media) => media.type === 'image');
     if (connection.platform === 'instagram' && mediaCount === 0) return 'Requires at least one media attachment';
     if ((connection.platform === 'tiktok' || connection.platform === 'youtube') && mediaCount === 0) {
       return 'Requires at least one media attachment';
     }
-    if ((connection.platform === 'tiktok' || connection.platform === 'youtube') && !hasVideo) {
+    if (connection.platform === 'tiktok' && hasVideo && hasImage) {
+      return 'Cannot mix image and video attachments';
+    }
+    if (connection.platform === 'tiktok' && hasVideo && mediaCount > 1) {
+      return 'TikTok video posts support one video attachment';
+    }
+    if (connection.platform === 'youtube' && !hasVideo) {
       return 'Requires video media';
     }
     if (connection.platform === 'pinterest' && mediaCount === 0) return 'Requires at least one media attachment';
@@ -270,6 +567,18 @@ export function ComposePage() {
       return 'Only image attachments supported';
     }
     if (connection.platform === 'twitter' && mediaCount > 4) return 'Maximum 4 media attachments';
+    if (connection.platform === 'iohah' && iohahDestination === 'page' && !iohahPageId.trim()) {
+      return 'Select an Iohah page or create one first';
+    }
+    if (connection.platform === 'iohah' && iohahDestination === 'group' && !iohahGroupId.trim()) {
+      return 'Select an Iohah group or create one first';
+    }
+    if (connection.platform === 'chrxstians' && chrxstiansDestination === 'page' && !chrxstiansPageId.trim()) {
+      return 'Select a Chrxstians page or create one first';
+    }
+    if (connection.platform === 'chrxstians' && chrxstiansDestination === 'group' && !chrxstiansGroupId.trim()) {
+      return 'Select a Chrxstians group or create one first';
+    }
 
     return null;
   }
@@ -288,6 +597,7 @@ export function ComposePage() {
       setMediaUploads((prev) => [...prev, ...uploaded]);
     } catch (err: any) {
       setResult({ success: false, message: err.message || 'Failed to upload media' });
+      toast.error('Upload Failed', err.message || 'Failed to upload media');
     } finally {
       setUploadingMedia(false);
       if (imageFileInputRef.current) imageFileInputRef.current.value = '';
@@ -306,11 +616,32 @@ export function ComposePage() {
     setHashtagsInput('');
     setPlatformMetadataInput('');
     setShowAdvancedMetadata(false);
+    setEntreprenrsDestination('timeline');
+    setEntreprenrsPageId('');
+    setSelectedEntreprenrsPage(null);
+    setChrxstiansDestination('timeline');
+    setChrxstiansPageId('');
+    setChrxstiansGroupId('');
+    setChrxstiansPages([]);
+    setChrxstiansGroups([]);
+    setIohahDestination('timeline');
+    setIohahPageId('');
+    setIohahGroupId('');
+    setIohahPages([]);
+    setIohahGroups([]);
     setSelectedIds(new Set());
     setPerPlatformCaptions({});
     setScheduledAt('');
     setAutosaveState('idle');
     setLastAutosavedAt(null);
+    setInlineAiPrompt('');
+    setInlineAiInstruction('');
+    setInlineAiTone('casual');
+    setInlineAiAction(null);
+    setInlineAiError(null);
+    setInlineAiSuggestion(null);
+    setSelectedTextLength(0);
+    setShowInlineAiPanel(false);
     lastAutosaveSignatureRef.current = '';
     if (clearDraftSelection) {
       setCurrentDraftId('');
@@ -329,9 +660,125 @@ export function ComposePage() {
     });
   }
 
-  function buildPostPayload() {
+  function buildPostPayload(options?: { includeScheduledAt?: boolean }) {
+    const includeScheduledAt = options?.includeScheduledAt ?? true;
     const hashtags = parseHashtagsInput(hashtagsInput);
     const platformMetadata = parsePlatformMetadata(platformMetadataInput);
+    const scheduledAtIso = includeScheduledAt ? toUtcIsoFromLocalDateTimeInput(scheduledAt) : undefined;
+    if (includeScheduledAt && scheduledAt && !scheduledAtIso) {
+      throw new Error('Invalid scheduled date');
+    }
+
+    // Inject Facebook page target into platform metadata if a page is selected
+    let mergedMetadata = platformMetadata;
+    if (fbDestination === 'page' && selectedFacebookPage && selectedFbConnection) {
+      mergedMetadata = mergedMetadata || {};
+      mergedMetadata.facebook = {
+        ...(mergedMetadata.facebook || {}),
+        facebookPageId: selectedFacebookPage.id,
+        facebookPageToken: selectedFacebookPage.accessToken,
+      };
+    }
+
+    const selectedEntreprenrsConnectionIds = Array.from(selectedIds).filter((connectionId) => {
+      const connection = connections.find((c) => c.id === connectionId);
+      return connection?.platform === 'entreprenrs';
+    });
+    const resolvedEntreprenrsPageId = (selectedEntreprenrsPage?.id || entreprenrsPageId).trim();
+    if (
+      selectedEntreprenrsConnectionIds.length > 0
+      && entreprenrsDestination === 'page'
+      && resolvedEntreprenrsPageId
+    ) {
+      mergedMetadata = mergedMetadata || {};
+      mergedMetadata.entreprenrs = {
+        ...(mergedMetadata.entreprenrs || {}),
+        destination: 'page',
+        postOn: 'page',
+        post_on: 'page',
+        pageId: resolvedEntreprenrsPageId,
+        page_id: resolvedEntreprenrsPageId,
+      };
+      selectedEntreprenrsConnectionIds.forEach((connectionId) => {
+        mergedMetadata = mergedMetadata || {};
+        mergedMetadata[connectionId] = {
+          ...(mergedMetadata[connectionId] || {}),
+          destination: 'page',
+          postOn: 'page',
+          post_on: 'page',
+          pageId: resolvedEntreprenrsPageId,
+          page_id: resolvedEntreprenrsPageId,
+        };
+      });
+    }
+
+    const selectedIohahConnectionIds = Array.from(selectedIds).filter((connectionId) => {
+      const connection = connections.find((c) => c.id === connectionId);
+      return connection?.platform === 'iohah';
+    });
+    const selectedChrxstiansConnectionIds = Array.from(selectedIds).filter((connectionId) => {
+      const connection = connections.find((c) => c.id === connectionId);
+      return connection?.platform === 'chrxstians';
+    });
+    if (selectedChrxstiansConnectionIds.length > 0) {
+      mergedMetadata = mergedMetadata || {};
+      const chrxMetadata: Record<string, unknown> = {
+        destination: chrxstiansDestination,
+        postOn: chrxstiansDestination,
+        post_on: chrxstiansDestination,
+      };
+      if (chrxstiansDestination === 'page' && chrxstiansPageId.trim()) {
+        chrxMetadata.pageId = chrxstiansPageId.trim();
+        chrxMetadata.page_id = chrxstiansPageId.trim();
+      }
+      if (chrxstiansDestination === 'group' && chrxstiansGroupId.trim()) {
+        chrxMetadata.groupId = chrxstiansGroupId.trim();
+        chrxMetadata.group_id = chrxstiansGroupId.trim();
+      }
+
+      mergedMetadata.chrxstians = {
+        ...(mergedMetadata.chrxstians || {}),
+        ...chrxMetadata,
+      };
+
+      selectedChrxstiansConnectionIds.forEach((connectionId) => {
+        mergedMetadata = mergedMetadata || {};
+        mergedMetadata[connectionId] = {
+          ...(mergedMetadata[connectionId] || {}),
+          ...chrxMetadata,
+        };
+      });
+    }
+
+    if (selectedIohahConnectionIds.length > 0) {
+      mergedMetadata = mergedMetadata || {};
+      const ioMetadata: Record<string, unknown> = {
+        destination: iohahDestination,
+        postOn: iohahDestination,
+        post_on: iohahDestination,
+      };
+      if (iohahDestination === 'page' && iohahPageId.trim()) {
+        ioMetadata.pageId = iohahPageId.trim();
+        ioMetadata.page_id = iohahPageId.trim();
+      }
+      if (iohahDestination === 'group' && iohahGroupId.trim()) {
+        ioMetadata.groupId = iohahGroupId.trim();
+        ioMetadata.group_id = iohahGroupId.trim();
+      }
+
+      mergedMetadata.iohah = {
+        ...(mergedMetadata.iohah || {}),
+        ...ioMetadata,
+      };
+
+      selectedIohahConnectionIds.forEach((connectionId) => {
+        mergedMetadata = mergedMetadata || {};
+        mergedMetadata[connectionId] = {
+          ...(mergedMetadata[connectionId] || {}),
+          ...ioMetadata,
+        };
+      });
+    }
 
     return {
       content,
@@ -339,8 +786,8 @@ export function ComposePage() {
       mediaUrls: mediaUploads.map((media) => media.url),
       link: link.trim() || undefined,
       hashtags: hashtags.length > 0 ? hashtags : undefined,
-      platformMetadata,
-      scheduledAt: scheduledAt || undefined,
+      platformMetadata: mergedMetadata,
+      scheduledAt: scheduledAtIso,
     };
   }
 
@@ -388,6 +835,110 @@ export function ComposePage() {
       && !Array.isArray(payloadMap.platformMetadata)
         ? JSON.stringify(payloadMap.platformMetadata, null, 2)
         : '';
+    const rawPlatformMetadata = payloadMap.platformMetadata
+      && typeof payloadMap.platformMetadata === 'object'
+      && !Array.isArray(payloadMap.platformMetadata)
+        ? payloadMap.platformMetadata as Record<string, unknown>
+        : null;
+    const entrepreneConnectionIds = (post.platformPosts || [])
+      .filter((platformPost) => platformPost.platform === 'entreprenrs')
+      .map((platformPost) => platformPost.socialConnectionId);
+    const firstConnectionMetadata = rawPlatformMetadata && entrepreneConnectionIds.length > 0
+      ? rawPlatformMetadata[entrepreneConnectionIds[0]]
+      : null;
+    const entreprenrsMetadata = firstConnectionMetadata
+      && typeof firstConnectionMetadata === 'object'
+      && !Array.isArray(firstConnectionMetadata)
+        ? firstConnectionMetadata as Record<string, unknown>
+        : rawPlatformMetadata
+          && rawPlatformMetadata.entreprenrs
+          && typeof rawPlatformMetadata.entreprenrs === 'object'
+          && !Array.isArray(rawPlatformMetadata.entreprenrs)
+            ? rawPlatformMetadata.entreprenrs as Record<string, unknown>
+            : null;
+    const nextEntreprenrsPageId = entreprenrsMetadata && typeof entreprenrsMetadata.pageId === 'string'
+      ? entreprenrsMetadata.pageId
+      : entreprenrsMetadata && typeof entreprenrsMetadata.page_id === 'string'
+        ? entreprenrsMetadata.page_id
+        : '';
+    const chrxstiansConnectionIds = (post.platformPosts || [])
+      .filter((platformPost) => platformPost.platform === 'chrxstians')
+      .map((platformPost) => platformPost.socialConnectionId);
+    const chrxstiansConnectionMetadata = rawPlatformMetadata && chrxstiansConnectionIds.length > 0
+      ? rawPlatformMetadata[chrxstiansConnectionIds[0]]
+      : null;
+    const chrxstiansMetadata = chrxstiansConnectionMetadata
+      && typeof chrxstiansConnectionMetadata === 'object'
+      && !Array.isArray(chrxstiansConnectionMetadata)
+        ? chrxstiansConnectionMetadata as Record<string, unknown>
+        : rawPlatformMetadata
+          && rawPlatformMetadata.chrxstians
+          && typeof rawPlatformMetadata.chrxstians === 'object'
+          && !Array.isArray(rawPlatformMetadata.chrxstians)
+            ? rawPlatformMetadata.chrxstians as Record<string, unknown>
+            : null;
+    const rawChrxstiansDestination = chrxstiansMetadata
+      && typeof chrxstiansMetadata.destination === 'string'
+        ? chrxstiansMetadata.destination
+        : chrxstiansMetadata && typeof chrxstiansMetadata.postOn === 'string'
+          ? chrxstiansMetadata.postOn
+          : chrxstiansMetadata && typeof chrxstiansMetadata.post_on === 'string'
+            ? chrxstiansMetadata.post_on
+            : '';
+    const nextChrxstiansDestination = rawChrxstiansDestination.toLowerCase() === 'group'
+      ? 'group'
+      : rawChrxstiansDestination.toLowerCase() === 'page'
+        ? 'page'
+        : 'timeline';
+    const nextChrxstiansPageId = chrxstiansMetadata && typeof chrxstiansMetadata.pageId === 'string'
+      ? chrxstiansMetadata.pageId
+      : chrxstiansMetadata && typeof chrxstiansMetadata.page_id === 'string'
+        ? chrxstiansMetadata.page_id
+        : '';
+    const nextChrxstiansGroupId = chrxstiansMetadata && typeof chrxstiansMetadata.groupId === 'string'
+      ? chrxstiansMetadata.groupId
+      : chrxstiansMetadata && typeof chrxstiansMetadata.group_id === 'string'
+        ? chrxstiansMetadata.group_id
+        : '';
+    const iohahConnectionIds = (post.platformPosts || [])
+      .filter((platformPost) => platformPost.platform === 'iohah')
+      .map((platformPost) => platformPost.socialConnectionId);
+    const iohahConnectionMetadata = rawPlatformMetadata && iohahConnectionIds.length > 0
+      ? rawPlatformMetadata[iohahConnectionIds[0]]
+      : null;
+    const iohahMetadata = iohahConnectionMetadata
+      && typeof iohahConnectionMetadata === 'object'
+      && !Array.isArray(iohahConnectionMetadata)
+        ? iohahConnectionMetadata as Record<string, unknown>
+        : rawPlatformMetadata
+          && rawPlatformMetadata.iohah
+          && typeof rawPlatformMetadata.iohah === 'object'
+          && !Array.isArray(rawPlatformMetadata.iohah)
+            ? rawPlatformMetadata.iohah as Record<string, unknown>
+            : null;
+    const rawIohahDestination = iohahMetadata
+      && typeof iohahMetadata.destination === 'string'
+        ? iohahMetadata.destination
+        : iohahMetadata && typeof iohahMetadata.postOn === 'string'
+          ? iohahMetadata.postOn
+          : iohahMetadata && typeof iohahMetadata.post_on === 'string'
+            ? iohahMetadata.post_on
+            : '';
+    const nextIohahDestination = rawIohahDestination.toLowerCase() === 'group'
+      ? 'group'
+      : rawIohahDestination.toLowerCase() === 'page'
+        ? 'page'
+        : 'timeline';
+    const nextIohahPageId = iohahMetadata && typeof iohahMetadata.pageId === 'string'
+      ? iohahMetadata.pageId
+      : iohahMetadata && typeof iohahMetadata.page_id === 'string'
+        ? iohahMetadata.page_id
+        : '';
+    const nextIohahGroupId = iohahMetadata && typeof iohahMetadata.groupId === 'string'
+      ? iohahMetadata.groupId
+      : iohahMetadata && typeof iohahMetadata.group_id === 'string'
+        ? iohahMetadata.group_id
+        : '';
 
     const nextMedia = (post.media || []).map((media, index) => ({
       url: media.url,
@@ -407,8 +958,17 @@ export function ComposePage() {
     setLink(nextLink);
     setHashtagsInput(nextHashtags);
     setPlatformMetadataInput(nextPlatformMetadata);
+    setEntreprenrsDestination(nextEntreprenrsPageId ? 'page' : 'timeline');
+    setEntreprenrsPageId(nextEntreprenrsPageId);
+    setSelectedEntreprenrsPage(nextEntreprenrsPageId ? { id: nextEntreprenrsPageId, name: `Page ${nextEntreprenrsPageId}` } : null);
     setShowAdvancedMetadata(nextPlatformMetadata.length > 0);
     setScheduledAt(nextScheduledAt);
+    setChrxstiansDestination(nextChrxstiansDestination);
+    setChrxstiansPageId(nextChrxstiansPageId);
+    setChrxstiansGroupId(nextChrxstiansGroupId);
+    setIohahDestination(nextIohahDestination);
+    setIohahPageId(nextIohahPageId);
+    setIohahGroupId(nextIohahGroupId);
     setAutosaveState('idle');
     setLastAutosavedAt(null);
 
@@ -430,8 +990,10 @@ export function ComposePage() {
       const res = await api.posts.get(draftId);
       hydrateDraft(res.data as DraftPost);
       setResult({ success: true, message: 'Draft loaded.' });
+      toast.success('Draft Loaded');
     } catch (err: any) {
       setResult({ success: false, message: err.message || 'Failed to load draft.' });
+      toast.error('Load Failed', err.message || 'Failed to load draft.');
     } finally {
       setDraftActionLoading(null);
     }
@@ -446,30 +1008,205 @@ export function ComposePage() {
       }
       await refreshDrafts();
       setResult({ success: true, message: 'Draft deleted.' });
+      toast.success('Draft Deleted');
     } catch (err: any) {
       setResult({ success: false, message: err.message || 'Failed to delete draft.' });
+      toast.error('Delete Failed', err.message || 'Failed to delete draft.');
     } finally {
       setDraftActionLoading(null);
     }
   }
 
-  async function handlePublish(isDraft = false) {
+  function readSelectedContentRange() {
+    const textarea = contentTextareaRef.current;
+    if (!textarea) {
+      return { start: 0, end: 0, text: '' };
+    }
+
+    const start = Math.max(0, Math.min(textarea.selectionStart || 0, content.length));
+    const end = Math.max(start, Math.min(textarea.selectionEnd || 0, content.length));
+    return {
+      start,
+      end,
+      text: content.slice(start, end),
+    };
+  }
+
+  async function handleInlineAiGenerate() {
+    const prompt = inlineAiPrompt.trim();
+    if (!prompt) {
+      setInlineAiError('Enter a prompt so AI can generate content.');
+      return;
+    }
+
+    setInlineAiAction('generate');
+    setInlineAiError(null);
+    setInlineAiSuggestion(null);
+
+    try {
+      const captionRes = await api.ai.caption({
+        topic: prompt,
+        platform: inlineAiPlatform,
+        tone: inlineAiTone,
+        include_cta: true,
+        include_emoji: true,
+      });
+      const captionData = captionRes.data || {};
+      const baseCaption = typeof captionData.caption === 'string' ? captionData.caption.trim() : '';
+      if (!baseCaption) {
+        throw new Error('AI did not return generated content');
+      }
+
+      const instructionSuffix = inlineAiInstruction.trim()
+        ? ` Additional instruction: ${inlineAiInstruction.trim()}`
+        : '';
+      const rewriteRes = await api.ai.rewrite({
+        content: baseCaption,
+        platform: inlineAiPlatform,
+        tone: inlineAiTone,
+        instruction: `Humanize this content so it sounds natural, authentic, and conversational while staying clear and post-ready.${instructionSuffix}`,
+      });
+      const rewriteData = rewriteRes.data || {};
+      const rewritten = typeof rewriteData.rewritten === 'string' && rewriteData.rewritten.trim().length > 0
+        ? rewriteData.rewritten.trim()
+        : baseCaption;
+      const hashtags = Array.isArray(captionData.hashtags)
+        ? captionData.hashtags.filter((value: unknown): value is string => typeof value === 'string' && value.trim().length > 0)
+        : [];
+
+      setInlineAiSuggestion({
+        mode: 'generate',
+        text: rewritten,
+        summary: typeof rewriteData.changes_summary === 'string' ? rewriteData.changes_summary : undefined,
+        hashtags,
+      });
+      toast.success('AI Suggestion Ready');
+    } catch (err: any) {
+      const message = err.message || 'Failed to generate AI content';
+      setInlineAiError(message);
+      toast.error('AI Generation Failed', message);
+    } finally {
+      setInlineAiAction(null);
+    }
+  }
+
+  async function handleInlineAiRewrite(autoApply = false) {
+    const selection = readSelectedContentRange();
+    const hasSelection = selection.end > selection.start && selection.text.trim().length > 0;
+    const sourceText = hasSelection ? selection.text : content;
+    if (!sourceText.trim()) {
+      setInlineAiError('Write content first, then select a segment or rewrite all.');
+      return;
+    }
+
+    setInlineAiAction('rewrite');
+    setInlineAiError(null);
+    setInlineAiSuggestion(null);
+
+    try {
+      const instruction = inlineAiInstruction.trim()
+        || 'Rewrite and humanize this content while preserving the main message.';
+      const rewriteRes = await api.ai.rewrite({
+        content: sourceText,
+        platform: inlineAiPlatform,
+        tone: inlineAiTone,
+        instruction,
+      });
+      const rewriteData = rewriteRes.data || {};
+      const rewritten = typeof rewriteData.rewritten === 'string' ? rewriteData.rewritten.trim() : '';
+      if (!rewritten) {
+        throw new Error('AI did not return rewritten content');
+      }
+
+      const start = hasSelection ? selection.start : 0;
+      const end = hasSelection ? selection.end : content.length;
+      if (autoApply) {
+        setContent((prev) => `${prev.slice(0, start)}${rewritten}${prev.slice(end)}`);
+        setInlineAiSuggestion(null);
+        setInlineAiError(null);
+        toast.success(hasSelection ? 'Selected Text Rewritten' : 'Content Rewritten');
+        requestAnimationFrame(() => {
+          const textarea = contentTextareaRef.current;
+          if (!textarea) return;
+          textarea.focus();
+          const caret = start + rewritten.length;
+          textarea.setSelectionRange(caret, caret);
+        });
+      } else {
+        setInlineAiSuggestion({
+          mode: 'rewrite',
+          text: rewritten,
+          summary: typeof rewriteData.changes_summary === 'string' ? rewriteData.changes_summary : undefined,
+          start,
+          end,
+        });
+        toast.success(hasSelection ? 'Selected Text Rewritten' : 'Content Rewritten');
+      }
+    } catch (err: any) {
+      const message = err.message || 'Failed to rewrite content';
+      setInlineAiError(message);
+      toast.error('AI Rewrite Failed', message);
+    } finally {
+      setInlineAiAction(null);
+    }
+  }
+
+  function handleApplyInlineAiSuggestion() {
+    if (!inlineAiSuggestion) return;
+
+    if (inlineAiSuggestion.mode === 'generate') {
+      setContent(inlineAiSuggestion.text);
+      if ((inlineAiSuggestion.hashtags || []).length > 0 && !hashtagsInput.trim()) {
+        setHashtagsInput((inlineAiSuggestion.hashtags || []).join(', '));
+      }
+      setInlineAiSuggestion(null);
+      setInlineAiError(null);
+      toast.success('AI content added to composer');
+      return;
+    }
+
+    const start = typeof inlineAiSuggestion.start === 'number'
+      ? Math.max(0, Math.min(inlineAiSuggestion.start, content.length))
+      : 0;
+    const end = typeof inlineAiSuggestion.end === 'number'
+      ? Math.max(start, Math.min(inlineAiSuggestion.end, content.length))
+      : content.length;
+
+    setContent((prev) => `${prev.slice(0, start)}${inlineAiSuggestion.text}${prev.slice(end)}`);
+    setInlineAiSuggestion(null);
+    setInlineAiError(null);
+    toast.success('AI rewrite applied');
+
+    requestAnimationFrame(() => {
+      const textarea = contentTextareaRef.current;
+      if (!textarea) return;
+      textarea.focus();
+      const caret = start + inlineAiSuggestion.text.length;
+      textarea.setSelectionRange(caret, caret);
+    });
+  }
+
+  async function handlePublish(action: 'draft' | 'publish' | 'schedule' = 'publish') {
     if (!content.trim() || selectedIds.size === 0) return;
 
     let payload: ReturnType<typeof buildPostPayload>;
     try {
-      payload = buildPostPayload();
+      payload = buildPostPayload({ includeScheduledAt: action !== 'publish' });
+      if (action === 'schedule' && !payload.scheduledAt) {
+        throw new Error('Choose a future date/time to schedule this post');
+      }
     } catch (err: any) {
       setResult({ success: false, message: err.message || 'Invalid platform metadata' });
       setAutosaveState('paused');
       return;
     }
 
-    isDraft ? setSavingDraft(true) : setPublishing(true);
+    action === 'draft' ? setSavingDraft(true) : setPublishing(true);
     setResult(null);
+    setPublishResults([]);
 
     try {
-      if (isDraft) {
+      if (action === 'draft') {
         let draftId = currentDraftId;
         if (draftId) {
           await api.posts.update(draftId, payload);
@@ -486,33 +1223,57 @@ export function ComposePage() {
         setLastAutosavedAt(new Date().toISOString());
         await refreshDrafts();
         setResult({ success: true, message: 'Draft saved!' });
+        toast.success('Draft Saved');
         return;
       }
 
+      let results: PublishResultItem[] = [];
       if (currentDraftId) {
         await api.posts.update(currentDraftId, payload);
 
-        if (scheduledAt) {
-          const scheduledDate = new Date(scheduledAt);
-          if (Number.isNaN(scheduledDate.getTime())) {
-            throw new Error('Invalid scheduled date');
-          }
-          await api.schedule.schedulePost(currentDraftId, scheduledDate.toISOString());
+        if (action === 'schedule') {
+          await api.schedule.schedulePost(currentDraftId, payload.scheduledAt!);
         } else {
-          await api.posts.publish(currentDraftId);
+          const pubRes = await api.posts.publish(currentDraftId);
+          results = Array.isArray(pubRes.data) ? pubRes.data : [];
         }
       } else {
-        await api.posts.create({ ...payload, isDraft: false });
+        if (action === 'schedule') {
+          const createRes = await api.posts.create({ ...payload, scheduledAt: undefined, isDraft: true });
+          const createdPostId = typeof createRes.data?.id === 'string' ? createRes.data.id : '';
+          if (!createdPostId) {
+            throw new Error('Could not create post for scheduling');
+          }
+          setCurrentDraftId(createdPostId);
+          setApprovalPostId(createdPostId);
+          await api.schedule.schedulePost(createdPostId, payload.scheduledAt!);
+        } else {
+          const createRes = await api.posts.create({ ...payload, isDraft: false });
+          // For direct create+publish, results come from the platformPosts
+          if (Array.isArray(createRes.data?.platformPosts)) {
+            results = createRes.data.platformPosts.map((pp: any) => ({
+              platform: pp.platform,
+              status: pp.status,
+              platformPostId: pp.platformPostId || undefined,
+            }));
+          }
+        }
       }
 
+      setPublishResults(results);
       setResult({
         success: true,
-        message: scheduledAt ? 'Post scheduled!' : 'Post published!',
+        message: action === 'schedule' ? 'Post scheduled!' : 'Post published!',
       });
+      toast.success(
+        action === 'schedule' ? 'Post Scheduled!' : 'Post Published!',
+        action === 'schedule' ? 'Your post has been scheduled.' : 'Your post is now live.',
+      );
       await refreshDrafts();
       resetComposerState();
     } catch (err: any) {
       setResult({ success: false, message: err.message || 'Failed to publish' });
+      toast.error('Publish Failed', err.message || 'Failed to publish');
     } finally {
       setPublishing(false);
       setSavingDraft(false);
@@ -522,6 +1283,7 @@ export function ComposePage() {
   async function handleSubmitForApproval() {
     if (!approvalPostId.trim()) {
       setResult({ success: false, message: 'Enter a post ID to submit for approval.' });
+      toast.warning('Missing Post ID', 'Enter a post ID to submit for approval.');
       return;
     }
 
@@ -529,9 +1291,11 @@ export function ComposePage() {
     try {
       await api.posts.submitForApproval(approvalPostId.trim());
       setResult({ success: true, message: 'Post submitted for approval.' });
+      toast.success('Submitted', 'Post submitted for approval.');
       await refreshApprovalQueue();
     } catch (err: any) {
       setResult({ success: false, message: err.message || 'Failed to submit for approval.' });
+      toast.error('Submit Failed', err.message || 'Failed to submit for approval.');
     } finally {
       setApprovalActionLoading(null);
     }
@@ -546,9 +1310,11 @@ export function ComposePage() {
         await api.posts.reject(postId);
       }
       setResult({ success: true, message: `Post ${action === 'approve' ? 'approved' : 'rejected'}.` });
+      toast.success(action === 'approve' ? 'Approved' : 'Rejected', `Post ${action === 'approve' ? 'approved' : 'rejected'}.`);
       await refreshApprovalQueue();
     } catch (err: any) {
       setResult({ success: false, message: err.message || `Failed to ${action} post.` });
+      toast.error('Action Failed', err.message || `Failed to ${action} post.`);
     } finally {
       setApprovalActionLoading(null);
     }
@@ -640,6 +1406,9 @@ export function ComposePage() {
   ]);
 
   const selectedConnections = connections.filter((c) => selectedIds.has(c.id));
+  const selectedEntreprenrsConnections = selectedConnections.filter((c) => c.platform === 'entreprenrs');
+  const selectedChrxstiansConnections = selectedConnections.filter((c) => c.platform === 'chrxstians');
+  const selectedIohahConnections = selectedConnections.filter((c) => c.platform === 'iohah');
   const hasOverLimit = selectedConnections.some((c) => {
     const { count, limit } = getCharCount(c);
     return count > limit;
@@ -660,14 +1429,26 @@ export function ComposePage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
         <div>
           <h1 className="text-2xl font-heading font-bold text-neutral-900">Compose Post</h1>
           <p className="text-sm text-neutral-500 mt-1">
             Create and publish to {selectedIds.size} platform{selectedIds.size !== 1 ? 's' : ''}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant={showInlineAiPanel ? 'primary' : 'secondary'}
+            size="sm"
+            onClick={() => {
+              setShowInlineAiPanel((prev) => !prev);
+              setInlineAiError(null);
+              setInlineAiSuggestion(null);
+            }}
+            disabled={uploadingMedia}
+          >
+            <Sparkles className="w-4 h-4" /> Compose AI
+          </Button>
           <Button
             variant="secondary"
             size="sm"
@@ -695,20 +1476,28 @@ export function ComposePage() {
           <Button
             variant="secondary"
             size="sm"
-            onClick={() => handlePublish(true)}
+            onClick={() => void handlePublish('draft')}
             loading={savingDraft}
             disabled={uploadingMedia}
           >
             <Save className="w-4 h-4" /> Save Draft
           </Button>
           <Button
+            variant="secondary"
             size="sm"
-            onClick={() => handlePublish(false)}
+            onClick={() => void handlePublish('publish')}
             loading={publishing}
             disabled={!content.trim() || selectedIds.size === 0 || hasOverLimit || hasRuleViolation || uploadingMedia}
           >
-            {scheduledAt ? <Clock className="w-4 h-4" /> : <Send className="w-4 h-4" />}
-            {scheduledAt ? 'Schedule' : 'Publish Now'}
+            <Send className="w-4 h-4" /> Publish Now
+          </Button>
+          <Button
+            size="sm"
+            onClick={() => void handlePublish('schedule')}
+            loading={publishing}
+            disabled={!scheduledAt || !content.trim() || selectedIds.size === 0 || hasOverLimit || hasRuleViolation || uploadingMedia}
+          >
+            <Clock className="w-4 h-4" /> Schedule Post
           </Button>
         </div>
       </div>
@@ -723,14 +1512,44 @@ export function ComposePage() {
         <div className="lg:col-span-2 space-y-4">
           <Card className="p-4">
             <textarea
+              ref={contentTextareaRef}
               value={content}
               onChange={(e) => setContent(e.target.value)}
+              onSelect={(event) => {
+                const target = event.currentTarget;
+                const start = target.selectionStart || 0;
+                const end = target.selectionEnd || 0;
+                setSelectedTextLength(Math.max(0, end - start));
+              }}
               placeholder="What do you want to share?"
               rows={6}
               className="w-full resize-none border-none text-base text-neutral-800 placeholder-neutral-300 focus:outline-none focus:ring-0"
             />
             <div className="flex items-center justify-between pt-3 border-t border-neutral-100">
               <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowInlineAiPanel((prev) => !prev);
+                    setInlineAiError(null);
+                    setInlineAiSuggestion(null);
+                  }}
+                  className="p-2 rounded-lg hover:bg-neutral-100 text-neutral-400 hover:text-neutral-600 disabled:opacity-50"
+                  disabled={uploadingMedia || inlineAiAction !== null}
+                  aria-label="Open in-composer AI"
+                  title="Open in-composer AI"
+                >
+                  <Sparkles className="w-5 h-5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleInlineAiRewrite(true)}
+                  className="px-2.5 py-1.5 rounded-lg hover:bg-neutral-100 text-xs font-medium text-neutral-500 hover:text-neutral-700 disabled:opacity-50"
+                  disabled={uploadingMedia || inlineAiAction !== null || !content.trim()}
+                  title={selectedTextLength > 0 ? 'Humanize selected text' : 'Humanize all content'}
+                >
+                  Humanize {selectedTextLength > 0 ? 'Selection' : 'All'}
+                </button>
                 <button
                   type="button"
                   onClick={() => {
@@ -815,6 +1634,94 @@ export function ComposePage() {
                     </button>
                   </div>
                 ))}
+              </div>
+            )}
+            {showInlineAiPanel && (
+              <div className="mt-4 rounded-xl border border-brand-200 bg-brand-50/50 p-3 space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-semibold text-neutral-800">In-Composer AI</p>
+                    <p className="text-[11px] text-neutral-500">
+                      Generate from a prompt or rewrite {selectedTextLength > 0 ? 'your selected text' : 'all content'} without leaving compose.
+                    </p>
+                  </div>
+                  <Badge variant="brand">{PLATFORMS[inlineAiPlatform].name}</Badge>
+                </div>
+
+                <textarea
+                  value={inlineAiPrompt}
+                  onChange={(event) => setInlineAiPrompt(event.target.value)}
+                  placeholder="Prompt for new content (optional for rewrite)"
+                  rows={2}
+                  className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-sm resize-none bg-white"
+                />
+                <input
+                  value={inlineAiInstruction}
+                  onChange={(event) => setInlineAiInstruction(event.target.value)}
+                  placeholder="Optional instruction (e.g. make it more persuasive)"
+                  className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-sm bg-white"
+                />
+
+                <div className="flex flex-wrap gap-1.5">
+                  {INLINE_AI_TONES.map((tone) => (
+                    <button
+                      key={tone}
+                      type="button"
+                      onClick={() => setInlineAiTone(tone)}
+                      className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition ${
+                        inlineAiTone === tone
+                          ? 'bg-brand-blue text-white'
+                          : 'bg-white border border-neutral-200 text-neutral-600 hover:border-neutral-300'
+                      }`}
+                    >
+                      {tone}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    loading={inlineAiAction === 'generate'}
+                    onClick={() => void handleInlineAiGenerate()}
+                    disabled={inlineAiAction !== null}
+                  >
+                    <Sparkles className="w-4 h-4" /> Generate Humanized Content
+                  </Button>
+                  <Button
+                    size="sm"
+                    loading={inlineAiAction === 'rewrite'}
+                    onClick={() => void handleInlineAiRewrite()}
+                    disabled={inlineAiAction !== null || !content.trim()}
+                  >
+                    <Sparkles className="w-4 h-4" /> Rewrite & Humanize {selectedTextLength > 0 ? 'Selection' : 'All'}
+                  </Button>
+                </div>
+
+                {inlineAiError && (
+                  <p className="text-xs text-red-600">{inlineAiError}</p>
+                )}
+
+                {inlineAiSuggestion && (
+                  <div className="rounded-lg border border-neutral-200 bg-white p-3 space-y-2">
+                    <p className="text-xs font-medium text-neutral-600">
+                      {inlineAiSuggestion.mode === 'generate' ? 'Generated suggestion' : 'Rewrite suggestion'}
+                    </p>
+                    <p className="text-sm text-neutral-800 whitespace-pre-wrap">{inlineAiSuggestion.text}</p>
+                    {inlineAiSuggestion.summary && (
+                      <p className="text-[11px] text-neutral-500">{inlineAiSuggestion.summary}</p>
+                    )}
+                    <div className="flex gap-2">
+                      <Button size="sm" onClick={handleApplyInlineAiSuggestion}>
+                        Accept
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => setInlineAiSuggestion(null)}>
+                        Dismiss
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </Card>
@@ -997,7 +1904,7 @@ export function ComposePage() {
                   type="datetime-local"
                   value={scheduledAt}
                   onChange={(e) => setScheduledAt(e.target.value)}
-                  min={new Date().toISOString().slice(0, 16)}
+                  min={toLocalDateTimeInputFromDate(new Date())}
                   className="w-full mt-1 px-3 py-2 border border-neutral-200 rounded-lg text-sm"
                 />
               </div>
@@ -1022,6 +1929,30 @@ export function ComposePage() {
                   {result.message}
                 </span>
               </div>
+              {publishResults.length > 0 && (
+                <div className="mt-3 space-y-1.5">
+                  {publishResults.map((pr, i) => {
+                    const platform = PLATFORMS[pr.platform as PlatformType];
+                    const url = pr.url || (pr.platformPostId ? buildPlatformUrl(pr.platform, pr.platformPostId) : null);
+                    return (
+                      <div key={i} className="flex items-center justify-between gap-2 text-xs">
+                        <span className="flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full inline-block" style={{ backgroundColor: platform?.color || '#888' }} />
+                          <span className="text-neutral-700">{platform?.name || pr.platform}</span>
+                          <span className={pr.status === 'published' ? 'text-green-600' : 'text-red-500'}>
+                            {pr.status === 'published' ? '✓' : '✗'}
+                          </span>
+                        </span>
+                        {url && (
+                          <a href={url} target="_blank" rel="noreferrer" className="text-brand-blue hover:underline">
+                            View post →
+                          </a>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </Card>
           )}
         </div>
@@ -1086,6 +2017,374 @@ export function ComposePage() {
             )}
           </Card>
 
+          {/* Facebook destination selection */}
+          {selectedFbConnection && (
+            <Card className="p-4 space-y-3">
+              <h3 className="text-sm font-semibold text-neutral-700">Post to Page</h3>
+              {loadingFbPages ? (
+                <div className="flex items-center gap-2 py-2">
+                  <Loader2 className="w-4 h-4 animate-spin text-neutral-400" />
+                  <p className="text-xs text-neutral-400">Loading your Pages...</p>
+                </div>
+              ) : facebookPages.length === 0 ? (
+                <div className="rounded-lg bg-amber-50 border border-amber-100 p-3 space-y-2">
+                  <p className="text-xs text-amber-700">
+                    No Facebook Pages found. Facebook only allows apps to post to Pages you manage.
+                  </p>
+                  <a
+                    href="https://www.facebook.com/pages/create"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-block text-xs font-medium text-brand-blue hover:underline"
+                  >
+                    Create a Facebook Page →
+                  </a>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {facebookPages.map((page) => (
+                    <button
+                      key={page.id}
+                      onClick={() => { setFbDestination('page'); setSelectedFacebookPage(page); }}
+                      className={`w-full flex items-center gap-3 p-2.5 rounded-lg border text-left transition-all ${
+                        selectedFacebookPage?.id === page.id
+                          ? 'border-brand-blue bg-blue-50' : 'border-neutral-200 hover:border-neutral-300'
+                      }`}
+                    >
+                      <div className="w-8 h-8 rounded-lg overflow-hidden bg-neutral-100 flex items-center justify-center">
+                        {page.picture ? (
+                          <img src={page.picture} alt="" className="w-8 h-8 object-cover" />
+                        ) : (
+                          <span className="text-sm">📄</span>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-neutral-800 truncate">{page.name}</p>
+                        <p className="text-xs text-neutral-400">Facebook Page</p>
+                      </div>
+                      {selectedFacebookPage?.id === page.id && (
+                        <Check className="w-4 h-4 text-brand-blue" />
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </Card>
+          )}
+
+          {selectedEntreprenrsConnections.length > 0 && (
+            <Card className="p-4 space-y-3">
+              <h3 className="text-sm font-semibold text-neutral-700">Entreprenrs Destination</h3>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setEntreprenrsDestination('timeline')}
+                  className={`rounded-lg border px-3 py-2 text-xs font-medium transition ${
+                    entreprenrsDestination === 'timeline'
+                      ? 'border-brand-blue bg-blue-50 text-brand-blue'
+                      : 'border-neutral-200 text-neutral-600 hover:border-neutral-300'
+                  }`}
+                >
+                  Timeline
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEntreprenrsDestination('page')}
+                  className={`rounded-lg border px-3 py-2 text-xs font-medium transition ${
+                    entreprenrsDestination === 'page'
+                      ? 'border-brand-blue bg-blue-50 text-brand-blue'
+                      : 'border-neutral-200 text-neutral-600 hover:border-neutral-300'
+                  }`}
+                >
+                  Page
+                </button>
+              </div>
+              {entreprenrsDestination === 'page' && (
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-neutral-600">Entreprenrs Page</label>
+                  {loadingEntreprenrsPages ? (
+                    <div className="flex items-center gap-2 py-2">
+                      <Loader2 className="w-4 h-4 animate-spin text-neutral-400" />
+                      <p className="text-xs text-neutral-400">Loading Entreprenrs pages...</p>
+                    </div>
+                  ) : entreprenrsPages.length > 0 ? (
+                    <select
+                      value={selectedEntreprenrsPage?.id || entreprenrsPageId}
+                      onChange={(event) => {
+                        const pageId = event.target.value;
+                        const page = entreprenrsPages.find((item) => item.id === pageId) || null;
+                        setSelectedEntreprenrsPage(page);
+                        setEntreprenrsPageId(pageId);
+                      }}
+                      className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-sm bg-white"
+                    >
+                      {entreprenrsPages.map((page) => (
+                        <option key={page.id} value={page.id}>
+                          {page.name} ({page.id})
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      value={entreprenrsPageId}
+                      onChange={(event) => {
+                        setSelectedEntreprenrsPage(null);
+                        setEntreprenrsPageId(event.target.value);
+                      }}
+                      placeholder="Enter page ID"
+                      className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-sm"
+                    />
+                  )}
+                  <p className="text-[11px] text-neutral-500">
+                    We auto-load pages from your connected account. If none are returned, you can still enter a Page ID manually.
+                  </p>
+                </div>
+              )}
+            </Card>
+          )}
+
+          {selectedChrxstiansConnections.length > 0 && (
+            <Card className="p-4 space-y-3">
+              <h3 className="text-sm font-semibold text-neutral-700">Chrxstians Destination</h3>
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setChrxstiansDestination('timeline')}
+                  className={`rounded-lg border px-3 py-2 text-xs font-medium transition ${
+                    chrxstiansDestination === 'timeline'
+                      ? 'border-brand-blue bg-blue-50 text-brand-blue'
+                      : 'border-neutral-200 text-neutral-600 hover:border-neutral-300'
+                  }`}
+                >
+                  Timeline
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setChrxstiansDestination('page')}
+                  className={`rounded-lg border px-3 py-2 text-xs font-medium transition ${
+                    chrxstiansDestination === 'page'
+                      ? 'border-brand-blue bg-blue-50 text-brand-blue'
+                      : 'border-neutral-200 text-neutral-600 hover:border-neutral-300'
+                  }`}
+                >
+                  Page
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setChrxstiansDestination('group')}
+                  className={`rounded-lg border px-3 py-2 text-xs font-medium transition ${
+                    chrxstiansDestination === 'group'
+                      ? 'border-brand-blue bg-blue-50 text-brand-blue'
+                      : 'border-neutral-200 text-neutral-600 hover:border-neutral-300'
+                  }`}
+                >
+                  Group
+                </button>
+              </div>
+
+              {chrxstiansDestination === 'page' && (
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-neutral-600">Chrxstians Page</label>
+                  {loadingChrxstiansPages ? (
+                    <div className="flex items-center gap-2 py-2">
+                      <Loader2 className="w-4 h-4 animate-spin text-neutral-400" />
+                      <p className="text-xs text-neutral-400">Loading Chrxstians pages...</p>
+                    </div>
+                  ) : chrxstiansPages.length > 0 ? (
+                    <select
+                      value={chrxstiansPageId}
+                      onChange={(event) => setChrxstiansPageId(event.target.value)}
+                      className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-sm bg-white"
+                    >
+                      {chrxstiansPages.map((page) => (
+                        <option key={page.id} value={page.id}>
+                          {page.name} ({page.id})
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <div className="rounded-lg border border-dashed border-neutral-300 bg-neutral-50 px-3 py-2">
+                      <p className="text-xs text-neutral-600">
+                        No pages found for this Chrxstians account.
+                      </p>
+                      <a
+                        href="https://chrxstians.com/pages"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-xs text-brand-blue hover:underline"
+                      >
+                        Create a page on Chrxstians
+                      </a>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {chrxstiansDestination === 'group' && (
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-neutral-600">Chrxstians Group</label>
+                  {loadingChrxstiansGroups ? (
+                    <div className="flex items-center gap-2 py-2">
+                      <Loader2 className="w-4 h-4 animate-spin text-neutral-400" />
+                      <p className="text-xs text-neutral-400">Loading Chrxstians groups...</p>
+                    </div>
+                  ) : chrxstiansGroups.length > 0 ? (
+                    <select
+                      value={chrxstiansGroupId}
+                      onChange={(event) => setChrxstiansGroupId(event.target.value)}
+                      className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-sm bg-white"
+                    >
+                      {chrxstiansGroups.map((group) => (
+                        <option key={group.id} value={group.id}>
+                          {group.name} ({group.id})
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <div className="rounded-lg border border-dashed border-neutral-300 bg-neutral-50 px-3 py-2">
+                      <p className="text-xs text-neutral-600">
+                        No groups found for this Chrxstians account.
+                      </p>
+                      <a
+                        href="https://chrxstians.com/groups"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-xs text-brand-blue hover:underline"
+                      >
+                        Create a group on Chrxstians
+                      </a>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <p className="text-[11px] text-neutral-500">
+                We auto-load your Chrxstians pages/groups and let you select the destination.
+              </p>
+            </Card>
+          )}
+
+          {selectedIohahConnections.length > 0 && (
+            <Card className="p-4 space-y-3">
+              <h3 className="text-sm font-semibold text-neutral-700">Iohah Destination</h3>
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIohahDestination('timeline')}
+                  className={`rounded-lg border px-3 py-2 text-xs font-medium transition ${
+                    iohahDestination === 'timeline'
+                      ? 'border-brand-blue bg-blue-50 text-brand-blue'
+                      : 'border-neutral-200 text-neutral-600 hover:border-neutral-300'
+                  }`}
+                >
+                  Timeline
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIohahDestination('page')}
+                  className={`rounded-lg border px-3 py-2 text-xs font-medium transition ${
+                    iohahDestination === 'page'
+                      ? 'border-brand-blue bg-blue-50 text-brand-blue'
+                      : 'border-neutral-200 text-neutral-600 hover:border-neutral-300'
+                  }`}
+                >
+                  Page
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIohahDestination('group')}
+                  className={`rounded-lg border px-3 py-2 text-xs font-medium transition ${
+                    iohahDestination === 'group'
+                      ? 'border-brand-blue bg-blue-50 text-brand-blue'
+                      : 'border-neutral-200 text-neutral-600 hover:border-neutral-300'
+                  }`}
+                >
+                  Group
+                </button>
+              </div>
+
+              {iohahDestination === 'page' && (
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-neutral-600">Iohah Page</label>
+                  {loadingIohahPages ? (
+                    <div className="flex items-center gap-2 py-2">
+                      <Loader2 className="w-4 h-4 animate-spin text-neutral-400" />
+                      <p className="text-xs text-neutral-400">Loading Iohah pages...</p>
+                    </div>
+                  ) : iohahPages.length > 0 ? (
+                    <select
+                      value={iohahPageId}
+                      onChange={(event) => setIohahPageId(event.target.value)}
+                      className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-sm bg-white"
+                    >
+                      {iohahPages.map((page) => (
+                        <option key={page.id} value={page.id}>
+                          {page.name} ({page.id})
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <div className="rounded-lg border border-dashed border-neutral-300 bg-neutral-50 px-3 py-2">
+                      <p className="text-xs text-neutral-600">
+                        No pages found for this Iohah account.
+                      </p>
+                      <a
+                        href="https://iohah.com/pages"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-xs text-brand-blue hover:underline"
+                      >
+                        Create a page on Iohah
+                      </a>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {iohahDestination === 'group' && (
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-neutral-600">Iohah Group</label>
+                  {loadingIohahGroups ? (
+                    <div className="flex items-center gap-2 py-2">
+                      <Loader2 className="w-4 h-4 animate-spin text-neutral-400" />
+                      <p className="text-xs text-neutral-400">Loading Iohah groups...</p>
+                    </div>
+                  ) : iohahGroups.length > 0 ? (
+                    <select
+                      value={iohahGroupId}
+                      onChange={(event) => setIohahGroupId(event.target.value)}
+                      className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-sm bg-white"
+                    >
+                      {iohahGroups.map((group) => (
+                        <option key={group.id} value={group.id}>
+                          {group.name} ({group.id})
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <div className="rounded-lg border border-dashed border-neutral-300 bg-neutral-50 px-3 py-2">
+                      <p className="text-xs text-neutral-600">
+                        No groups found for this Iohah account.
+                      </p>
+                      <a
+                        href="https://iohah.com/groups"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-xs text-brand-blue hover:underline"
+                      >
+                        Create a group on Iohah
+                      </a>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <p className="text-[11px] text-neutral-500">
+                We auto-load your Iohah pages/groups and let you select the destination.
+              </p>
+            </Card>
+          )}
+
           <Card className="p-4 space-y-3">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-semibold text-neutral-700">Drafts</h3>
@@ -1140,6 +2439,7 @@ export function ComposePage() {
             )}
           </Card>
 
+          {!isAdminOrOwner && (
           <Card className="p-4 space-y-3">
             <h3 className="text-sm font-semibold text-neutral-700">Approval Workflow</h3>
             <div className="space-y-2">
@@ -1190,6 +2490,7 @@ export function ComposePage() {
               </div>
             )}
           </Card>
+          )}
 
           {/* Character limits summary */}
           {selectedConnections.length > 0 && (

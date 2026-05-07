@@ -1,4 +1,4 @@
-import { FormEvent, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Button, Card, Input } from '@/components/ui';
 import { api, ApiError } from '@/lib/api';
@@ -15,16 +15,53 @@ function resolvePlanLabel(priceKey: string): string {
 export function CheckoutPage() {
   const [searchParams] = useSearchParams();
   const priceKey = useMemo(() => searchParams.get('priceKey') || '', [searchParams]);
+  const couponFromQuery = useMemo(() => searchParams.get('coupon') || '', [searchParams]);
   const canceled = searchParams.get('canceled') === '1';
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [couponCode, setCouponCode] = useState(couponFromQuery);
+  const [couponPreview, setCouponPreview] = useState<any>(null);
+  const [couponError, setCouponError] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [existingAccount, setExistingAccount] = useState(false);
 
-  const nextPath = useMemo(() => `/billing?upgrade=${encodeURIComponent(priceKey)}`, [priceKey]);
+  const nextPath = useMemo(() => {
+    const params = new URLSearchParams();
+    params.set('upgrade', priceKey);
+    if (couponCode.trim()) {
+      params.set('coupon', couponCode.trim());
+    }
+    return `/billing?${params.toString()}`;
+  }, [priceKey, couponCode]);
   const loginHref = useMemo(() => `/auth/login?next=${encodeURIComponent(nextPath)}`, [nextPath]);
+
+  useEffect(() => {
+    setCouponCode(couponFromQuery);
+  }, [couponFromQuery]);
+
+  useEffect(() => {
+    let active = true;
+    const code = couponCode.trim();
+    if (!code) {
+      setCouponPreview(null);
+      setCouponError('');
+      return () => { active = false; };
+    }
+    api.billing.previewCoupon(code, priceKey || undefined)
+      .then((res) => {
+        if (!active) return;
+        setCouponPreview(res.data);
+        setCouponError('');
+      })
+      .catch((err) => {
+        if (!active) return;
+        setCouponPreview(null);
+        setCouponError(err instanceof ApiError ? err.message : 'Invalid coupon');
+      });
+    return () => { active = false; };
+  }, [couponCode, priceKey]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -38,7 +75,12 @@ export function CheckoutPage() {
 
     setLoading(true);
     try {
-      const res = await api.billing.checkoutPublic({ name, email, priceKey });
+      const res = await api.billing.checkoutPublic({
+        name,
+        email,
+        priceKey,
+        ...(couponCode.trim() ? { couponCode: couponCode.trim() } : {}),
+      });
       window.location.href = res.data.url;
     } catch (err) {
       const message = err instanceof ApiError ? err.message : 'Unable to start checkout';
@@ -87,6 +129,38 @@ export function CheckoutPage() {
               Selected plan: <span className="font-semibold">{resolvePlanLabel(priceKey)}</span>
             </p>
           </div>
+
+          <Input
+            label="Coupon code (optional)"
+            value={couponCode}
+            onChange={(e) => setCouponCode(e.target.value)}
+            placeholder="SPRING50"
+          />
+
+          {couponPreview && (
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+              <p className="font-medium">{couponPreview.name} applied</p>
+              <p className="text-xs text-emerald-700 mt-1">
+                {couponPreview.discountPercent ? `${couponPreview.discountPercent}% discount` : 'No percentage discount'}
+                {couponPreview.freeDurationDays ? ` • ${couponPreview.freeDurationDays} free day(s)` : ''}
+                {couponPreview.remainingUserSlots !== null && couponPreview.remainingUserSlots !== undefined
+                  ? ` • ${couponPreview.remainingUserSlots} user slot(s) left`
+                  : ''}
+                {couponPreview.remainingTotalUses !== null && couponPreview.remainingTotalUses !== undefined
+                  ? ` • ${couponPreview.remainingTotalUses} total use(s) left`
+                  : ''}
+                {couponPreview.requireCardForFreeCheckout === false
+                  ? ' • No card required for free checkout'
+                  : ' • Card required at checkout'}
+              </p>
+            </div>
+          )}
+
+          {couponError && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+              {couponError}
+            </div>
+          )}
 
           {error && (
             <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
@@ -137,4 +211,3 @@ export function CheckoutPage() {
     </div>
   );
 }
-

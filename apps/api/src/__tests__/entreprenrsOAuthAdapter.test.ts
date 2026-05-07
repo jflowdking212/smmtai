@@ -46,6 +46,7 @@ describe('EntreprenrsAdapter auth flow', () => {
     expect(JSON.parse(tokens.accessToken)).toEqual({
       accessToken: 'access-token',
       serverKey: 'server-key',
+      userId: 'acct_1',
     });
     expect(tokens.refreshToken).toBe(tokens.accessToken);
   });
@@ -94,14 +95,69 @@ describe('EntreprenrsAdapter auth flow', () => {
     expect(JSON.parse(tokens.accessToken)).toEqual({
       accessToken: 'access-token',
       serverKey: 'server-key',
+      userId: '101',
     });
     expect(tokens.refreshToken).toBe(tokens.accessToken);
   });
 
   it('rejects malformed credential payloads before API calls', async () => {
     await expect(adapter.exchangeCode('access-token-only')).rejects.toThrow(
-      'Provide entreprenrs credentials as JSON: {"accessToken":"token","serverKey":"server-key"}',
+      'Provide entreprenrs credentials as JSON: {"accessToken":"token","serverKey":"server-key"} or {"username":"user","password":"pass","serverKey":"server-key"}',
     );
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects server-key-only payloads', async () => {
+    await expect(
+      adapter.exchangeCode(
+        JSON.stringify({
+          serverKey: 'server-key',
+        }),
+      ),
+    ).rejects.toThrow(
+      'Provide entreprenrs credentials as JSON: {"accessToken":"token","serverKey":"server-key"} or {"username":"user","password":"pass","serverKey":"server-key"}',
+    );
+  });
+
+  it('exchanges username/password credentials through /api/auth', async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          access_token: 'fresh-access-token',
+          user_id: 101,
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
+    ).mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          user_data: {
+            user_id: 101,
+          },
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
+    );
+
+    const tokens = await adapter.exchangeCode(
+      JSON.stringify({
+        username: ' founder ',
+        password: ' password123 ',
+        serverKey: ' server-key ',
+      }),
+    );
+
+    const authRequestUrl = new URL(fetchMock.mock.calls[0]?.[0] as string);
+    const verifyRequestUrl = new URL(fetchMock.mock.calls[1]?.[0] as string);
+    expect(`${authRequestUrl.origin}${authRequestUrl.pathname}`).toBe('https://entreprenrs.com/api/auth');
+    expect(authRequestUrl.searchParams.get('server_key')).toBe('server-key');
+    expect(verifyRequestUrl.searchParams.get('access_token')).toBe('fresh-access-token');
+    expect(verifyRequestUrl.searchParams.get('server_key')).toBe('server-key');
+    expect(verifyRequestUrl.searchParams.get('user_id')).toBe('101');
+    expect(JSON.parse(tokens.accessToken)).toEqual({
+      accessToken: 'fresh-access-token',
+      serverKey: 'server-key',
+      userId: '101',
+    });
   });
 });

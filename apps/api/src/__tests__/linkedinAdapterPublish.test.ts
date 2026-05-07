@@ -142,4 +142,89 @@ describe('LinkedInAdapter publishing', () => {
       }),
     ).rejects.toThrow('LinkedIn currently supports image attachments only');
   });
+
+  it('fetches analytics via LinkedIn REST socialActions endpoint with version header', async () => {
+    fetchMock.mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          impressionSummary: { impressionCount: 42 },
+          likesSummary: { totalLikes: 8 },
+          commentsSummary: { totalFirstLevelComments: 3 },
+          sharesSummary: { count: 2 },
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
+    );
+
+    const analytics = await adapter.getPostAnalytics('linkedin-access-token', 'urn:li:ugcPost:999');
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://api.linkedin.com/rest/socialActions/urn%3Ali%3AugcPost%3A999',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: 'Bearer linkedin-access-token',
+          'Linkedin-Version': expect.any(String),
+          'X-Restli-Protocol-Version': '2.0.0',
+        }),
+      }),
+    );
+    expect(analytics).toEqual(
+      expect.objectContaining({
+        impressions: 42,
+        reach: 42,
+        likes: 8,
+        comments: 3,
+        shares: 2,
+      }),
+    );
+  });
+
+  it('returns zero analytics when LinkedIn denies socialActions permissions', async () => {
+    fetchMock.mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          message: 'Not enough permissions to access: socialActions.GET.NO_VERSION',
+        }),
+        { status: 403, headers: { 'Content-Type': 'application/json' } },
+      ),
+    );
+
+    const analytics = await adapter.getPostAnalytics('linkedin-access-token', 'urn:li:ugcPost:1000');
+
+    expect(analytics).toEqual(
+      expect.objectContaining({
+        impressions: 0,
+        reach: 0,
+        likes: 0,
+        comments: 0,
+        shares: 0,
+      }),
+    );
+    expect(analytics.metadata).toEqual(
+      expect.objectContaining({
+        warning: expect.stringContaining('Not enough permissions'),
+      }),
+    );
+  });
+
+  it('returns zero analytics when LinkedIn analytics fetch fails at network layer', async () => {
+    fetchMock.mockRejectedValue(new TypeError('fetch failed'));
+
+    const analytics = await adapter.getPostAnalytics('linkedin-access-token', 'urn:li:ugcPost:1001');
+
+    expect(analytics).toEqual(
+      expect.objectContaining({
+        impressions: 0,
+        reach: 0,
+        likes: 0,
+        comments: 0,
+        shares: 0,
+      }),
+    );
+    expect(analytics.metadata).toEqual(
+      expect.objectContaining({
+        warning: expect.stringContaining('temporarily unavailable'),
+      }),
+    );
+  });
 });

@@ -37,6 +37,7 @@ describe('PinterestAdapter OAuth', () => {
     expect(authUrl.searchParams.get('client_id')).toBe(process.env.PINTEREST_CLIENT_ID);
     expect(authUrl.searchParams.get('redirect_uri')).toBe(process.env.PINTEREST_REDIRECT_URI);
     expect(authUrl.searchParams.get('response_type')).toBe('code');
+    expect(authUrl.searchParams.get('scope')).toBe('user_accounts:read,boards:read,boards:write,pins:read,pins:write');
   });
 
   it('supports legacy Pinterest OAuth env aliases', () => {

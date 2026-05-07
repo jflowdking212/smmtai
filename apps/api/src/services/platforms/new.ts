@@ -551,24 +551,25 @@ export class TelegramAdapter implements PlatformAdapter {
     }
 
     const mediaUrl = post.mediaUrls?.[0];
+    const postText = typeof post.text === 'string' ? post.text : '';
     const method = mediaUrl ? this.resolveMediaMethod(mediaUrl, post.mediaType) : 'sendMessage';
     const requestBody = method === 'sendMessage'
       ? {
         chat_id: chatId,
-        text: post.text,
+        text: postText,
         parse_mode: 'HTML',
       }
       : method === 'sendVideo'
         ? {
           chat_id: chatId,
           video: mediaUrl,
-          caption: post.text,
+          caption: postText,
           parse_mode: 'HTML',
         }
         : {
           chat_id: chatId,
           photo: mediaUrl,
-          caption: post.text,
+          caption: postText,
           parse_mode: 'HTML',
         };
 
@@ -584,7 +585,38 @@ export class TelegramAdapter implements PlatformAdapter {
     };
     const messageId = data.result?.message_id;
     if (!res.ok || !data.ok || messageId === undefined || messageId === null) {
-      throw new Error(data.description || 'Failed to send Telegram message');
+      const description = data.description || 'Failed to send Telegram message';
+      const isMediaUrlFetchError = !!mediaUrl && /(failed to get http url content|wrong type of the web page content)/i.test(description);
+
+      if (isMediaUrlFetchError) {
+        const fallbackText = [postText.trim(), mediaUrl]
+          .filter((value) => value.length > 0)
+          .join('\n\n');
+        const fallbackRes = await fetch(`https://api.telegram.org/bot${creds.botToken}/sendMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: chatId,
+            text: fallbackText,
+            parse_mode: 'HTML',
+            disable_web_page_preview: false,
+          }),
+        });
+        const fallbackData = await fallbackRes.json().catch(() => ({})) as {
+          ok?: boolean;
+          result?: { message_id?: number | string };
+          description?: string;
+        };
+        const fallbackMessageId = fallbackData.result?.message_id;
+        if (fallbackRes.ok && fallbackData.ok && fallbackMessageId !== undefined && fallbackMessageId !== null) {
+          return { platformPostId: fallbackMessageId.toString() };
+        }
+
+        const fallbackDescription = fallbackData.description || 'Failed to send Telegram message';
+        throw new Error(`${description}; text fallback failed (${fallbackDescription})`);
+      }
+
+      throw new Error(description);
     }
 
     return { platformPostId: messageId.toString() };

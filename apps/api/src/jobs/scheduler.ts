@@ -374,7 +374,7 @@ export async function schedulePost(postId: string, scheduledAt: Date): Promise<s
 
   await prisma.post.update({
     where: { id: postId },
-    data: { status: 'scheduled' },
+    data: { status: 'scheduled', scheduledAt },
   });
   await prisma.schedule.updateMany({
     where: { postId },

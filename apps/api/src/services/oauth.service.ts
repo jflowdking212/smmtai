@@ -162,10 +162,24 @@ class OAuthService {
 
   private getProviderConfig(provider: OAuthProvider) {
     const providerConfig = config.oauth[provider];
+    const resolvedProviderConfig = provider === 'facebook'
+      ? {
+          clientId: process.env.FACEBOOK_APP_ID || process.env.FACEBOOK_CLIENT_ID || providerConfig.clientId,
+          clientSecret: process.env.FACEBOOK_APP_SECRET || process.env.FACEBOOK_CLIENT_SECRET || providerConfig.clientSecret,
+          callbackUrl: process.env.FACEBOOK_CALLBACK_URL || providerConfig.callbackUrl,
+        }
+      : provider === 'google'
+        ? {
+            clientId: process.env.GOOGLE_CLIENT_ID || process.env.YOUTUBE_CLIENT_ID || providerConfig.clientId,
+            clientSecret: process.env.GOOGLE_CLIENT_SECRET || process.env.YOUTUBE_CLIENT_SECRET || providerConfig.clientSecret,
+            callbackUrl: process.env.GOOGLE_CALLBACK_URL || providerConfig.callbackUrl,
+          }
+        : providerConfig;
+
     if (
-      !providerConfig.clientId ||
-      !providerConfig.clientSecret ||
-      !providerConfig.callbackUrl
+      !resolvedProviderConfig.clientId ||
+      !resolvedProviderConfig.clientSecret ||
+      !resolvedProviderConfig.callbackUrl
     ) {
       throw new AppError(
         `${provider} OAuth is not configured`,
@@ -173,7 +187,7 @@ class OAuthService {
         'OAUTH_NOT_CONFIGURED',
       );
     }
-    return providerConfig;
+    return resolvedProviderConfig;
   }
 
   private getExpiryDate(rawValue: unknown): Date | undefined {

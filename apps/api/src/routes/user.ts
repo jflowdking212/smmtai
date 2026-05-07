@@ -64,3 +64,16 @@ userRouter.patch(
     }
   },
 );
+
+userRouter.get(
+  '/entrepreneurs',
+  authenticate,
+  async (_req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const profiles = await userService.listEntrepreneurs();
+      res.json({ success: true, data: profiles });
+    } catch (err) {
+      next(err);
+    }
+  },
+);

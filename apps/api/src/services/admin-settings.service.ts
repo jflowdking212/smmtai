@@ -1,3 +1,5 @@
+import { existsSync, readFileSync, writeFileSync } from 'fs';
+import { resolve } from 'path';
 import { prisma } from '../config/database.js';
 import { encrypt, decrypt } from '../utils/encryption.js';
 import { AppError } from '../middleware/errorHandler.js';
@@ -9,6 +11,7 @@ const SENSITIVE_KEYS = new Set([
   'platform_entreprenrs_access_token',
   'platform_entreprenrs_server_key',
   'platform_chrxstians_access_token',
+  'platform_chrxstians_server_key',
   'platform_iohah_access_token',
   'platform_iohah_server_key',
 ]);
@@ -283,6 +286,100 @@ export type PlatformCredentials = Record<string, PlatformCredentialEntry>;
 
 const CREDENTIAL_FIELDS: (keyof PlatformCredentialEntry)[] = ['access_token', 'server_key', 'client_id', 'client_secret'];
 
+const PLATFORM_ENV_SYNC_MAP: Partial<Record<
+PlatformType,
+Partial<Record<keyof PlatformCredentialEntry, string[]>>
+>> = {
+  facebook: {
+    client_id: ['FACEBOOK_APP_ID', 'FACEBOOK_CLIENT_ID'],
+    client_secret: ['FACEBOOK_APP_SECRET', 'FACEBOOK_CLIENT_SECRET'],
+  },
+  instagram: {
+    client_id: ['INSTAGRAM_APP_ID'],
+    client_secret: ['INSTAGRAM_APP_SECRET'],
+  },
+  tiktok: {
+    client_id: ['TIKTOK_CLIENT_KEY', 'TIKTOK_CLIENT_ID'],
+    client_secret: ['TIKTOK_CLIENT_SECRET', 'TIKTOK_APP_SECRET'],
+  },
+  linkedin: {
+    client_id: ['LINKEDIN_CLIENT_ID', 'LINKEDIN_APP_ID'],
+    client_secret: ['LINKEDIN_CLIENT_SECRET', 'LINKEDIN_APP_SECRET'],
+  },
+  twitter: {
+    client_id: ['TWITTER_CLIENT_ID'],
+    client_secret: ['TWITTER_CLIENT_SECRET'],
+  },
+  youtube: {
+    client_id: ['YOUTUBE_CLIENT_ID', 'GOOGLE_CLIENT_ID'],
+    client_secret: ['YOUTUBE_CLIENT_SECRET', 'GOOGLE_CLIENT_SECRET'],
+  },
+  pinterest: {
+    client_id: ['PINTEREST_CLIENT_ID', 'PINTEREST_APP_ID'],
+    client_secret: ['PINTEREST_CLIENT_SECRET', 'PINTEREST_APP_SECRET'],
+  },
+  telegram: {
+    access_token: ['TELEGRAM_BOT_TOKEN'],
+    client_id: ['TELEGRAM_CHAT_ID'],
+  },
+  entreprenrs: {
+    access_token: ['ENTREPRENRS_ACCESS_TOKEN'],
+    server_key: ['ENTREPRENRS_SERVER_KEY'],
+  },
+};
+
+function formatEnvValue(value: string): string {
+  if (/^[A-Za-z0-9._:/-]+$/.test(value)) return value;
+  return `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+}
+
+function upsertEnvContent(content: string, updates: Record<string, string>): string {
+  const remaining = new Set(Object.keys(updates));
+  const lines = content.split(/\r?\n/).map((line) => {
+    const match = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=/);
+    if (!match) return line;
+    const key = match[1];
+    if (!key || !(key in updates)) return line;
+    remaining.delete(key);
+    return `${key}=${formatEnvValue(updates[key] ?? '')}`;
+  });
+
+  for (const key of remaining) {
+    lines.push(`${key}=${formatEnvValue(updates[key] ?? '')}`);
+  }
+
+  return lines.join('\n');
+}
+
+function syncPlatformCredentialEnvironment(updates: Record<string, string>): void {
+  const entries = Object.entries(updates);
+  if (entries.length === 0) return;
+
+  for (const [key, value] of entries) {
+    process.env[key] = value;
+  }
+
+  const envFiles = [
+    resolve(process.cwd(), '.env'),
+    resolve(process.cwd(), '../../.env'),
+  ];
+  const seen = new Set<string>();
+
+  for (const envFile of envFiles) {
+    if (seen.has(envFile) || !existsSync(envFile)) continue;
+    seen.add(envFile);
+
+    try {
+      const current = readFileSync(envFile, 'utf8');
+      const next = upsertEnvContent(current, updates);
+      if (next === current) continue;
+      writeFileSync(envFile, next.endsWith('\n') ? next : `${next}\n`);
+    } catch (error) {
+      console.warn('[AdminSettings] Unable to sync platform env file:', envFile, error);
+    }
+  }
+}
+
 export async function getPlatformCredentials(): Promise<PlatformCredentials> {
   const cfg = await getConfigGroup('platform_');
   const result: PlatformCredentials = {};
@@ -312,6 +409,8 @@ export async function getPlatformCredentialsMasked(): Promise<PlatformCredential
 }
 
 export async function savePlatformCredentials(data: Record<string, Partial<PlatformCredentialEntry>>): Promise<void> {
+  const envUpdates: Record<string, string> = {};
+
   for (const platform of GLOBAL_CREDENTIAL_PLATFORMS) {
     const entry = data[platform];
     if (!entry) continue;
@@ -319,18 +418,48 @@ export async function savePlatformCredentials(data: Record<string, Partial<Platf
       const value = normalizeValue(entry[field]);
       if (!value || isMaskedSecret(value)) continue;
       await setConfig(`platform_${platform}_${field}`, value);
+      const envKeys = PLATFORM_ENV_SYNC_MAP[platform]?.[field] || [];
+      for (const envKey of envKeys) {
+        envUpdates[envKey] = value;
+      }
     }
   }
+
+  syncPlatformCredentialEnvironment(envUpdates);
 }
 
 export async function getGlobalCredentialsForPlatform(platform: PlatformType): Promise<string | null> {
   if (!GLOBAL_CREDENTIAL_PLATFORMS.includes(platform)) return null;
-  const accessToken = await getConfig(`platform_${platform}_access_token`);
-  if (!accessToken) return null;
-  const serverKey = await getConfig(`platform_${platform}_server_key`);
-  // Build the same JSON credential format the adapters expect
-  const creds: Record<string, string> = { accessToken };
-  if (serverKey) creds.serverKey = serverKey;
+  const accessToken = await getConfig(`platform_${platform}_access_token`)
+    || (platform === 'entreprenrs'
+      ? process.env.ENTREPRENRS_ACCESS_TOKEN || ''
+      : platform === 'telegram'
+        ? process.env.TELEGRAM_BOT_TOKEN || ''
+        : '');
+  const serverKey = await getConfig(`platform_${platform}_server_key`)
+    || (platform === 'entreprenrs' ? process.env.ENTREPRENRS_SERVER_KEY || '' : '');
+  const clientId = await getConfig(`platform_${platform}_client_id`)
+    || (platform === 'telegram' ? process.env.TELEGRAM_CHAT_ID || '' : '');
+
+  if (platform === 'entreprenrs') {
+    const normalizedAccessToken = normalizeValue(accessToken);
+    const normalizedServerKey = normalizeValue(serverKey);
+    if (!normalizedAccessToken || !normalizedServerKey) return null;
+    return JSON.stringify({ accessToken: normalizedAccessToken, serverKey: normalizedServerKey });
+  }
+
+  if (platform === 'telegram') {
+    const normalizedBotToken = normalizeValue(accessToken);
+    const normalizedChatId = normalizeValue(clientId);
+    if (!normalizedBotToken || !normalizedChatId) return null;
+    return JSON.stringify({ botToken: normalizedBotToken, chatId: normalizedChatId });
+  }
+
+  const normalizedAccessToken = normalizeValue(accessToken);
+  if (!normalizedAccessToken) return null;
+  const creds: Record<string, string> = { accessToken: normalizedAccessToken };
+  const normalizedServerKey = normalizeValue(serverKey);
+  if (normalizedServerKey) creds.serverKey = normalizedServerKey;
   return JSON.stringify(creds);
 }
 

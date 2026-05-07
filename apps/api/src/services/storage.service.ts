@@ -112,6 +112,7 @@ async function uploadToS3(params: {
     Key: normalizedKey,
     Body: params.buffer,
     ContentType: params.contentType || 'application/octet-stream',
+    ACL: 'public-read',
   }));
 
   return {

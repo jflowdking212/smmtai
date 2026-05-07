@@ -16,6 +16,8 @@ describe('YouTubeAdapter OAuth', () => {
     vi.stubGlobal('fetch', fetchMock);
     process.env.GOOGLE_CLIENT_ID = 'google-client-id';
     process.env.GOOGLE_CLIENT_SECRET = 'google-client-secret';
+    process.env.YOUTUBE_CLIENT_ID = '';
+    process.env.YOUTUBE_CLIENT_SECRET = '';
     process.env.YOUTUBE_REDIRECT_URI = 'http://localhost:4016/api/v1/connections/youtube/callback';
   });
 
@@ -32,12 +34,16 @@ describe('YouTubeAdapter OAuth', () => {
   it('builds OAuth URL with configured callback URI', () => {
     const state = 'signed-state-token';
     const authUrl = new URL(new YouTubeAdapter().getAuthUrl(state));
+    const scope = authUrl.searchParams.get('scope') || '';
 
     expect(authUrl.searchParams.get('state')).toBe(state);
     expect(authUrl.searchParams.get('client_id')).toBe(process.env.GOOGLE_CLIENT_ID);
     expect(authUrl.searchParams.get('redirect_uri')).toBe(process.env.YOUTUBE_REDIRECT_URI);
     expect(authUrl.searchParams.get('response_type')).toBe('code');
-    expect(authUrl.searchParams.get('scope')).toContain('https://www.googleapis.com/auth/youtube.upload');
+    expect(scope).toContain('https://www.googleapis.com/auth/youtube.upload');
+    expect(scope).toContain('openid');
+    expect(scope).toContain('profile');
+    expect(scope).toContain('email');
   });
 
   it('supports legacy YouTube OAuth env aliases', () => {
@@ -103,5 +109,80 @@ describe('YouTubeAdapter OAuth', () => {
     expect(params.get('refresh_token')).toBe('youtube-refresh-token');
     expect(params.get('client_id')).toBe(process.env.GOOGLE_CLIENT_ID);
     expect(params.get('client_secret')).toBe(process.env.GOOGLE_CLIENT_SECRET);
+  });
+
+  it('returns channel profile when YouTube channel exists', async () => {
+    fetchMock.mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          items: [{ id: 'UC123', snippet: { title: 'Bliss Channel', thumbnails: { default: { url: 'https://img.test/a.jpg' } } } }],
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
+    );
+
+    const account = await new YouTubeAdapter().getAccountInfo('access-token');
+
+    expect(account.id).toBe('UC123');
+    expect(account.name).toBe('Bliss Channel');
+    expect(account.avatar).toBe('https://img.test/a.jpg');
+  });
+
+  it('falls back to Google profile when no YouTube channel exists yet', async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({ items: [] }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({ sub: 'abc123', name: 'Bliss Tech', picture: 'https://img.test/u.jpg' }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+      );
+
+    const account = await new YouTubeAdapter().getAccountInfo('access-token');
+
+    expect(account.id).toBe('google:abc123');
+    expect(account.name).toBe('Bliss Tech');
+    expect(account.avatar).toBe('https://img.test/u.jpg');
+    expect(fetchMock.mock.calls[1]?.[0]).toBe('https://openidconnect.googleapis.com/v1/userinfo');
+  });
+
+  it('fails fast when YouTube Data API v3 is disabled', async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({ error: { message: 'YouTube Data API v3 has not been used in project 1060322636806 before or it is disabled.' } }),
+          { status: 403, headers: { 'Content-Type': 'application/json' } },
+        ),
+      );
+
+    await expect(new YouTubeAdapter().getAccountInfo('access-token')).rejects.toThrow(
+      'YouTube Data API v3 has not been used in project 1060322636806 before or it is disabled.',
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('throws clear error when channel and fallback profile are unavailable', async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({ items: [] }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({ error: 'insufficient_scope' }),
+          { status: 403, headers: { 'Content-Type': 'application/json' } },
+        ),
+      );
+
+    await expect(new YouTubeAdapter().getAccountInfo('access-token')).rejects.toThrow(
+      'No YouTube channel found for this Google account. Open YouTube once to create a channel, then reconnect.',
+    );
   });
 });

@@ -2,9 +2,10 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Card, Button, Badge } from '@/components/ui';
 import { TemplatePreview } from '@/components/TemplatePreview';
-import { useCanvas, type CanvasSize } from '@/hooks/useCanvas';
+import { useCanvas, type CanvasSize, type PhotoFrameType } from '@/hooks/useCanvas';
 import { CANVAS_SIZES, getCanvasSize, getAvailablePostTypes } from '@/lib/canvasSizes';
 import { TEMPLATES, getCategories, getTemplatesByCategory, type TemplateData } from '@/lib/templates';
+import { SCENE_SHAPES } from '@/lib/sceneShapes';
 import { saveComposeSeed } from '@/lib/composeSeed';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
@@ -16,7 +17,8 @@ import {
   SunMedium, Contrast, Droplets, Eraser, Frame, Smile, ChevronsUp, ChevronsDown,
   Monitor, Radio, Car, Smartphone, Coffee, Music, Camera, Heart, Star, Zap,
   Globe, MapPin, ShoppingBag, Briefcase, Megaphone, Pen, BookOpen, Cpu, Wifi,
-  Scissors, RotateCcw, RotateCw, Link2, Send,
+  Scissors, RotateCcw, RotateCw, Link2, Send, AlignLeft, AlignCenter, AlignRight, Bold, Italic,
+  Clock,
 } from 'lucide-react';
 
 const GOOGLE_FONTS = [
@@ -25,15 +27,147 @@ const GOOGLE_FONTS = [
   'Source Sans 3', 'PT Sans', 'Ubuntu', 'Bebas Neue',
 ];
 
-const GRADIENT_PRESETS = [
-  { label: 'Blue → Purple', value: 'linear(#2563EB, #7C3AED)' },
-  { label: 'Green → Teal', value: 'linear(#10B981, #06B6D4)' },
-  { label: 'Orange → Red', value: 'linear(#F97316, #EF4444)' },
-  { label: 'Pink → Purple', value: 'linear(#EC4899, #8B5CF6)' },
-  { label: 'Cyan → Blue', value: 'linear(#06B6D4, #2563EB)' },
-  { label: 'Yellow → Orange', value: 'linear(#EAB308, #F97316)' },
-  { label: 'Slate → Zinc', value: 'linear(#334155, #18181B)' },
-  { label: 'Rose → Amber', value: 'linear(#F43F5E, #F59E0B)' },
+const BACKGROUND_COLORS_BASE = [
+  '#ef4444', '#f97316', '#f59e0b', '#eab308', '#84cc16',
+  '#22c55e', '#10b981', '#14b8a6', '#06b6d4', '#0ea5e9',
+  '#3b82f6', '#6366f1', '#8b5cf6', '#a855f7', '#d946ef',
+  '#ec4899', '#f43f5e', '#111827', '#334155', '#475569',
+  '#6b7280', '#9ca3af', '#d1d5db', '#f3f4f6', '#ffffff',
+  '#7f1d1d', '#7c2d12', '#78350f', '#365314', '#14532d',
+  '#064e3b', '#134e4a', '#164e63', '#1e3a8a', '#312e81',
+  '#4c1d95', '#701a75', '#831843', '#fca5a5', '#fdba74',
+  '#fcd34d', '#bef264', '#86efac', '#6ee7b7', '#67e8f9',
+  '#93c5fd', '#a5b4fc', '#c4b5fd', '#f0abfc', '#f9a8d4',
+];
+
+const BACKGROUND_COLORS_EXTRA = [
+  '#020617', '#0f172a', '#1f2937', '#374151', '#4b5563',
+  '#52525b', '#71717a', '#a1a1aa', '#e4e4e7', '#fafafa',
+  '#7c3aed', '#6d28d9', '#5b21b6', '#581c87', '#86198f',
+  '#a21caf', '#c026d3', '#e879f9', '#f0f9ff', '#bae6fd',
+  '#7dd3fc', '#38bdf8', '#0284c7', '#0369a1', '#0c4a6e',
+  '#083344', '#042f2e', '#115e59', '#0f766e', '#0d9488',
+  '#2dd4bf', '#99f6e4', '#ccfbf1', '#052e16', '#166534',
+  '#15803d', '#16a34a', '#4ade80', '#bbf7d0', '#dcfce7',
+  '#3f6212', '#65a30d', '#a3e635', '#facc15', '#fef08a',
+  '#fde047', '#fef9c3', '#422006', '#713f12', '#92400e',
+];
+
+const BACKGROUND_COLORS = [...BACKGROUND_COLORS_BASE, ...BACKGROUND_COLORS_EXTRA];
+
+const GRADIENT_PRESETS_BASE = [
+  { label: 'Ruby Fire', value: 'linear(#ef4444, #f97316)' },
+  { label: 'Sunset Gold', value: 'linear(#f97316, #f59e0b)' },
+  { label: 'Solar Punch', value: 'linear(#f59e0b, #eab308)' },
+  { label: 'Lime Spark', value: 'linear(#eab308, #84cc16)' },
+  { label: 'Green Pulse', value: 'linear(#84cc16, #22c55e)' },
+  { label: 'Emerald Sea', value: 'linear(#22c55e, #10b981)' },
+  { label: 'Mint Aqua', value: 'linear(#10b981, #14b8a6)' },
+  { label: 'Aqua Sky', value: 'linear(#14b8a6, #06b6d4)' },
+  { label: 'Ocean Pop', value: 'linear(#06b6d4, #0ea5e9)' },
+  { label: 'Blue Blaze', value: 'linear(#0ea5e9, #3b82f6)' },
+  { label: 'Indigo Beam', value: 'linear(#3b82f6, #6366f1)' },
+  { label: 'Violet Dream', value: 'linear(#6366f1, #8b5cf6)' },
+  { label: 'Purple Pop', value: 'linear(#8b5cf6, #a855f7)' },
+  { label: 'Orchid Glow', value: 'linear(#a855f7, #d946ef)' },
+  { label: 'Pink Neon', value: 'linear(#d946ef, #ec4899)' },
+  { label: 'Rose Candy', value: 'linear(#ec4899, #f43f5e)' },
+  { label: 'Cherry Burst', value: 'linear(#f43f5e, #ef4444)' },
+  { label: 'Midnight Blue', value: 'linear(#111827, #1e3a8a)' },
+  { label: 'Slate Steel', value: 'linear(#334155, #475569)' },
+  { label: 'Charcoal Fade', value: 'linear(#475569, #111827)' },
+  { label: 'Silver Shine', value: 'linear(#6b7280, #e5e7eb, #9ca3af)' },
+  { label: 'Platinum Gloss', value: 'linear(#9ca3af, #f3f4f6, #d1d5db)' },
+  { label: 'Graphite Metal', value: 'linear(#111827, #6b7280, #374151)' },
+  { label: 'Gold Luxe', value: 'linear(#a16207, #facc15, #fef3c7)' },
+  { label: 'Rose Gold', value: 'linear(#b45309, #f59e0b, #fbcfe8)' },
+  { label: 'Bronze Rich', value: 'linear(#7c2d12, #b45309, #fde68a)' },
+  { label: 'Copper Glow', value: 'linear(#9a3412, #f97316, #fdba74)' },
+  { label: 'Royal Gold', value: 'linear(#78350f, #d97706, #fef3c7)' },
+  { label: 'Sapphire Gloss', value: 'linear(#1e3a8a, #60a5fa, #1d4ed8)' },
+  { label: 'Emerald Gloss', value: 'linear(#14532d, #34d399, #047857)' },
+  { label: 'Ruby Gloss', value: 'linear(#7f1d1d, #f87171, #991b1b)' },
+  { label: 'Violet Gloss', value: 'linear(#4c1d95, #c4b5fd, #6d28d9)' },
+  { label: 'Teal Gloss', value: 'linear(#134e4a, #5eead4, #0f766e)' },
+  { label: 'Candy Pop 3', value: 'linear(#ef4444, #f59e0b, #eab308)' },
+  { label: 'Tropical Pop 3', value: 'linear(#22c55e, #06b6d4, #3b82f6)' },
+  { label: 'Unicorn Pop 3', value: 'linear(#8b5cf6, #ec4899, #f43f5e)' },
+  { label: 'Aurora 3', value: 'linear(#06b6d4, #8b5cf6, #ec4899)' },
+  { label: 'Festival 3', value: 'linear(#f97316, #ec4899, #8b5cf6)' },
+  { label: 'Lagoon 3', value: 'linear(#0ea5e9, #14b8a6, #22c55e)' },
+  { label: 'Heatwave 3', value: 'linear(#ef4444, #f97316, #f59e0b)' },
+  { label: 'Cosmic 3', value: 'linear(#111827, #312e81, #701a75)' },
+  { label: 'Forest 3', value: 'linear(#365314, #22c55e, #84cc16)' },
+  { label: 'Ocean Deep 3', value: 'linear(#164e63, #0ea5e9, #67e8f9)' },
+  { label: 'Candy Gloss 3', value: 'linear(#f43f5e, #ffffff, #ec4899)' },
+  { label: 'Blue Gloss 3', value: 'linear(#2563eb, #ffffff, #1d4ed8)' },
+  { label: 'Mint Gloss 3', value: 'linear(#10b981, #ffffff, #059669)' },
+  { label: 'Gold Gloss 3', value: 'linear(#d97706, #ffffff, #f59e0b)' },
+  { label: 'Silver Gloss 3', value: 'linear(#6b7280, #ffffff, #9ca3af)' },
+  { label: 'Pearl Shine 3', value: 'linear(#d1d5db, #ffffff, #f3f4f6)' },
+  { label: 'Rainbow Rich 3', value: 'linear(#ef4444, #f59e0b, #3b82f6)' },
+];
+
+const GRADIENT_PRESETS_EXTRA = [
+  { label: 'Obsidian Glow', value: 'linear(#020617, #1f2937, #4b5563)' },
+  { label: 'Steel Night', value: 'linear(#0f172a, #374151, #a1a1aa)' },
+  { label: 'Graphite Luxe', value: 'linear(#111827, #374151, #e4e4e7)' },
+  { label: 'Deep Indigo', value: 'linear(#312e81, #5b21b6, #7c3aed)' },
+  { label: 'Royal Purple', value: 'linear(#581c87, #86198f, #a21caf)' },
+  { label: 'Ultra Violet', value: 'linear(#5b21b6, #7c3aed)' },
+  { label: 'Neon Orchid', value: 'linear(#a21caf, #e879f9)' },
+  { label: 'Candy Violet', value: 'linear(#6d28d9, #c026d3, #f0abfc)' },
+  { label: 'Sky Prism', value: 'linear(#bae6fd, #38bdf8, #0369a1)' },
+  { label: 'Lagoon Surge', value: 'linear(#0c4a6e, #06b6d4, #99f6e4)' },
+  { label: 'Ocean Glass', value: 'linear(#083344, #0284c7, #f0f9ff)' },
+  { label: 'Arctic Blue', value: 'linear(#f0f9ff, #7dd3fc, #3b82f6)' },
+  { label: 'Teal Spark', value: 'linear(#042f2e, #0d9488, #2dd4bf)' },
+  { label: 'Mint Ice', value: 'linear(#ccfbf1, #99f6e4, #2dd4bf)' },
+  { label: 'Emerald Forest', value: 'linear(#052e16, #166534, #4ade80)' },
+  { label: 'Green Shine', value: 'linear(#14532d, #16a34a, #dcfce7)' },
+  { label: 'Lime Burst', value: 'linear(#3f6212, #84cc16, #fef08a)' },
+  { label: 'Citrus Pop', value: 'linear(#65a30d, #a3e635, #facc15)' },
+  { label: 'Amber Rich', value: 'linear(#713f12, #f59e0b, #fde047)' },
+  { label: 'Honey Glow', value: 'linear(#92400e, #facc15, #fef9c3)' },
+  { label: 'Copper Metal', value: 'linear(#7c2d12, #92400e, #fdba74)' },
+  { label: 'Bronze Metal', value: 'linear(#422006, #b45309, #fcd34d)' },
+  { label: 'Ruby Metal', value: 'linear(#7f1d1d, #ef4444, #fca5a5)' },
+  { label: 'Rose Quartz', value: 'linear(#831843, #ec4899, #f9a8d4)' },
+  { label: 'Magenta Gloss', value: 'linear(#86198f, #d946ef, #ffffff)' },
+  { label: 'Blue Gloss X', value: 'linear(#1e3a8a, #38bdf8, #ffffff)' },
+  { label: 'Emerald Gloss X', value: 'linear(#166534, #2dd4bf, #ffffff)' },
+  { label: 'Golden Gloss X', value: 'linear(#92400e, #fde047, #ffffff)' },
+  { label: 'Silver Frost', value: 'linear(#6b7280, #e4e4e7, #ffffff)' },
+  { label: 'Pearl Night', value: 'linear(#334155, #f3f4f6, #ffffff)' },
+  { label: 'Storm Gray', value: 'linear(#111827, #6b7280, #d1d5db)' },
+  { label: 'Twilight Blend', value: 'linear(#0f172a, #312e81, #701a75)' },
+  { label: 'Aurora Boreal', value: 'linear(#115e59, #22c55e, #a3e635)' },
+  { label: 'Aurora Magenta', value: 'linear(#0ea5e9, #8b5cf6, #e879f9)' },
+  { label: 'Rainbow Prism', value: 'linear(#ef4444, #f59e0b, #eab308, #22c55e, #06b6d4, #6366f1)' },
+  { label: 'Sunset Neon', value: 'linear(#f43f5e, #f97316, #facc15)' },
+  { label: 'Tropical Neon', value: 'linear(#10b981, #06b6d4, #7c3aed)' },
+  { label: 'Velvet Night', value: 'linear(#1f2937, #4c1d95, #831843)' },
+  { label: 'Cyber Glow', value: 'linear(#020617, #0369a1, #06b6d4)' },
+  { label: 'Electric Mint', value: 'linear(#0f766e, #14b8a6, #67e8f9)' },
+  { label: 'Emerald Gold', value: 'linear(#166534, #facc15, #fef9c3)' },
+  { label: 'Sapphire Gold', value: 'linear(#1e3a8a, #f59e0b, #fde68a)' },
+  { label: 'Ruby Sapphire', value: 'linear(#ef4444, #312e81, #3b82f6)' },
+  { label: 'Mint Rose', value: 'linear(#10b981, #ec4899, #f9a8d4)' },
+  { label: 'Cosmic Candy', value: 'linear(#6d28d9, #ec4899, #f97316)' },
+  { label: 'Lime Sky', value: 'linear(#84cc16, #06b6d4, #93c5fd)' },
+  { label: 'Coral Bloom', value: 'linear(#f97316, #f43f5e, #f0abfc)' },
+  { label: 'Obsidian Pearl', value: 'linear(#020617, #4b5563, #fafafa)' },
+  { label: 'Glacier Shine', value: 'linear(#bae6fd, #ffffff, #7dd3fc)' },
+  { label: 'Forest Bronze', value: 'linear(#14532d, #92400e, #fcd34d)' },
+];
+
+const GRADIENT_PRESETS = [...GRADIENT_PRESETS_BASE, ...GRADIENT_PRESETS_EXTRA];
+
+const SHAPE_COLOR_SWATCHES = [
+  '#111827', '#374151', '#6b7280', '#ef4444', '#f97316',
+  '#f59e0b', '#eab308', '#22c55e', '#10b981', '#14b8a6',
+  '#06b6d4', '#0ea5e9', '#3b82f6', '#6366f1', '#8b5cf6',
+  '#a855f7', '#d946ef', '#ec4899', '#f43f5e', '#ffffff',
 ];
 
 // SVG icon library for drag-onto-canvas
@@ -59,8 +193,24 @@ const ICON_LIBRARY = [
   { name: 'Wifi', icon: Wifi, svg: '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h.01"/><path d="M2 8.82a15 15 0 0 1 20 0"/><path d="M5 12.859a10 10 0 0 1 14 0"/><path d="M8.5 16.429a5 5 0 0 1 7 0"/></svg>' },
 ];
 
+type CanvasShapeType = 'rect' | 'circle' | 'line' | 'arrow';
+type ShapeLibraryItem = { name: string; kind: 'native' | 'svg'; shapeType?: CanvasShapeType; svg: string };
+type FrameLibraryItem = { name: string; svg: string; kind?: 'svg' | 'photo'; photoType?: PhotoFrameType };
+type SidebarPanel = 'platform' | 'background' | 'assets' | 'quick' | 'text' | 'shape' | 'crop' | 'tune' | 'layers';
+
+const PHOTO_FRAME_LIBRARY: FrameLibraryItem[] = [
+  { name: 'Photo Frame - Rectangle', kind: 'photo', photoType: 'rect', svg: '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><rect x="16" y="26" width="168" height="138" rx="10" fill="#f8fafc" stroke="#111827" stroke-width="4"/><path d="M32 142 76 98l34 30 22-22 36 36" fill="none" stroke="#94a3b8" stroke-width="5"/><circle cx="70" cy="70" r="10" fill="#cbd5e1"/></svg>' },
+  { name: 'Photo Frame - Rounded', kind: 'photo', photoType: 'rounded', svg: '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><rect x="14" y="22" width="172" height="144" rx="28" fill="#f8fafc" stroke="#111827" stroke-width="4"/><path d="M30 146 84 92l30 26 28-24 28 52" fill="none" stroke="#94a3b8" stroke-width="5"/><circle cx="76" cy="72" r="10" fill="#cbd5e1"/></svg>' },
+  { name: 'Photo Frame - Circle', kind: 'photo', photoType: 'circle', svg: '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><circle cx="100" cy="100" r="78" fill="#f8fafc" stroke="#111827" stroke-width="4"/><path d="M44 132 84 98l22 16 24-24 26 42" fill="none" stroke="#94a3b8" stroke-width="5"/><circle cx="82" cy="76" r="9" fill="#cbd5e1"/></svg>' },
+  { name: 'Photo Frame - Diamond', kind: 'photo', photoType: 'diamond', svg: '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><polygon points="100,18 182,100 100,182 18,100" fill="#f8fafc" stroke="#111827" stroke-width="4"/><path d="M50 128 84 94l20 16 26-24 20 42" fill="none" stroke="#94a3b8" stroke-width="5"/><circle cx="84" cy="74" r="9" fill="#cbd5e1"/></svg>' },
+  { name: 'Photo Frame - Hex', kind: 'photo', photoType: 'hex', svg: '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><polygon points="56,20 144,20 186,100 144,180 56,180 14,100" fill="#f8fafc" stroke="#111827" stroke-width="4"/><path d="M40 136 84 94l28 24 18-18 30 36" fill="none" stroke="#94a3b8" stroke-width="5"/><circle cx="78" cy="74" r="9" fill="#cbd5e1"/></svg>' },
+  { name: 'Photo Frame - Arch', kind: 'photo', photoType: 'arch', svg: '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><path d="M24 174V94Q100 14 176 94V174Z" fill="#f8fafc" stroke="#111827" stroke-width="4"/><path d="M46 148 80 108l22 20 24-22 28 42" fill="none" stroke="#94a3b8" stroke-width="5"/><circle cx="80" cy="82" r="9" fill="#cbd5e1"/></svg>' },
+  { name: 'Photo Frame - Ticket', kind: 'photo', photoType: 'ticket', svg: '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><path d="M20 44h160v30q-20 12 0 24v60H20V98q20-12 0-24z" fill="#f8fafc" stroke="#111827" stroke-width="4"/><path d="M40 138 82 94l24 20 24-24 28 48" fill="none" stroke="#94a3b8" stroke-width="5"/><circle cx="78" cy="74" r="9" fill="#cbd5e1"/></svg>' },
+  { name: 'Photo Frame - Capsule', kind: 'photo', photoType: 'capsule', svg: '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><rect x="10" y="50" width="180" height="100" rx="50" fill="#f8fafc" stroke="#111827" stroke-width="4"/><path d="M38 128 80 96l22 18 22-20 36 38" fill="none" stroke="#94a3b8" stroke-width="5"/><circle cx="80" cy="84" r="9" fill="#cbd5e1"/></svg>' },
+];
+
 // Decorative frame SVGs
-const FRAME_LIBRARY = [
+const FRAME_LIBRARY_BASE: FrameLibraryItem[] = [
   { name: 'Simple Border', svg: '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><rect x="5" y="5" width="190" height="190" rx="8" fill="none" stroke="#111827" stroke-width="3"/></svg>' },
   { name: 'Double Border', svg: '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><rect x="5" y="5" width="190" height="190" rx="8" fill="none" stroke="#111827" stroke-width="2"/><rect x="12" y="12" width="176" height="176" rx="6" fill="none" stroke="#111827" stroke-width="1"/></svg>' },
   { name: 'Rounded Frame', svg: '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><rect x="5" y="5" width="190" height="190" rx="24" fill="none" stroke="#2563EB" stroke-width="3"/></svg>' },
@@ -71,7 +221,92 @@ const FRAME_LIBRARY = [
   { name: 'Ornate Frame', svg: '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><rect x="10" y="10" width="180" height="180" rx="4" fill="none" stroke="#D4AF37" stroke-width="3"/><rect x="18" y="18" width="164" height="164" rx="2" fill="none" stroke="#D4AF37" stroke-width="1"/><circle cx="10" cy="10" r="4" fill="#D4AF37"/><circle cx="190" cy="10" r="4" fill="#D4AF37"/><circle cx="10" cy="190" r="4" fill="#D4AF37"/><circle cx="190" cy="190" r="4" fill="#D4AF37"/></svg>' },
   { name: 'Hexagon', svg: '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><polygon points="100,5 185,50 185,150 100,195 15,150 15,50" fill="none" stroke="#10B981" stroke-width="3"/></svg>' },
   { name: 'Wave Border', svg: '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><rect x="5" y="5" width="190" height="190" rx="12" fill="none" stroke="#EC4899" stroke-width="3"/><path d="M5 100 Q30 85 55 100 Q80 115 105 100 Q130 85 155 100 Q180 115 195 100" fill="none" stroke="#EC4899" stroke-width="1.5" opacity="0.4"/></svg>' },
+  { name: 'Photo Matte', svg: '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><rect x="4" y="4" width="192" height="192" fill="#111827"/><rect x="20" y="20" width="160" height="160" fill="#ffffff"/><rect x="28" y="28" width="144" height="144" fill="none" stroke="#111827" stroke-width="2"/></svg>' },
+  { name: 'Polaroid Classic', svg: '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><rect x="18" y="10" width="164" height="180" rx="6" fill="#ffffff" stroke="#d1d5db" stroke-width="2"/><rect x="32" y="24" width="136" height="118" fill="none" stroke="#111827" stroke-width="2"/><rect x="52" y="154" width="96" height="22" rx="4" fill="#f3f4f6"/></svg>' },
+  { name: 'Film Strip', svg: '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><rect x="8" y="8" width="184" height="184" rx="8" fill="#111827"/><rect x="28" y="28" width="144" height="144" fill="none" stroke="#ffffff" stroke-width="2"/><g fill="#ffffff"><rect x="16" y="18" width="10" height="14"/><rect x="16" y="42" width="10" height="14"/><rect x="16" y="66" width="10" height="14"/><rect x="16" y="90" width="10" height="14"/><rect x="16" y="114" width="10" height="14"/><rect x="16" y="138" width="10" height="14"/><rect x="16" y="162" width="10" height="14"/><rect x="174" y="18" width="10" height="14"/><rect x="174" y="42" width="10" height="14"/><rect x="174" y="66" width="10" height="14"/><rect x="174" y="90" width="10" height="14"/><rect x="174" y="114" width="10" height="14"/><rect x="174" y="138" width="10" height="14"/><rect x="174" y="162" width="10" height="14"/></g></svg>' },
+  { name: 'Ticket Cutout', svg: '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><path d="M20 20h160v42a14 14 0 010 28v20a14 14 0 010 28v42H20v-42a14 14 0 010-28V90a14 14 0 010-28V20z" fill="none" stroke="#111827" stroke-width="3"/><path d="M100 20v160" stroke="#9ca3af" stroke-width="2" stroke-dasharray="5 4"/></svg>' },
+  { name: 'Octagon Frame', svg: '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><polygon points="60,5 140,5 195,60 195,140 140,195 60,195 5,140 5,60" fill="none" stroke="#0ea5e9" stroke-width="3"/></svg>' },
+  { name: 'Leaf Corners', svg: '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><rect x="8" y="8" width="184" height="184" rx="10" fill="none" stroke="#15803d" stroke-width="2"/><path d="M12 32c18 0 18-18 36-18-2 20-14 32-36 18zM188 32c-18 0-18-18-36-18 2 20 14 32 36 18zM12 168c18 0 18 18 36 18-2-20-14-32-36-18zM188 168c-18 0-18 18-36 18 2-20 14-32 36-18z" fill="#22c55e"/></svg>' },
+  { name: 'Classic Oval', svg: '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><ellipse cx="100" cy="100" rx="92" ry="74" fill="none" stroke="#7c3aed" stroke-width="3"/><ellipse cx="100" cy="100" rx="80" ry="62" fill="none" stroke="#a78bfa" stroke-width="1.5"/></svg>' },
+  { name: 'Shine Border', svg: '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><rect x="6" y="6" width="188" height="188" rx="14" fill="none" stroke="#334155" stroke-width="3"/><path d="M22 22h92M22 34h70M178 178h-92M178 166h-70" stroke="#e2e8f0" stroke-width="2" opacity="0.9"/></svg>' },
 ];
+
+const FRAME_ACCENT_COLORS = [
+  '#ef4444', '#f97316', '#f59e0b', '#eab308', '#84cc16',
+  '#22c55e', '#10b981', '#14b8a6', '#06b6d4', '#0ea5e9',
+  '#3b82f6', '#6366f1', '#8b5cf6', '#a855f7', '#d946ef',
+  '#ec4899', '#f43f5e', '#111827', '#475569', '#9ca3af',
+];
+
+const FRAME_LIBRARY_EXTRA: FrameLibraryItem[] = FRAME_ACCENT_COLORS.flatMap((color, idx) => {
+  const slot = idx + 1;
+  return [
+    {
+      name: `Classic Tint ${slot}`,
+      svg: `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><rect x="6" y="6" width="188" height="188" rx="14" fill="none" stroke="${color}" stroke-width="4"/><rect x="16" y="16" width="168" height="168" rx="10" fill="none" stroke="${color}" stroke-opacity="0.5" stroke-width="2"/></svg>`,
+    },
+    {
+      name: `Corner Glow ${slot}`,
+      svg: `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><rect x="6" y="6" width="188" height="188" rx="18" fill="none" stroke="${color}" stroke-width="3"/><circle cx="22" cy="22" r="7" fill="${color}" fill-opacity="0.9"/><circle cx="178" cy="22" r="7" fill="${color}" fill-opacity="0.9"/><circle cx="22" cy="178" r="7" fill="${color}" fill-opacity="0.9"/><circle cx="178" cy="178" r="7" fill="${color}" fill-opacity="0.9"/></svg>`,
+    },
+  ];
+});
+
+const FRAME_LIBRARY: FrameLibraryItem[] = [...PHOTO_FRAME_LIBRARY, ...FRAME_LIBRARY_BASE, ...FRAME_LIBRARY_EXTRA];
+
+const SHAPE_LIBRARY_BASE: ShapeLibraryItem[] = [
+  { name: 'Rectangle', kind: 'native', shapeType: 'rect', svg: '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120"><rect x="12" y="20" width="96" height="80" rx="10" fill="#3b82f6"/></svg>' },
+  { name: 'Circle', kind: 'native', shapeType: 'circle', svg: '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120"><circle cx="60" cy="60" r="40" fill="#10b981"/></svg>' },
+  { name: 'Line', kind: 'native', shapeType: 'line', svg: '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120"><line x1="16" y1="60" x2="104" y2="60" stroke="#6b7280" stroke-width="8" stroke-linecap="round"/></svg>' },
+  { name: 'Arrow', kind: 'native', shapeType: 'arrow', svg: '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120"><line x1="16" y1="60" x2="92" y2="60" stroke="#6b7280" stroke-width="8" stroke-linecap="round"/><polygon points="92,40 112,60 92,80" fill="#6b7280"/></svg>' },
+  { name: 'Rounded Box', kind: 'svg', svg: '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120"><rect x="14" y="14" width="92" height="92" rx="22" fill="#6366f1"/></svg>' },
+  { name: 'Triangle', kind: 'svg', svg: '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120"><polygon points="60,10 110,104 10,104" fill="#0ea5e9"/></svg>' },
+  { name: 'Diamond', kind: 'svg', svg: '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120"><polygon points="60,8 112,60 60,112 8,60" fill="#8b5cf6"/></svg>' },
+  { name: 'Pentagon', kind: 'svg', svg: '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120"><polygon points="60,8 110,45 92,108 28,108 10,45" fill="#ec4899"/></svg>' },
+  { name: 'Hexagon', kind: 'svg', svg: '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120"><polygon points="60,8 104,34 104,86 60,112 16,86 16,34" fill="#14b8a6"/></svg>' },
+  { name: 'Octagon', kind: 'svg', svg: '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120"><polygon points="40,8 80,8 112,40 112,80 80,112 40,112 8,80 8,40" fill="#f97316"/></svg>' },
+  { name: 'Star', kind: 'svg', svg: '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120"><polygon points="60,8 74,44 112,44 82,66 94,104 60,80 26,104 38,66 8,44 46,44" fill="#f59e0b"/></svg>' },
+  { name: 'Heart', kind: 'svg', svg: '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120"><path d="M60 104C33 84 16 69 16 47a22 22 0 0 1 40-13 22 22 0 0 1 40 13c0 22-17 37-36 57z" fill="#ef4444"/></svg>' },
+  { name: 'Cloud', kind: 'svg', svg: '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120"><path d="M31 90h58a19 19 0 0 0 0-38 27 27 0 0 0-52-7 19 19 0 0 0-6 45z" fill="#60a5fa"/></svg>' },
+  { name: 'Speech Bubble', kind: 'svg', svg: '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120"><path d="M16 24h88v56H48l-20 16v-16H16z" fill="#22c55e"/></svg>' },
+  { name: 'Ribbon', kind: 'svg', svg: '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120"><path d="M20 20h80v56H72l-12 16-12-16H20z" fill="#a855f7"/></svg>' },
+  { name: 'Badge', kind: 'svg', svg: '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120"><circle cx="60" cy="52" r="34" fill="#06b6d4"/><polygon points="43,82 43,112 60,98 77,112 77,82" fill="#0891b2"/></svg>' },
+  { name: 'Parallelogram', kind: 'svg', svg: '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120"><polygon points="28,20 108,20 92,100 12,100" fill="#84cc16"/></svg>' },
+  { name: 'Trapezoid', kind: 'svg', svg: '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120"><polygon points="30,20 90,20 108,100 12,100" fill="#eab308"/></svg>' },
+  { name: 'Lightning', kind: 'svg', svg: '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120"><polygon points="66,10 36,64 60,64 50,110 88,52 64,52" fill="#facc15"/></svg>' },
+  { name: 'Check Mark', kind: 'svg', svg: '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120"><path d="M16 64l24 24 64-64" fill="none" stroke="#22c55e" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/></svg>' },
+];
+
+const SHAPE_STYLED_3D: ShapeLibraryItem[] = [
+  { name: '3D Cube Blue', kind: 'svg', svg: '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120"><defs><linearGradient id="g1" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#93c5fd"/><stop offset="100%" stop-color="#2563eb"/></linearGradient><linearGradient id="g2" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#60a5fa"/><stop offset="100%" stop-color="#1d4ed8"/></linearGradient></defs><polygon points="60,8 102,30 60,52 18,30" fill="url(#g1)"/><polygon points="18,30 60,52 60,98 18,76" fill="#1e40af"/><polygon points="102,30 60,52 60,98 102,76" fill="url(#g2)"/></svg>' },
+  { name: '3D Sphere Purple', kind: 'svg', svg: '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120"><defs><radialGradient id="s1" cx="32%" cy="28%" r="62%"><stop offset="0%" stop-color="#f5d0fe"/><stop offset="55%" stop-color="#d946ef"/><stop offset="100%" stop-color="#7e22ce"/></radialGradient></defs><circle cx="60" cy="60" r="44" fill="url(#s1)"/><ellipse cx="44" cy="42" rx="14" ry="9" fill="#ffffff" opacity="0.35"/></svg>' },
+  { name: '3D Cylinder Emerald', kind: 'svg', svg: '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120"><ellipse cx="60" cy="28" rx="34" ry="12" fill="#6ee7b7"/><rect x="26" y="28" width="68" height="58" fill="#10b981"/><ellipse cx="60" cy="86" rx="34" ry="12" fill="#047857"/></svg>' },
+  { name: 'Metallic Star Gold', kind: 'svg', svg: '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120"><defs><linearGradient id="m1" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#fef3c7"/><stop offset="50%" stop-color="#d4af37"/><stop offset="100%" stop-color="#a16207"/></linearGradient></defs><polygon points="60,10 74,44 112,44 82,66 94,104 60,82 26,104 38,66 8,44 46,44" fill="url(#m1)" stroke="#92400e" stroke-width="3"/></svg>' },
+  { name: 'Metallic Shield Silver', kind: 'svg', svg: '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120"><defs><linearGradient id="m2" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#f8fafc"/><stop offset="45%" stop-color="#cbd5e1"/><stop offset="100%" stop-color="#64748b"/></linearGradient></defs><path d="M60 10 96 24v28c0 30-18 48-36 58C42 100 24 82 24 52V24Z" fill="url(#m2)" stroke="#475569" stroke-width="3"/></svg>' },
+  { name: 'Glossy Subscribe Button', kind: 'svg', svg: '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120"><defs><linearGradient id="gsub" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#fb7185"/><stop offset="100%" stop-color="#be123c"/></linearGradient></defs><rect x="12" y="34" width="96" height="52" rx="26" fill="url(#gsub)"/><path d="M26 44h68" stroke="#fff" stroke-opacity="0.35" stroke-width="6"/><text x="60" y="67" text-anchor="middle" fill="#fff" font-size="12" font-family="Inter, Arial" font-weight="700">SUBSCRIBE</text></svg>' },
+  { name: 'Glossy Click Badge', kind: 'svg', svg: '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120"><defs><radialGradient id="gclick" cx="30%" cy="30%" r="70%"><stop offset="0%" stop-color="#93c5fd"/><stop offset="100%" stop-color="#1d4ed8"/></radialGradient></defs><circle cx="60" cy="60" r="42" fill="url(#gclick)"/><circle cx="60" cy="60" r="30" fill="none" stroke="#dbeafe" stroke-width="3" opacity="0.7"/><text x="60" y="66" text-anchor="middle" fill="#fff" font-size="14" font-family="Inter, Arial" font-weight="700">CLICK</text></svg>' },
+  { name: 'Gradient Sale Tag', kind: 'svg', svg: '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120"><defs><linearGradient id="sale" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#f97316"/><stop offset="100%" stop-color="#ef4444"/></linearGradient></defs><path d="M14 34h56l36 36-36 36H14z" fill="url(#sale)"/><circle cx="38" cy="52" r="6" fill="#fff"/><text x="55" y="77" text-anchor="middle" fill="#fff" font-size="14" font-family="Inter, Arial" font-weight="700">SALE</text></svg>' },
+  { name: 'Neon Play Button', kind: 'svg', svg: '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120"><rect x="14" y="28" width="92" height="64" rx="16" fill="#0f172a" stroke="#22d3ee" stroke-width="3"/><polygon points="52,45 82,60 52,75" fill="#22d3ee"/><path d="M24 38h72" stroke="#22d3ee" stroke-opacity="0.3"/></svg>' },
+  { name: 'Glass Card', kind: 'svg', svg: '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120"><rect x="16" y="22" width="88" height="76" rx="14" fill="#e2e8f0" fill-opacity="0.55" stroke="#ffffff" stroke-width="2"/><path d="M20 36h80" stroke="#ffffff" stroke-opacity="0.7" stroke-width="3"/><circle cx="36" cy="70" r="10" fill="#93c5fd" fill-opacity="0.8"/><rect x="52" y="62" width="40" height="16" rx="8" fill="#ffffff" fill-opacity="0.75"/></svg>' },
+];
+
+const SHAPE_LIBRARY_LIMIT = 500;
+const BASE_SHAPE_NAMES = new Set(SHAPE_LIBRARY_BASE.map((shape) => shape.name.toLowerCase()));
+const SCENE_SHAPE_LIBRARY: ShapeLibraryItem[] = SCENE_SHAPES
+  .filter((shape) => !BASE_SHAPE_NAMES.has(shape.name.toLowerCase()))
+  .map((shape) => ({
+    name: shape.name,
+    kind: 'svg' as const,
+    svg: shape.svg,
+  }));
+
+const SHAPE_LIBRARY: ShapeLibraryItem[] = [
+  ...SHAPE_LIBRARY_BASE,
+  ...SHAPE_STYLED_3D,
+  ...SCENE_SHAPE_LIBRARY,
+]
+  .filter((item, idx, arr) => arr.findIndex((other) => other.name.toLowerCase() === item.name.toLowerCase()) === idx)
+  .slice(0, SHAPE_LIBRARY_LIMIT);
 
 interface CollabUser {
   id: string;
@@ -107,10 +342,9 @@ export function EditorPage() {
   const [collabEnabled, setCollabEnabled] = useState(false);
 
   // New state for advanced features
-  const [showLayers, setShowLayers] = useState(false);
-  const [showImageTuning, setShowImageTuning] = useState(false);
+  const [openPanel, setOpenPanel] = useState<SidebarPanel | null>(null);
+  const [assetTab, setAssetTab] = useState<'shapes' | 'frames'>('shapes');
   const [showIconLibrary, setShowIconLibrary] = useState(false);
-  const [showFrameLibrary, setShowFrameLibrary] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const [activeObjType, setActiveObjType] = useState<string | null>(null);
   const [brightness, setBrightness] = useState(0);
@@ -118,24 +352,36 @@ export function EditorPage() {
   const [saturation, setSaturation] = useState(0);
   const [layerRefresh, setLayerRefresh] = useState(0);
   const [bgRemovalLoading, setBgRemovalLoading] = useState(false);
-  const [showCropTools, setShowCropTools] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
   const [sendingToCompose, setSendingToCompose] = useState(false);
+  const [textColor, setTextColor] = useState('#111827');
+  const [textSize, setTextSize] = useState(32);
+  const [textWeight, setTextWeight] = useState<'normal' | 'bold'>('normal');
+  const [textItalic, setTextItalic] = useState(false);
+  const [textAlign, setTextAlign] = useState<'left' | 'center' | 'right'>('left');
+  const [canvasScale, setCanvasScale] = useState(SCALE_FACTOR);
+  const [customBgColor, setCustomBgColor] = useState('#ffffff');
+  const [customGradientA, setCustomGradientA] = useState('#2563eb');
+  const [customGradientB, setCustomGradientB] = useState('#8b5cf6');
+  const [customGradientC, setCustomGradientC] = useState('#ec4899');
+  const [shapeFillColor, setShapeFillColor] = useState('#2563eb');
+  const [shapeStrokeColor, setShapeStrokeColor] = useState('#111827');
 
   const size = getCanvasSize(platform, postType);
   const {
-    canvas, canvasReady, addText, addShape, addImage, deleteSelected,
+    canvas, canvasReady, addText, addShape, addPhotoFrame, addImage, placeImage, deleteSelected,
     resizeCanvas, setBackground, exportImage, loadJSON, toJSON,
     undo, redo, canUndo, canRedo, bringForward, sendBackward,
     copySelected, pasteClipboard, groupSelected, ungroupSelected,
     applyImageFilter, clearImageFilters, getObjects, getActiveType,
     selectObject, bringToFront, sendToBack, toggleObjectVisibility,
     toggleObjectLock, addSvgString, cropActiveImageToAspect,
-    resetActiveImageCrop, rotateSelected,
+    resetActiveImageCrop, rotateSelected, commitHistory,
   } = useCanvas('editor-canvas', size);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const loadedQueryTemplateIdRef = useRef<string | null>(null);
+  const canvasViewportRef = useRef<HTMLDivElement>(null);
   const canvasAreaRef = useRef<HTMLDivElement>(null);
   const collabClientIdRef = useRef(`client-${Math.random().toString(36).slice(2, 10)}`);
   const generatedRoomIdRef = useRef(`design-${Math.random().toString(36).slice(2, 10)}`);
@@ -149,18 +395,51 @@ export function EditorPage() {
     const c = canvas.current;
     if (!c) return;
     const onSelection = () => {
-      setActiveObjType(getActiveType());
+      const selectedType = getActiveType();
+      const active = c.getActiveObject() as any;
+      setActiveObjType(selectedType);
       setLayerRefresh((n) => n + 1);
       // Reset filter sliders when selecting a new image
       setBrightness(0);
       setContrast(0);
       setSaturation(0);
+      if (selectedType === 'text' && active) {
+        if (typeof active.fill === 'string' && active.fill) setTextColor(active.fill);
+        if (Number.isFinite(active.fontSize)) setTextSize(Math.max(1, Math.round(active.fontSize)));
+        if (typeof active.fontFamily === 'string' && active.fontFamily.trim()) setSelectedFont(active.fontFamily);
+        const weight = active.fontWeight;
+        setTextWeight(weight === 'bold' || Number(weight) >= 600 ? 'bold' : 'normal');
+        setTextItalic((active.fontStyle || '').toString().toLowerCase() === 'italic');
+        if (active.textAlign === 'left' || active.textAlign === 'center' || active.textAlign === 'right') {
+          setTextAlign(active.textAlign);
+        }
+      }
+      if ((selectedType === 'shape' || selectedType === 'group' || selectedType === 'selection') && active) {
+        const readShapeColors = (obj: any): { fill?: string; stroke?: string } => {
+          if (!obj) return {};
+          const type = (obj.type || '').toString().toLowerCase();
+          if ((type === 'group' || type === 'activeselection') && typeof obj.getObjects === 'function') {
+            const children = obj.getObjects();
+            for (const child of children) {
+              const childColors = readShapeColors(child);
+              if (childColors.fill || childColors.stroke) return childColors;
+            }
+            return {};
+          }
+          return {
+            fill: typeof obj.fill === 'string' && obj.fill !== 'none' ? obj.fill : undefined,
+            stroke: typeof obj.stroke === 'string' && obj.stroke !== 'none' ? obj.stroke : undefined,
+          };
+        };
+        const colors = readShapeColors(active);
+        if (colors.fill) setShapeFillColor(colors.fill);
+        if (colors.stroke) setShapeStrokeColor(colors.stroke);
+      }
     };
     c.on('selection:created', onSelection);
     c.on('selection:updated', onSelection);
     c.on('selection:cleared', () => {
       setActiveObjType(null);
-      setShowImageTuning(false);
     });
     c.on('object:modified', () => setLayerRefresh((n) => n + 1));
     c.on('object:added', () => setLayerRefresh((n) => n + 1));
@@ -183,32 +462,36 @@ export function EditorPage() {
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
 
       const ctrl = e.ctrlKey || e.metaKey;
+      const key = e.key.toLowerCase();
+      const active = canvas.current?.getActiveObject() as any;
+      if (active?.isEditing) return;
+      if (e.repeat && ctrl && ['z', 'y'].includes(key)) return;
 
       if (e.key === 'Delete' || e.key === 'Backspace') {
         e.preventDefault();
         deleteSelected();
-      } else if (ctrl && e.key === 'z' && !e.shiftKey) {
+      } else if (ctrl && key === 'z' && !e.shiftKey) {
         e.preventDefault();
         undo();
-      } else if (ctrl && e.key === 'z' && e.shiftKey) {
+      } else if (ctrl && key === 'z' && e.shiftKey) {
         e.preventDefault();
         redo();
-      } else if (ctrl && e.key === 'y') {
+      } else if (ctrl && key === 'y') {
         e.preventDefault();
         redo();
-      } else if (ctrl && e.key === 'c') {
+      } else if (ctrl && key === 'c') {
         e.preventDefault();
         copySelected();
-      } else if (ctrl && e.key === 'v') {
+      } else if (ctrl && key === 'v') {
         e.preventDefault();
         pasteClipboard();
-      } else if (ctrl && e.key === 'g' && !e.shiftKey) {
+      } else if (ctrl && key === 'g' && !e.shiftKey) {
         e.preventDefault();
         groupSelected();
-      } else if (ctrl && e.key === 'g' && e.shiftKey) {
+      } else if (ctrl && key === 'g' && e.shiftKey) {
         e.preventDefault();
         ungroupSelected();
-      } else if (ctrl && e.key === 'd') {
+      } else if (ctrl && key === 'd') {
         e.preventDefault();
         copySelected();
         setTimeout(() => pasteClipboard(), 50);
@@ -216,7 +499,7 @@ export function EditorPage() {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [deleteSelected, undo, redo, copySelected, pasteClipboard, groupSelected, ungroupSelected]);
+  }, [canvas, deleteSelected, undo, redo, copySelected, pasteClipboard, groupSelected, ungroupSelected]);
 
   useEffect(() => {
     if (searchParams.get('room')) return;
@@ -334,6 +617,146 @@ export function EditorPage() {
     };
   }, [canvas, canvasReady, collabEnabled, collabStatus, currentUser?.name, roomId, toJSON]);
 
+  useEffect(() => {
+    const viewport = canvasViewportRef.current;
+    if (!viewport) return;
+
+    const updateScale = () => {
+      const availableWidth = Math.max(viewport.clientWidth - 24, 1);
+      const availableHeight = Math.max(viewport.clientHeight - 24, 1);
+      const next = Math.min(1, availableWidth / size.width, availableHeight / size.height);
+      setCanvasScale(Math.max(0.2, next));
+    };
+
+    updateScale();
+    window.addEventListener('resize', updateScale);
+    const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(updateScale) : null;
+    observer?.observe(viewport);
+    return () => {
+      window.removeEventListener('resize', updateScale);
+      observer?.disconnect();
+    };
+  }, [size.height, size.width]);
+
+  const applyTextStyles = useCallback((styles: Record<string, unknown>) => {
+    const c = canvas.current;
+    if (!c) return;
+    const active = c.getActiveObject() as any;
+    if (!active) return;
+
+    const applyToObject = (obj: any) => {
+      if (!obj) return false;
+      const type = obj.type;
+      if (type !== 'i-text' && type !== 'text' && type !== 'textbox') return false;
+      obj.set(styles);
+      obj.setCoords?.();
+      return true;
+    };
+
+    let changed = false;
+    if (active.type === 'activeSelection' && typeof active.forEachObject === 'function') {
+      active.forEachObject((obj: any) => {
+        if (applyToObject(obj)) changed = true;
+      });
+    } else {
+      changed = applyToObject(active);
+    }
+
+    if (!changed) return;
+    c.requestRenderAll();
+    commitHistory();
+    setLayerRefresh((n) => n + 1);
+  }, [canvas, commitHistory]);
+
+  function handleFontFamilyChange(font: string) {
+    setSelectedFont(font);
+    applyTextStyles({ fontFamily: font });
+  }
+
+  function handleTextSizeChange(next: number) {
+    const value = Math.max(1, Math.min(400, Math.round(next || 1)));
+    setTextSize(value);
+    applyTextStyles({ fontSize: value });
+  }
+
+  function handleTextColorChange(color: string) {
+    setTextColor(color);
+    applyTextStyles({ fill: color });
+  }
+
+  function handleTextWeightChange(weight: 'normal' | 'bold') {
+    setTextWeight(weight);
+    applyTextStyles({ fontWeight: weight });
+  }
+
+  function handleTextItalicChange(value: boolean) {
+    setTextItalic(value);
+    applyTextStyles({ fontStyle: value ? 'italic' : 'normal' });
+  }
+
+  function handleTextAlignChange(align: 'left' | 'center' | 'right') {
+    setTextAlign(align);
+    applyTextStyles({ textAlign: align });
+  }
+
+  const applyShapeStyles = useCallback((styles: { fill?: string; stroke?: string }) => {
+    const c = canvas.current;
+    if (!c) return;
+    const active = c.getActiveObject() as any;
+    if (!active) return;
+
+    const applyToObject = (obj: any): boolean => {
+      if (!obj) return false;
+      const type = (obj.type || '').toString().toLowerCase();
+
+      if ((type === 'group' || type === 'activeselection') && typeof obj.getObjects === 'function') {
+        let changedInGroup = false;
+        obj.getObjects().forEach((child: any) => {
+          if (applyToObject(child)) changedInGroup = true;
+        });
+        obj.setCoords?.();
+        return changedInGroup;
+      }
+
+      let changed = false;
+      const canFill = typeof obj.fill === 'string' && obj.fill !== 'none';
+      const canStroke = typeof obj.stroke === 'string' || obj.stroke === undefined || obj.stroke === null;
+      const fillableTypes = ['rect', 'circle', 'triangle', 'ellipse', 'polygon', 'path'];
+      const strokeableTypes = ['line', 'polyline', 'path', 'polygon', 'rect', 'circle', 'triangle', 'ellipse'];
+
+      if (styles.fill && (canFill || fillableTypes.includes(type))) {
+        obj.set('fill', styles.fill);
+        changed = true;
+      }
+
+      if (styles.stroke && (canStroke || strokeableTypes.includes(type))) {
+        obj.set('stroke', styles.stroke);
+        if (!obj.strokeWidth && type !== 'line' && type !== 'polyline') {
+          obj.set('strokeWidth', 2);
+        }
+        changed = true;
+      }
+
+      obj.setCoords?.();
+      return changed;
+    };
+
+    if (!applyToObject(active)) return;
+    c.requestRenderAll();
+    commitHistory();
+    setLayerRefresh((n) => n + 1);
+  }, [canvas, commitHistory]);
+
+  function handleShapeFillChange(color: string) {
+    setShapeFillColor(color);
+    applyShapeStyles({ fill: color });
+  }
+
+  function handleShapeStrokeChange(color: string) {
+    setShapeStrokeColor(color);
+    applyShapeStyles({ stroke: color });
+  }
+
   function handlePlatformChange(p: string) {
     setPlatform(p);
     const types = getAvailablePostTypes(p);
@@ -351,7 +774,7 @@ export function EditorPage() {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = () => addImage(reader.result as string);
+    reader.onload = () => placeImage(reader.result as string);
     reader.readAsDataURL(file);
     e.target.value = '';
   }
@@ -373,16 +796,23 @@ export function EditorPage() {
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
+    const bounds = canvasAreaRef.current?.getBoundingClientRect();
+    const dropPoint = bounds
+      ? {
+        x: (e.clientX - bounds.left) / canvasScale,
+        y: (e.clientY - bounds.top) / canvasScale,
+      }
+      : undefined;
     const files = e.dataTransfer.files;
     if (files.length > 0) {
       const file = files[0];
       if (file.type.startsWith('image/')) {
         const reader = new FileReader();
-        reader.onload = () => addImage(reader.result as string);
+        reader.onload = () => placeImage(reader.result as string, dropPoint);
         reader.readAsDataURL(file);
       }
     }
-  }, [addImage]);
+  }, [canvasScale, placeImage]);
 
   function handleExport(format: 'png' | 'jpeg' | 'pdf') {
     if (format === 'pdf') {
@@ -410,9 +840,12 @@ export function EditorPage() {
     pdf.save(`postmind-${platform}-${postType}.pdf`);
   }
 
-  async function handleSendToCompose() {
+  async function pushDesignToCompose() {
     const dataUrl = exportImage('png');
-    if (!dataUrl) return;
+    if (!dataUrl) {
+      navigate('/compose');
+      return;
+    }
 
     setSendingToCompose(true);
     try {
@@ -431,6 +864,14 @@ export function EditorPage() {
     } finally {
       setSendingToCompose(false);
     }
+  }
+
+  async function handleSendToCompose() {
+    await pushDesignToCompose();
+  }
+
+  async function handleScheduleFromEditor() {
+    await pushDesignToCompose();
   }
 
   const handleLoadTemplate = useCallback((template: TemplateData) => {
@@ -586,9 +1027,40 @@ export function EditorPage() {
     cropActiveImageToAspect(aspect);
   }
 
+  const togglePanel = useCallback((panel: SidebarPanel) => {
+    setOpenPanel((current) => (current === panel ? null : panel));
+  }, []);
+
+  const openPanelOnly = useCallback((panel: SidebarPanel) => {
+    setOpenPanel(panel);
+  }, []);
+
+  const openAssetTab = useCallback((panel: 'shapes' | 'frames') => {
+    setAssetTab(panel);
+    setOpenPanel('assets');
+  }, []);
+
+  function handleShapeLibraryInsert(item: ShapeLibraryItem) {
+    if (item.kind === 'native' && item.shapeType) {
+      addShape(item.shapeType);
+      return;
+    }
+    addSvgString(item.svg);
+  }
+
+  function handleFrameLibraryInsert(frame: FrameLibraryItem) {
+    if (frame.kind === 'photo' && frame.photoType) {
+      addPhotoFrame(frame.photoType);
+      return;
+    }
+    addSvgString(frame.svg);
+  }
+
   const objects = getObjects();
-  const displayW = size.width * SCALE_FACTOR;
-  const displayH = size.height * SCALE_FACTOR;
+  const isTextSelected = activeObjType === 'text';
+  const isShapeSelected = activeObjType === 'shape' || activeObjType === 'group' || activeObjType === 'selection';
+  const displayW = Math.round(size.width * canvasScale);
+  const displayH = Math.round(size.height * canvasScale);
 
   // Toolbar button helper
   const TBtn = ({ onClick, title, children, disabled, danger }: {
@@ -606,13 +1078,13 @@ export function EditorPage() {
   );
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 min-h-[calc(100vh-8rem)]">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-heading font-bold text-neutral-900">Design Editor</h1>
           <p className="text-sm text-neutral-500 mt-1">{size.label} — {size.width}×{size.height}px</p>
         </div>
-        <div className="flex gap-2 items-center">
+        <div className="flex gap-2 items-center flex-wrap justify-end">
           {(collabEnabled || collabStatus === 'blocked' || collabStatus === 'error') && (
             <Badge variant={collabStatus === 'connected' ? 'success' : collabStatus === 'blocked' ? 'warning' : 'default'}>
               {collabStatus === 'connected'
@@ -647,6 +1119,20 @@ export function EditorPage() {
               <Link2 className="w-4 h-4" /> {shareCopied ? 'Copied' : 'Share Link'}
             </Button>
           )}
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => {
+              const promptValue = prompt('Describe the image to generate:');
+              if (promptValue) {
+                setAiImagePrompt(promptValue);
+                void handleAiImageGenerate();
+              }
+            }}
+            loading={aiImageLoading}
+          >
+            <Sparkles className="w-4 h-4" /> AI Image
+          </Button>
           <Button variant="secondary" size="sm" onClick={() => setShowSaveTemplate(true)}>
             <Save className="w-4 h-4" /> Save Template
           </Button>
@@ -655,6 +1141,9 @@ export function EditorPage() {
           </Button>
           <Button variant="secondary" size="sm" onClick={handleSendToCompose} loading={sendingToCompose}>
             <Send className="w-4 h-4" /> Send to Compose
+          </Button>
+          <Button variant="secondary" size="sm" onClick={handleScheduleFromEditor} loading={sendingToCompose}>
+            <Clock className="w-4 h-4" /> Schedule Post
           </Button>
           <Button variant="secondary" size="sm" onClick={() => handleExport('jpeg')}>
             <Download className="w-4 h-4" /> JPG
@@ -668,18 +1157,24 @@ export function EditorPage() {
         </div>
       </div>
 
-      <div className="flex gap-4">
+      <div className="flex gap-4 items-start h-[calc(100vh-12rem)]">
         {/* Left toolbar */}
-        <Card className="p-3 space-y-2 w-14 flex flex-col items-center">
-          <TBtn onClick={() => addText()} title="Add Text (T)"><Type className="w-5 h-5 text-neutral-600" /></TBtn>
-          <TBtn onClick={() => addShape('rect')} title="Rectangle"><Square className="w-5 h-5 text-neutral-600" /></TBtn>
-          <TBtn onClick={() => addShape('circle')} title="Circle"><Circle className="w-5 h-5 text-neutral-600" /></TBtn>
-          <TBtn onClick={() => addShape('line')} title="Line"><Minus className="w-5 h-5 text-neutral-600" /></TBtn>
-          <TBtn onClick={() => addShape('arrow')} title="Arrow"><MoveRight className="w-5 h-5 text-neutral-600" /></TBtn>
+        <Card className="p-3 space-y-2 w-14 h-full overflow-y-auto flex flex-col items-center shrink-0">
+          <TBtn onClick={() => openPanelOnly('text')} title="Text Styles">
+            <Type className={`w-5 h-5 ${openPanel === 'text' ? 'text-brand-blue' : 'text-neutral-600'}`} />
+          </TBtn>
+          <TBtn onClick={() => openPanelOnly('background')} title="Background">
+            <Palette className={`w-5 h-5 ${openPanel === 'background' ? 'text-brand-blue' : 'text-neutral-600'}`} />
+          </TBtn>
+          <TBtn onClick={() => openAssetTab('shapes')} title="Shape Library">
+            <Square className={`w-5 h-5 ${openPanel === 'assets' && assetTab === 'shapes' ? 'text-brand-blue' : 'text-neutral-600'}`} />
+          </TBtn>
+          <TBtn onClick={() => openAssetTab('frames')} title="Frame Library">
+            <Frame className={`w-5 h-5 ${openPanel === 'assets' && assetTab === 'frames' ? 'text-brand-blue' : 'text-neutral-600'}`} />
+          </TBtn>
           <TBtn onClick={() => fileInputRef.current?.click()} title="Upload Image"><ImageIcon className="w-5 h-5 text-neutral-600" /></TBtn>
           <TBtn onClick={() => setShowImageSearch(!showImageSearch)} title="Search Images"><Search className="w-5 h-5 text-neutral-600" /></TBtn>
           <TBtn onClick={() => setShowIconLibrary(true)} title="Icon Library"><Smile className="w-5 h-5 text-neutral-600" /></TBtn>
-          <TBtn onClick={() => setShowFrameLibrary(true)} title="Frame Library"><Frame className="w-5 h-5 text-neutral-600" /></TBtn>
           <TBtn onClick={() => { const p = prompt('Describe the image to generate:'); if (p) { setAiImagePrompt(p); handleAiImageGenerate(); } }} title="AI Generate">
             <Sparkles className="w-5 h-5 text-neutral-600" />
           </TBtn>
@@ -702,13 +1197,13 @@ export function EditorPage() {
           <TBtn onClick={sendToBack} title="Send to Back"><ChevronsDown className="w-5 h-5 text-neutral-600" /></TBtn>
 
           <div className="w-8 h-px bg-neutral-200" />
-          <TBtn onClick={() => setShowLayers(!showLayers)} title="Layers Panel">
-            <Layers className={`w-5 h-5 ${showLayers ? 'text-brand-blue' : 'text-neutral-600'}`} />
+          <TBtn onClick={() => togglePanel('layers')} title="Layers Panel">
+            <Layers className={`w-5 h-5 ${openPanel === 'layers' ? 'text-brand-blue' : 'text-neutral-600'}`} />
           </TBtn>
           {activeObjType === 'image' && (
             <>
-              <TBtn onClick={() => setShowCropTools(!showCropTools)} title="Crop Tools">
-                <Scissors className={`w-5 h-5 ${showCropTools ? 'text-brand-blue' : 'text-neutral-600'}`} />
+              <TBtn onClick={() => togglePanel('crop')} title="Crop Tools">
+                <Scissors className={`w-5 h-5 ${openPanel === 'crop' ? 'text-brand-blue' : 'text-neutral-600'}`} />
               </TBtn>
               <TBtn onClick={() => rotateSelected(-90)} title="Rotate Left">
                 <RotateCcw className="w-5 h-5 text-neutral-600" />
@@ -716,8 +1211,8 @@ export function EditorPage() {
               <TBtn onClick={() => rotateSelected(90)} title="Rotate Right">
                 <RotateCw className="w-5 h-5 text-neutral-600" />
               </TBtn>
-              <TBtn onClick={() => setShowImageTuning(!showImageTuning)} title="Image Tuning">
-                <SunMedium className={`w-5 h-5 ${showImageTuning ? 'text-brand-blue' : 'text-neutral-600'}`} />
+              <TBtn onClick={() => togglePanel('tune')} title="Image Tuning">
+                <SunMedium className={`w-5 h-5 ${openPanel === 'tune' ? 'text-brand-blue' : 'text-neutral-600'}`} />
               </TBtn>
               <TBtn onClick={handleBackgroundRemoval} title="Remove Background" disabled={bgRemovalLoading}>
                 <Eraser className="w-5 h-5 text-neutral-600" />
@@ -730,283 +1225,637 @@ export function EditorPage() {
         </Card>
 
         {/* Canvas with drag-and-drop */}
-        <div className="flex-1 flex justify-center">
-          <div
-            ref={canvasAreaRef}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-            className={`bg-white border-2 rounded-lg shadow-sm overflow-hidden transition-colors ${
-              dragActive ? 'border-brand-blue bg-brand-blue/5' : 'border-neutral-200'
-            }`}
-            style={{ width: displayW, height: displayH, position: 'relative' }}
-          >
-            {dragActive && (
-              <div className="absolute inset-0 z-10 flex items-center justify-center bg-brand-blue/10 pointer-events-none">
-                <div className="text-brand-blue font-medium text-sm flex items-center gap-2">
-                  <ImageIcon className="w-5 h-5" /> Drop image here
+        <div className="flex-1 min-w-0 h-full">
+          <div ref={canvasViewportRef} className="w-full h-full rounded-2xl border border-neutral-200 bg-neutral-50/60 p-3 flex items-center justify-center overflow-auto">
+            <div
+              ref={canvasAreaRef}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              className={`bg-white border-2 rounded-lg shadow-sm overflow-hidden transition-colors ${
+                dragActive ? 'border-brand-blue bg-brand-blue/5' : 'border-neutral-200'
+              }`}
+              style={{ width: displayW, height: displayH, position: 'relative' }}
+            >
+              {dragActive && (
+                <div className="absolute inset-0 z-10 flex items-center justify-center bg-brand-blue/10 pointer-events-none">
+                  <div className="text-brand-blue font-medium text-sm flex items-center gap-2">
+                    <ImageIcon className="w-5 h-5" /> Drop image here
+                  </div>
                 </div>
+              )}
+              <div style={{ transform: `scale(${canvasScale})`, transformOrigin: 'top left' }}>
+                <canvas id="editor-canvas" />
               </div>
-            )}
-            <div style={{ transform: `scale(${SCALE_FACTOR})`, transformOrigin: 'top left' }}>
-              <canvas id="editor-canvas" />
             </div>
           </div>
         </div>
 
         {/* Right panel */}
-        <div className="w-60 space-y-3 overflow-y-auto max-h-[80vh]">
+        <div className="w-72 h-full space-y-3 overflow-y-auto pr-1 shrink-0">
           {/* Platform & Size */}
-          <Card className="p-4 space-y-4">
-            <div>
-              <label className="block text-xs font-medium text-neutral-500 mb-1.5">Platform</label>
-              <select
-                value={platform}
-                onChange={(e) => handlePlatformChange(e.target.value)}
-                className="w-full px-2.5 py-1.5 border border-neutral-200 rounded-lg text-sm"
-              >
-                {Object.keys(CANVAS_SIZES).map((p) => (
-                  <option key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-neutral-500 mb-1.5">Post Type</label>
-              <div className="flex flex-wrap gap-1.5">
-                {getAvailablePostTypes(platform).map((type) => (
-                  <button
-                    key={type}
-                    onClick={() => handlePostTypeChange(type)}
-                    className={`px-2.5 py-1 rounded-full text-xs font-medium transition-all
-                      ${postType === type ? 'bg-brand-blue text-white' : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'}`}
+          <Card className="overflow-hidden">
+            <button
+              onClick={() => togglePanel('platform')}
+              className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-neutral-50"
+            >
+              <span className="text-xs font-medium text-neutral-700">Platform & Size</span>
+              <ChevronDown className={`w-4 h-4 text-neutral-500 transition-transform ${openPanel === 'platform' ? 'rotate-180' : ''}`} />
+            </button>
+            {openPanel === 'platform' && (
+              <div className="p-4 pt-0 space-y-4 border-t border-neutral-100">
+                <div>
+                  <label className="block text-xs font-medium text-neutral-500 mb-1.5">Platform</label>
+                  <select
+                    value={platform}
+                    onChange={(e) => handlePlatformChange(e.target.value)}
+                    className="w-full px-2.5 py-1.5 border border-neutral-200 rounded-lg text-sm"
                   >
-                    {type}
-                  </button>
-                ))}
-              </div>
-            </div>
+                    {Object.keys(CANVAS_SIZES).map((p) => (
+                      <option key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</option>
+                    ))}
+                  </select>
+                </div>
 
-            <div>
-              <label className="block text-xs font-medium text-neutral-500 mb-1.5">Font Family</label>
-              <select
-                value={selectedFont}
-                onChange={(e) => setSelectedFont(e.target.value)}
-                className="w-full px-2.5 py-1.5 border border-neutral-200 rounded-lg text-sm"
-              >
-                {GOOGLE_FONTS.map((f) => (
-                  <option key={f} value={f} style={{ fontFamily: f }}>{f}</option>
-                ))}
-              </select>
-            </div>
+                <div>
+                  <label className="block text-xs font-medium text-neutral-500 mb-1.5">Post Type</label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {getAvailablePostTypes(platform).map((type) => (
+                      <button
+                        key={type}
+                        onClick={() => handlePostTypeChange(type)}
+                        className={`px-2.5 py-1 rounded-full text-xs font-medium transition-all
+                          ${postType === type ? 'bg-brand-blue text-white' : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'}`}
+                      >
+                        {type}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-neutral-500 mb-1.5">Font Family</label>
+                  <select
+                    value={selectedFont}
+                    onChange={(e) => handleFontFamilyChange(e.target.value)}
+                    className="w-full px-2.5 py-1.5 border border-neutral-200 rounded-lg text-sm"
+                  >
+                    {GOOGLE_FONTS.map((f) => (
+                      <option key={f} value={f} style={{ fontFamily: f }}>{f}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
           </Card>
 
           {/* Background */}
-          <Card className="p-4 space-y-3">
-            <label className="block text-xs font-medium text-neutral-500">Background</label>
-            <div className="flex gap-1.5 flex-wrap">
-              {['#ffffff', '#f9fafb', '#111827', '#1e3a5f', '#2563eb', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'].map((c) => (
-                <button
-                  key={c}
-                  onClick={() => handleBgChange(c)}
-                  className={`w-7 h-7 rounded-lg border-2 transition-all ${bgColor === c ? 'border-brand-blue scale-110' : 'border-neutral-200'}`}
-                  style={{ backgroundColor: c }}
-                />
-              ))}
-            </div>
-            <label className="block text-xs font-medium text-neutral-500 mt-2">Gradients</label>
-            <div className="flex gap-1.5 flex-wrap">
-              {GRADIENT_PRESETS.map((g) => {
-                const colors = g.value.match(/#[0-9A-Fa-f]{6}/g) || [];
-                return (
-                  <button
-                    key={g.label}
-                    onClick={() => handleBgChange(g.value)}
-                    title={g.label}
-                    className="w-7 h-7 rounded-lg border-2 border-neutral-200 transition-all hover:scale-110"
-                    style={{ background: `linear-gradient(135deg, ${colors[0]}, ${colors[1]})` }}
+          <Card className="overflow-hidden">
+            <button
+              onClick={() => togglePanel('background')}
+              className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-neutral-50"
+            >
+              <span className="text-xs font-medium text-neutral-700">Background</span>
+              <ChevronDown className={`w-4 h-4 text-neutral-500 transition-transform ${openPanel === 'background' ? 'rotate-180' : ''}`} />
+            </button>
+            {openPanel === 'background' && (
+              <div className="p-4 pt-0 space-y-3 border-t border-neutral-100">
+                <div className="flex gap-1.5 flex-wrap max-h-[8.5rem] overflow-y-auto pr-1">
+                  {BACKGROUND_COLORS.map((c) => (
+                    <button
+                      key={c}
+                      onClick={() => handleBgChange(c)}
+                      className={`w-7 h-7 rounded-lg border-2 transition-all ${bgColor === c ? 'border-brand-blue scale-110' : 'border-neutral-200'}`}
+                      style={{ backgroundColor: c }}
+                    />
+                  ))}
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="color"
+                    value={customBgColor}
+                    onChange={(e) => setCustomBgColor(e.target.value)}
+                    className="w-9 h-8 px-1 py-1 border border-neutral-200 rounded-lg bg-white"
+                    title="Custom background color"
                   />
-                );
-              })}
-            </div>
+                  <Button size="sm" variant="secondary" className="text-xs flex-1" onClick={() => handleBgChange(customBgColor)}>
+                    Apply Custom Color
+                  </Button>
+                </div>
+                <label className="block text-xs font-medium text-neutral-500 mt-2">Gradients</label>
+                <div className="flex gap-1.5 flex-wrap max-h-[8.5rem] overflow-y-auto pr-1">
+                  {GRADIENT_PRESETS.map((g) => {
+                    const colors = g.value.match(/#[0-9A-Fa-f]{6}/g) || [];
+                    return (
+                      <button
+                        key={g.label}
+                        onClick={() => handleBgChange(g.value)}
+                        title={g.label}
+                        className="w-7 h-7 rounded-lg border-2 border-neutral-200 transition-all hover:scale-110"
+                        style={{ background: colors.length ? `linear-gradient(135deg, ${colors.join(', ')})` : '#e5e7eb' }}
+                      />
+                    );
+                  })}
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <input
+                    type="color"
+                    value={customGradientA}
+                    onChange={(e) => setCustomGradientA(e.target.value)}
+                    className="w-full h-8 px-1 py-1 border border-neutral-200 rounded-lg bg-white"
+                    title="Gradient color 1"
+                  />
+                  <input
+                    type="color"
+                    value={customGradientB}
+                    onChange={(e) => setCustomGradientB(e.target.value)}
+                    className="w-full h-8 px-1 py-1 border border-neutral-200 rounded-lg bg-white"
+                    title="Gradient color 2"
+                  />
+                  <input
+                    type="color"
+                    value={customGradientC}
+                    onChange={(e) => setCustomGradientC(e.target.value)}
+                    className="w-full h-8 px-1 py-1 border border-neutral-200 rounded-lg bg-white"
+                    title="Gradient color 3"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    className="text-xs"
+                    onClick={() => handleBgChange(`linear(${customGradientA}, ${customGradientB})`)}
+                  >
+                    Apply 2-Color
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    className="text-xs"
+                    onClick={() => handleBgChange(`linear(${customGradientA}, ${customGradientB}, ${customGradientC})`)}
+                  >
+                    Apply 3-Color
+                  </Button>
+                </div>
+              </div>
+            )}
+          </Card>
+
+          {/* Assets */}
+          <Card className="overflow-hidden">
+            <button
+              onClick={() => togglePanel('assets')}
+              className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-neutral-50"
+            >
+              <span className="text-xs font-medium text-neutral-700">Shapes & Frames</span>
+              <ChevronDown className={`w-4 h-4 text-neutral-500 transition-transform ${openPanel === 'assets' ? 'rotate-180' : ''}`} />
+            </button>
+            {openPanel === 'assets' && (
+              <div className="p-4 pt-0 space-y-3 border-t border-neutral-100">
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setAssetTab('shapes')}
+                    className={`flex-1 px-2 py-1 rounded-md text-xs font-medium transition-colors border ${assetTab === 'shapes' ? 'bg-neutral-900 border-neutral-900 text-white' : 'bg-white border-neutral-200 text-neutral-700 hover:bg-neutral-100'}`}
+                    style={assetTab === 'shapes' ? { backgroundColor: '#111827', color: '#ffffff', borderColor: '#111827' } : undefined}
+                  >
+                    Shapes ({SHAPE_LIBRARY.length})
+                  </button>
+                  <button
+                    onClick={() => setAssetTab('frames')}
+                    className={`flex-1 px-2 py-1 rounded-md text-xs font-medium transition-colors border ${assetTab === 'frames' ? 'bg-neutral-900 border-neutral-900 text-white' : 'bg-white border-neutral-200 text-neutral-700 hover:bg-neutral-100'}`}
+                    style={assetTab === 'frames' ? { backgroundColor: '#111827', color: '#ffffff', borderColor: '#111827' } : undefined}
+                  >
+                    Frames ({FRAME_LIBRARY.length})
+                  </button>
+                </div>
+                <div className="max-h-72 overflow-y-auto pr-1">
+                  {assetTab === 'shapes' ? (
+                    <div className="grid grid-cols-2 gap-2">
+                      {SHAPE_LIBRARY.map((item) => (
+                        <button
+                          key={item.name}
+                          onClick={() => handleShapeLibraryInsert(item)}
+                          className="flex flex-col items-center gap-1.5 p-2 rounded-lg border border-neutral-200 hover:border-brand-blue hover:shadow-sm transition-all"
+                        >
+                          <div
+                            className="w-16 h-16 flex items-center justify-center bg-neutral-50 rounded-md"
+                            dangerouslySetInnerHTML={{ __html: item.svg.replace(/width="120"/g, 'width="64"').replace(/height="120"/g, 'height="64"') }}
+                          />
+                          <span className="text-[10px] text-neutral-600 leading-tight text-center">{item.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <p className="text-[10px] text-neutral-500 px-1">Tip: drop or upload an image while selecting/dropping on a Photo Frame to auto-fit.</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {FRAME_LIBRARY.map((frame) => (
+                          <button
+                            key={frame.name}
+                            onClick={() => handleFrameLibraryInsert(frame)}
+                            className="flex flex-col items-center gap-1.5 p-2 rounded-lg border border-neutral-200 hover:border-brand-blue hover:shadow-sm transition-all"
+                          >
+                            <div
+                              className="w-16 h-16 flex items-center justify-center bg-neutral-50 rounded-md"
+                              dangerouslySetInnerHTML={{ __html: frame.svg.replace(/width="200"/g, 'width="64"').replace(/height="200"/g, 'height="64"') }}
+                            />
+                            <span className="text-[10px] text-neutral-600 leading-tight text-center">{frame.name}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </Card>
 
           {/* Quick Add */}
-          <Card className="p-4 space-y-2">
-            <label className="block text-xs font-medium text-neutral-500 mb-1">Quick Add</label>
-            <Button size="sm" variant="secondary" className="w-full text-xs" onClick={() => addText('Heading', { fontSize: 48, fontWeight: 'bold', fontFamily: selectedFont } as any)}>
-              + Heading
-            </Button>
-            <Button size="sm" variant="secondary" className="w-full text-xs" onClick={() => addText('Body text', { fontSize: 24, fontFamily: selectedFont } as any)}>
-              + Body Text
-            </Button>
-            <Button size="sm" variant="secondary" className="w-full text-xs" onClick={() => addText('Caption', { fontSize: 18, fill: '#6B7280', fontFamily: selectedFont } as any)}>
-              + Caption
-            </Button>
+          <Card className="overflow-hidden">
+            <button
+              onClick={() => togglePanel('quick')}
+              className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-neutral-50"
+            >
+              <span className="text-xs font-medium text-neutral-700">Quick Add</span>
+              <ChevronDown className={`w-4 h-4 text-neutral-500 transition-transform ${openPanel === 'quick' ? 'rotate-180' : ''}`} />
+            </button>
+            {openPanel === 'quick' && (
+              <div className="p-4 pt-0 space-y-2 border-t border-neutral-100">
+                <Button size="sm" variant="secondary" className="w-full text-xs" onClick={() => addText('Heading', { fontSize: 48, fontWeight: 'bold', fontFamily: selectedFont } as any)}>
+                  + Heading
+                </Button>
+                <Button size="sm" variant="secondary" className="w-full text-xs" onClick={() => addText('Body text', { fontSize: 24, fontFamily: selectedFont } as any)}>
+                  + Body Text
+                </Button>
+                <Button size="sm" variant="secondary" className="w-full text-xs" onClick={() => addText('Caption', { fontSize: 18, fill: '#6B7280', fontFamily: selectedFont } as any)}>
+                  + Caption
+                </Button>
+                <div className="grid grid-cols-2 gap-1.5 pt-1">
+                  <Button size="sm" variant="secondary" className="text-xs" onClick={() => addShape('rect')}>
+                    + Rectangle
+                  </Button>
+                  <Button size="sm" variant="secondary" className="text-xs" onClick={() => addShape('circle')}>
+                    + Circle
+                  </Button>
+                  <Button size="sm" variant="secondary" className="text-xs" onClick={() => handleFrameLibraryInsert(FRAME_LIBRARY[0])}>
+                    + Picture Frame
+                  </Button>
+                  <Button size="sm" variant="secondary" className="text-xs" onClick={() => handleFrameLibraryInsert(FRAME_LIBRARY[2])}>
+                    + Round Frame
+                  </Button>
+                </div>
+              </div>
+            )}
           </Card>
 
-          {/* Image Crop Tools (contextual) */}
-          {showCropTools && activeObjType === 'image' && (
-            <Card className="p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-medium text-neutral-700 flex items-center gap-1">
-                  <Scissors className="w-3.5 h-3.5" /> Crop & Rotate
-                </label>
-                <button onClick={() => setShowCropTools(false)} className="p-0.5 rounded hover:bg-neutral-100">
-                  <X className="w-3.5 h-3.5 text-neutral-400" />
-                </button>
+          {/* Text styling */}
+          <Card className="overflow-hidden">
+            <button
+              onClick={() => togglePanel('text')}
+              className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-neutral-50"
+            >
+              <span className="text-xs font-medium text-neutral-700">Text Styles</span>
+              <ChevronDown className={`w-4 h-4 text-neutral-500 transition-transform ${openPanel === 'text' ? 'rotate-180' : ''}`} />
+            </button>
+            {openPanel === 'text' && (
+              <div className="p-4 pt-0 space-y-3 border-t border-neutral-100">
+                {!isTextSelected && <span className="text-[10px] text-neutral-400">Select text to edit</span>}
+                <div>
+                  <label className="block text-[10px] text-neutral-500 mb-1">Font</label>
+                  <select
+                    value={selectedFont}
+                    onChange={(e) => handleFontFamilyChange(e.target.value)}
+                    disabled={!isTextSelected}
+                    className="w-full px-2.5 py-1.5 border border-neutral-200 rounded-lg text-xs disabled:opacity-50"
+                  >
+                    {GOOGLE_FONTS.map((f) => (
+                      <option key={f} value={f} style={{ fontFamily: f }}>{f}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[10px] text-neutral-500 mb-1">Size</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={400}
+                      value={textSize}
+                      disabled={!isTextSelected}
+                      onChange={(e) => handleTextSizeChange(parseInt(e.target.value, 10))}
+                      className="w-full px-2.5 py-1.5 border border-neutral-200 rounded-lg text-xs disabled:opacity-50"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] text-neutral-500 mb-1">Color</label>
+                    <input
+                      type="color"
+                      value={textColor}
+                      disabled={!isTextSelected}
+                      onChange={(e) => handleTextColorChange(e.target.value)}
+                      className="w-full h-8 px-1 py-1 border border-neutral-200 rounded-lg bg-white disabled:opacity-50"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <Button
+                    size="sm"
+                    variant={textWeight === 'bold' ? 'primary' : 'secondary'}
+                    className="text-xs"
+                    disabled={!isTextSelected}
+                    onClick={() => handleTextWeightChange('bold')}
+                  >
+                    <Bold className="w-3.5 h-3.5" /> Bold
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={textWeight === 'normal' ? 'primary' : 'secondary'}
+                    className="text-xs"
+                    disabled={!isTextSelected}
+                    onClick={() => handleTextWeightChange('normal')}
+                  >
+                    Normal
+                  </Button>
+                </div>
+                <div className="grid grid-cols-1 gap-1.5">
+                  <Button
+                    size="sm"
+                    variant={textItalic ? 'primary' : 'secondary'}
+                    className="text-xs"
+                    disabled={!isTextSelected}
+                    onClick={() => handleTextItalicChange(!textItalic)}
+                  >
+                    <Italic className="w-3.5 h-3.5" /> Italic
+                  </Button>
+                </div>
+                <div className="grid grid-cols-3 gap-1.5">
+                  <Button
+                    size="sm"
+                    variant={textAlign === 'left' ? 'primary' : 'secondary'}
+                    className="text-xs"
+                    disabled={!isTextSelected}
+                    onClick={() => handleTextAlignChange('left')}
+                  >
+                    <AlignLeft className="w-3.5 h-3.5" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={textAlign === 'center' ? 'primary' : 'secondary'}
+                    className="text-xs"
+                    disabled={!isTextSelected}
+                    onClick={() => handleTextAlignChange('center')}
+                  >
+                    <AlignCenter className="w-3.5 h-3.5" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={textAlign === 'right' ? 'primary' : 'secondary'}
+                    className="text-xs"
+                    disabled={!isTextSelected}
+                    onClick={() => handleTextAlignChange('right')}
+                  >
+                    <AlignRight className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
               </div>
-              <div className="grid grid-cols-2 gap-1.5">
-                <button
-                  onClick={() => handleCropPreset('square')}
-                  className="px-2 py-1.5 rounded-md text-[11px] font-medium bg-neutral-100 text-neutral-700 hover:bg-neutral-200"
-                >
-                  1:1 Square
-                </button>
-                <button
-                  onClick={() => handleCropPreset('portrait')}
-                  className="px-2 py-1.5 rounded-md text-[11px] font-medium bg-neutral-100 text-neutral-700 hover:bg-neutral-200"
-                >
-                  4:5 Portrait
-                </button>
-                <button
-                  onClick={() => handleCropPreset('landscape')}
-                  className="px-2 py-1.5 rounded-md text-[11px] font-medium bg-neutral-100 text-neutral-700 hover:bg-neutral-200"
-                >
-                  16:9 Wide
-                </button>
-                <button
-                  onClick={() => handleCropPreset('reset')}
-                  className="px-2 py-1.5 rounded-md text-[11px] font-medium bg-neutral-100 text-neutral-700 hover:bg-neutral-200"
-                >
-                  Reset Crop
-                </button>
+            )}
+          </Card>
+
+          {/* Shape styling */}
+          <Card className="overflow-hidden">
+            <button
+              onClick={() => togglePanel('shape')}
+              className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-neutral-50"
+            >
+              <span className="text-xs font-medium text-neutral-700">Shape Styles</span>
+              <ChevronDown className={`w-4 h-4 text-neutral-500 transition-transform ${openPanel === 'shape' ? 'rotate-180' : ''}`} />
+            </button>
+            {openPanel === 'shape' && (
+              <div className="p-4 pt-0 space-y-3 border-t border-neutral-100">
+                {!isShapeSelected && <span className="text-[10px] text-neutral-400">Select shape/frame to edit</span>}
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[10px] text-neutral-500 mb-1">Fill</label>
+                    <input
+                      type="color"
+                      value={shapeFillColor}
+                      disabled={!isShapeSelected}
+                      onChange={(e) => handleShapeFillChange(e.target.value)}
+                      className="w-full h-8 px-1 py-1 border border-neutral-200 rounded-lg bg-white disabled:opacity-50"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] text-neutral-500 mb-1">Border</label>
+                    <input
+                      type="color"
+                      value={shapeStrokeColor}
+                      disabled={!isShapeSelected}
+                      onChange={(e) => handleShapeStrokeChange(e.target.value)}
+                      className="w-full h-8 px-1 py-1 border border-neutral-200 rounded-lg bg-white disabled:opacity-50"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-[10px] text-neutral-500 mb-1">Quick Fill Colors</label>
+                  <div className="flex gap-1.5 flex-wrap">
+                    {SHAPE_COLOR_SWATCHES.map((color) => (
+                      <button
+                        key={`shape-fill-${color}`}
+                        disabled={!isShapeSelected}
+                        onClick={() => handleShapeFillChange(color)}
+                        className={`w-6 h-6 rounded-md border-2 transition-all disabled:opacity-40 ${shapeFillColor === color ? 'border-brand-blue scale-110' : 'border-neutral-200'}`}
+                        style={{ backgroundColor: color }}
+                      />
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-[10px] text-neutral-500 mb-1">Quick Border Colors</label>
+                  <div className="flex gap-1.5 flex-wrap">
+                    {SHAPE_COLOR_SWATCHES.map((color) => (
+                      <button
+                        key={`shape-stroke-${color}`}
+                        disabled={!isShapeSelected}
+                        onClick={() => handleShapeStrokeChange(color)}
+                        className={`w-6 h-6 rounded-md border-2 transition-all disabled:opacity-40 ${shapeStrokeColor === color ? 'border-brand-blue scale-110' : 'border-neutral-200'}`}
+                        style={{ backgroundColor: color }}
+                      />
+                    ))}
+                  </div>
+                </div>
               </div>
-              <div className="grid grid-cols-2 gap-1.5">
-                <Button size="sm" variant="secondary" className="text-xs" onClick={() => rotateSelected(-90)}>
-                  <RotateCcw className="w-3.5 h-3.5" /> Left
+            )}
+          </Card>
+
+          {/* Image Crop Tools */}
+          <Card className={`overflow-hidden ${activeObjType !== 'image' ? 'opacity-60' : ''}`}>
+            <button
+              onClick={() => activeObjType === 'image' && togglePanel('crop')}
+              disabled={activeObjType !== 'image'}
+              className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-neutral-50 disabled:cursor-not-allowed"
+            >
+              <span className="text-xs font-medium text-neutral-700">Crop & Rotate</span>
+              <ChevronDown className={`w-4 h-4 text-neutral-500 transition-transform ${openPanel === 'crop' ? 'rotate-180' : ''}`} />
+            </button>
+            {openPanel === 'crop' && activeObjType === 'image' && (
+              <div className="p-4 pt-0 space-y-3 border-t border-neutral-100">
+                <div className="grid grid-cols-2 gap-1.5">
+                  <button
+                    onClick={() => handleCropPreset('square')}
+                    className="px-2 py-1.5 rounded-md text-[11px] font-medium bg-neutral-100 text-neutral-700 hover:bg-neutral-200"
+                  >
+                    1:1 Square
+                  </button>
+                  <button
+                    onClick={() => handleCropPreset('portrait')}
+                    className="px-2 py-1.5 rounded-md text-[11px] font-medium bg-neutral-100 text-neutral-700 hover:bg-neutral-200"
+                  >
+                    4:5 Portrait
+                  </button>
+                  <button
+                    onClick={() => handleCropPreset('landscape')}
+                    className="px-2 py-1.5 rounded-md text-[11px] font-medium bg-neutral-100 text-neutral-700 hover:bg-neutral-200"
+                  >
+                    16:9 Wide
+                  </button>
+                  <button
+                    onClick={() => handleCropPreset('reset')}
+                    className="px-2 py-1.5 rounded-md text-[11px] font-medium bg-neutral-100 text-neutral-700 hover:bg-neutral-200"
+                  >
+                    Reset Crop
+                  </button>
+                </div>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <Button size="sm" variant="secondary" className="text-xs" onClick={() => rotateSelected(-90)}>
+                    <RotateCcw className="w-3.5 h-3.5" /> Left
+                  </Button>
+                  <Button size="sm" variant="secondary" className="text-xs" onClick={() => rotateSelected(90)}>
+                    <RotateCw className="w-3.5 h-3.5" /> Right
+                  </Button>
+                </div>
+              </div>
+            )}
+          </Card>
+
+          {/* Image Fine-Tuning */}
+          <Card className={`overflow-hidden ${activeObjType !== 'image' ? 'opacity-60' : ''}`}>
+            <button
+              onClick={() => activeObjType === 'image' && togglePanel('tune')}
+              disabled={activeObjType !== 'image'}
+              className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-neutral-50 disabled:cursor-not-allowed"
+            >
+              <span className="text-xs font-medium text-neutral-700">Image Tuning</span>
+              <ChevronDown className={`w-4 h-4 text-neutral-500 transition-transform ${openPanel === 'tune' ? 'rotate-180' : ''}`} />
+            </button>
+            {openPanel === 'tune' && activeObjType === 'image' && (
+              <div className="p-4 pt-0 space-y-3 border-t border-neutral-100">
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[10px] text-neutral-500 flex items-center gap-1"><SunMedium className="w-3 h-3" /> Brightness</span>
+                    <span className="text-[10px] text-neutral-400">{Math.round(brightness * 100)}%</span>
+                  </div>
+                  <input type="range" min="-1" max="1" step="0.05" value={brightness}
+                    onChange={(e) => handleBrightnessChange(parseFloat(e.target.value))}
+                    className="w-full h-1.5 accent-brand-blue" />
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[10px] text-neutral-500 flex items-center gap-1"><Contrast className="w-3 h-3" /> Contrast</span>
+                    <span className="text-[10px] text-neutral-400">{Math.round(contrast * 100)}%</span>
+                  </div>
+                  <input type="range" min="-1" max="1" step="0.05" value={contrast}
+                    onChange={(e) => handleContrastChange(parseFloat(e.target.value))}
+                    className="w-full h-1.5 accent-brand-blue" />
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[10px] text-neutral-500 flex items-center gap-1"><Droplets className="w-3 h-3" /> Saturation</span>
+                    <span className="text-[10px] text-neutral-400">{Math.round(saturation * 100)}%</span>
+                  </div>
+                  <input type="range" min="-1" max="1" step="0.05" value={saturation}
+                    onChange={(e) => handleSaturationChange(parseFloat(e.target.value))}
+                    className="w-full h-1.5 accent-brand-blue" />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] text-neutral-500 mb-1.5">Preset Filters</label>
+                  <div className="flex gap-1.5 flex-wrap">
+                    {[
+                      { label: 'None', value: 'none' },
+                      { label: 'B&W', value: 'grayscale' },
+                      { label: 'Sepia', value: 'sepia' },
+                    ].map((p) => (
+                      <button
+                        key={p.value}
+                        onClick={() => handlePresetFilter(p.value)}
+                        className="px-2 py-1 rounded-md text-[10px] font-medium bg-neutral-100 text-neutral-600 hover:bg-neutral-200 transition-colors"
+                      >
+                        {p.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <Button size="sm" variant="ghost" className="w-full text-xs" onClick={() => { clearImageFilters(); setBrightness(0); setContrast(0); setSaturation(0); }}>
+                  Reset All Filters
                 </Button>
-                <Button size="sm" variant="secondary" className="text-xs" onClick={() => rotateSelected(90)}>
-                  <RotateCw className="w-3.5 h-3.5" /> Right
-                </Button>
               </div>
-            </Card>
-          )}
-
-          {/* Image Fine-Tuning (contextual) */}
-          {showImageTuning && activeObjType === 'image' && (
-            <Card className="p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-medium text-neutral-700">Image Tuning</label>
-                <button onClick={() => setShowImageTuning(false)} className="p-0.5 rounded hover:bg-neutral-100">
-                  <X className="w-3.5 h-3.5 text-neutral-400" />
-                </button>
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-[10px] text-neutral-500 flex items-center gap-1"><SunMedium className="w-3 h-3" /> Brightness</span>
-                  <span className="text-[10px] text-neutral-400">{Math.round(brightness * 100)}%</span>
-                </div>
-                <input type="range" min="-1" max="1" step="0.05" value={brightness}
-                  onChange={(e) => handleBrightnessChange(parseFloat(e.target.value))}
-                  className="w-full h-1.5 accent-brand-blue" />
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-[10px] text-neutral-500 flex items-center gap-1"><Contrast className="w-3 h-3" /> Contrast</span>
-                  <span className="text-[10px] text-neutral-400">{Math.round(contrast * 100)}%</span>
-                </div>
-                <input type="range" min="-1" max="1" step="0.05" value={contrast}
-                  onChange={(e) => handleContrastChange(parseFloat(e.target.value))}
-                  className="w-full h-1.5 accent-brand-blue" />
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-[10px] text-neutral-500 flex items-center gap-1"><Droplets className="w-3 h-3" /> Saturation</span>
-                  <span className="text-[10px] text-neutral-400">{Math.round(saturation * 100)}%</span>
-                </div>
-                <input type="range" min="-1" max="1" step="0.05" value={saturation}
-                  onChange={(e) => handleSaturationChange(parseFloat(e.target.value))}
-                  className="w-full h-1.5 accent-brand-blue" />
-              </div>
-
-              <div>
-                <label className="block text-[10px] text-neutral-500 mb-1.5">Preset Filters</label>
-                <div className="flex gap-1.5 flex-wrap">
-                  {[
-                    { label: 'None', value: 'none' },
-                    { label: 'B&W', value: 'grayscale' },
-                    { label: 'Sepia', value: 'sepia' },
-                  ].map((p) => (
-                    <button
-                      key={p.value}
-                      onClick={() => handlePresetFilter(p.value)}
-                      className="px-2 py-1 rounded-md text-[10px] font-medium bg-neutral-100 text-neutral-600 hover:bg-neutral-200 transition-colors"
-                    >
-                      {p.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <Button size="sm" variant="ghost" className="w-full text-xs" onClick={() => { clearImageFilters(); setBrightness(0); setContrast(0); setSaturation(0); }}>
-                Reset All Filters
-              </Button>
-            </Card>
-          )}
+            )}
+          </Card>
 
           {/* Layer Management Panel */}
-          {showLayers && (
-            <Card className="p-4 space-y-2">
-              <div className="flex items-center justify-between mb-1">
-                <label className="text-xs font-medium text-neutral-700 flex items-center gap-1">
-                  <Layers className="w-3.5 h-3.5" /> Layers ({objects.length})
-                </label>
-                <button onClick={() => setShowLayers(false)} className="p-0.5 rounded hover:bg-neutral-100">
-                  <X className="w-3.5 h-3.5 text-neutral-400" />
-                </button>
-              </div>
-              <div className="space-y-1 max-h-48 overflow-y-auto">
-                {[...objects].reverse().map((obj, idx) => {
-                  const realIdx = objects.length - 1 - idx;
-                  const objType = (obj as any).type || 'object';
-                  const isText = objType === 'i-text' || objType === 'text';
-                  const label = isText ? ((obj as any).text || 'Text').slice(0, 18) : `${objType} ${realIdx + 1}`;
-                  const isLocked = obj.lockMovementX;
+          <Card className="overflow-hidden">
+            <button
+              onClick={() => togglePanel('layers')}
+              className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-neutral-50"
+            >
+              <span className="text-xs font-medium text-neutral-700">Layers ({objects.length})</span>
+              <ChevronDown className={`w-4 h-4 text-neutral-500 transition-transform ${openPanel === 'layers' ? 'rotate-180' : ''}`} />
+            </button>
+            {openPanel === 'layers' && (
+              <div className="p-4 pt-0 space-y-2 border-t border-neutral-100">
+                <div className="space-y-1 max-h-48 overflow-y-auto">
+                  {[...objects].reverse().map((obj, idx) => {
+                    const realIdx = objects.length - 1 - idx;
+                    const objType = (obj as any).type || 'object';
+                    const isText = objType === 'i-text' || objType === 'text';
+                    const label = isText ? ((obj as any).text || 'Text').slice(0, 18) : `${objType} ${realIdx + 1}`;
+                    const isLocked = obj.lockMovementX;
 
-                  return (
-                    <div
-                      key={realIdx}
-                      onClick={() => selectObject(obj)}
-                      className="flex items-center gap-1.5 px-2 py-1.5 rounded-md text-[11px] hover:bg-neutral-50 cursor-pointer group transition-colors"
-                    >
-                      <span className="flex-1 truncate text-neutral-700">{label}</span>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); toggleObjectVisibility(obj); }}
-                        className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-neutral-200 transition-opacity"
-                        title={obj.visible === false ? 'Show' : 'Hide'}
+                    return (
+                      <div
+                        key={realIdx}
+                        onClick={() => selectObject(obj)}
+                        className="flex items-center gap-1.5 px-2 py-1.5 rounded-md text-[11px] hover:bg-neutral-50 cursor-pointer group transition-colors"
                       >
-                        {obj.visible === false ? <EyeOff className="w-3 h-3 text-neutral-400" /> : <Eye className="w-3 h-3 text-neutral-500" />}
-                      </button>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); toggleObjectLock(obj); }}
-                        className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-neutral-200 transition-opacity"
-                        title={isLocked ? 'Unlock' : 'Lock'}
-                      >
-                        {isLocked ? <Lock className="w-3 h-3 text-neutral-400" /> : <Unlock className="w-3 h-3 text-neutral-500" />}
-                      </button>
-                    </div>
-                  );
-                })}
-                {objects.length === 0 && (
-                  <p className="text-[10px] text-neutral-400 text-center py-2">No objects on canvas</p>
-                )}
+                        <span className="flex-1 truncate text-neutral-700">{label}</span>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); toggleObjectVisibility(obj); }}
+                          className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-neutral-200 transition-opacity"
+                          title={obj.visible === false ? 'Show' : 'Hide'}
+                        >
+                          {obj.visible === false ? <EyeOff className="w-3 h-3 text-neutral-400" /> : <Eye className="w-3 h-3 text-neutral-500" />}
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); toggleObjectLock(obj); }}
+                          className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-neutral-200 transition-opacity"
+                          title={isLocked ? 'Unlock' : 'Lock'}
+                        >
+                          {isLocked ? <Lock className="w-3 h-3 text-neutral-400" /> : <Unlock className="w-3 h-3 text-neutral-500" />}
+                        </button>
+                      </div>
+                    );
+                  })}
+                  {objects.length === 0 && (
+                    <p className="text-[10px] text-neutral-400 text-center py-2">No objects on canvas</p>
+                  )}
+                </div>
               </div>
-            </Card>
-          )}
+            )}
+          </Card>
         </div>
       </div>
 
@@ -1092,7 +1941,7 @@ export function EditorPage() {
                 {imageResults.map((img, i) => (
                   <button
                     key={i}
-                    onClick={() => { addImage(img.url); setShowImageSearch(false); }}
+                    onClick={() => { placeImage(img.url); setShowImageSearch(false); }}
                     className="rounded-lg overflow-hidden border border-neutral-200 hover:border-brand-blue hover:shadow-md transition-all"
                   >
                     <img src={img.thumb} alt={img.alt} className="w-full h-32 object-cover" />
@@ -1179,33 +2028,6 @@ export function EditorPage() {
         </div>
       )}
 
-      {/* Frame Library Modal */}
-      {showFrameLibrary && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
-          <Card className="w-full max-w-2xl max-h-[70vh] overflow-hidden flex flex-col">
-            <div className="flex items-center justify-between p-4 border-b border-neutral-100">
-              <h2 className="text-lg font-heading font-bold text-neutral-900">Frame Library</h2>
-              <button onClick={() => setShowFrameLibrary(false)} className="p-1 rounded hover:bg-neutral-100">
-                <X className="w-5 h-5 text-neutral-500" />
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-4">
-              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
-                {FRAME_LIBRARY.map((frame) => (
-                  <button
-                    key={frame.name}
-                    onClick={() => { addSvgString(frame.svg); setShowFrameLibrary(false); }}
-                    className="flex flex-col items-center gap-2 p-3 rounded-xl border border-neutral-200 hover:border-brand-blue hover:shadow-md transition-all hover:bg-neutral-50"
-                  >
-                    <div className="w-14 h-14" dangerouslySetInnerHTML={{ __html: frame.svg.replace(/width="200"/g, 'width="56"').replace(/height="200"/g, 'height="56"') }} />
-                    <span className="text-[9px] text-neutral-500 truncate w-full text-center">{frame.name}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </Card>
-        </div>
-      )}
     </div>
   );
 }

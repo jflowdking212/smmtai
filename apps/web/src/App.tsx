@@ -4,7 +4,9 @@ import { lazy, Suspense, useEffect } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { ProtectedRoute } from '@/components/layout/ProtectedRoute';
+import { AdminRoute } from '@/components/layout/AdminRoute';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { AIChatbot } from '@/components/AIChatbot';
 import { ToastProvider } from '@/components/Toast';
 import { ThemeProvider } from '@/components/ThemeProvider';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
@@ -18,6 +20,9 @@ import { AIPage } from '@/pages/AIPage';
 import { SettingsPage } from '@/pages/SettingsPage';
 import { BillingPage } from '@/pages/BillingPage';
 import { HelpPage } from '@/pages/HelpPage';
+import { EntrepreneursPage } from '@/pages/EntrepreneursPage';
+import { InboxPage } from '@/pages/InboxPage';
+import { CommentsPage } from '@/pages/CommentsPage';
 import { ConversationsPage } from '@/pages/ConversationsPage';
 import { KnowledgeBasePage } from '@/pages/KnowledgeBasePage';
 import { LandingPage } from '@/pages/LandingPage';
@@ -37,6 +42,7 @@ import { OAuthCallbackPage } from '@/pages/auth/OAuthCallbackPage';
 import { AdminDashboardPage } from '@/pages/admin/AdminDashboardPage';
 import { AdminUsersPage } from '@/pages/admin/AdminUsersPage';
 import { AdminPlansPage } from '@/pages/admin/AdminPlansPage';
+import { AdminCouponsPage } from '@/pages/admin/AdminCouponsPage';
 import { AdminAnalyticsPage } from '@/pages/admin/AdminAnalyticsPage';
 import { AdminMessagesPage } from '@/pages/admin/AdminMessagesPage';
 import { AdminSettingsPage } from '@/pages/admin/AdminSettingsPage';
@@ -124,6 +130,9 @@ export default function App() {
             <Route path="/calendar" element={<CalendarPage />} />
             <Route path="/analytics" element={<UpgradeGate feature="analytics"><Suspense fallback={<div className="p-8 text-center text-neutral-400">Loading analytics...</div>}><AnalyticsPage /></Suspense></UpgradeGate>} />
             <Route path="/connections" element={<ConnectionsPage />} />
+            <Route path="/entrepreneurs" element={<EntrepreneursPage />} />
+            <Route path="/inbox" element={<InboxPage />} />
+            <Route path="/comments" element={<CommentsPage />} />
             <Route path="/templates" element={<TemplatesPage />} />
             <Route path="/editor" element={<Suspense fallback={<div className="p-8 text-center text-neutral-400">Loading editor...</div>}><EditorPage /></Suspense>} />
             <Route path="/ai" element={<AIPage />} />
@@ -133,17 +142,18 @@ export default function App() {
             <Route path="/help" element={<HelpPage />} />
           </Route>
 
-          {/* Admin routes — separate layout */}
+          {/* Admin routes — owner only */}
           <Route
             element={
-              <ProtectedRoute>
+              <AdminRoute>
                 <AdminLayout />
-              </ProtectedRoute>
+              </AdminRoute>
             }
           >
             <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
             <Route path="/admin/users" element={<AdminUsersPage />} />
             <Route path="/admin/plans" element={<AdminPlansPage />} />
+            <Route path="/admin/coupons" element={<AdminCouponsPage />} />
             <Route path="/admin/analytics" element={<AdminAnalyticsPage />} />
             <Route path="/admin/messages" element={<AdminMessagesPage />} />
             <Route path="/admin/conversations" element={<ConversationsPage />} />
@@ -152,6 +162,7 @@ export default function App() {
             <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
           </Route>
               </Routes>
+              <AIChatbot />
             </BrowserRouter>
           </QueryClientProvider>
         </ToastProvider>

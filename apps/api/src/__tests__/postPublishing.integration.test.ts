@@ -225,7 +225,7 @@ describe('PostService publish status integration', () => {
         content: 'Video expected',
         platforms: [{
           connectionId: 'social_connection_2',
-          platform: 'tiktok',
+          platform: 'youtube',
         }],
         mediaUrls: ['https://cdn.example.com/post-image.png'],
         isDraft: false,

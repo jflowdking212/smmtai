@@ -47,3 +47,16 @@ export function toLocalDateTimeInput(value: string | null | undefined): string {
   const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60 * 1000);
   return localDate.toISOString().slice(0, 16);
 }
+
+export function toLocalDateTimeInputFromDate(value: Date): string {
+  if (!(value instanceof Date) || Number.isNaN(value.getTime())) return '';
+  const localDate = new Date(value.getTime() - value.getTimezoneOffset() * 60 * 1000);
+  return localDate.toISOString().slice(0, 16);
+}
+
+export function toUtcIsoFromLocalDateTimeInput(value: string | null | undefined): string | undefined {
+  if (!value) return undefined;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return undefined;
+  return date.toISOString();
+}

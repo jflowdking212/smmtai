@@ -6,9 +6,26 @@ import { authService } from '../services/auth.service.js';
 import { config } from '../config/index.js';
 import { changePlanSchema, publicCheckoutSchema } from '../utils/validators.js';
 import { getEffectiveLimits } from '../services/admin-settings.service.js';
+import { couponService } from '../services/coupon.service.js';
 import { SUBSCRIPTION_LIMITS, type SubscriptionTier } from '@ee-postmind/shared';
 
 export const billingRouter = Router();
+
+// Public coupon preview (for link-based checkout UX)
+billingRouter.get(
+  '/coupons/:code',
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const rawCode = req.params.code;
+      const code = (Array.isArray(rawCode) ? rawCode[0] : rawCode || '').trim();
+      const priceKey = typeof req.query.priceKey === 'string' ? req.query.priceKey : undefined;
+      const data = await couponService.previewCoupon(code, priceKey);
+      res.json({ success: true, data });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
 
 // Public checkout (new user purchase flow)
 billingRouter.post(
@@ -16,13 +33,29 @@ billingRouter.post(
   validate(publicCheckoutSchema),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { name, email, priceKey } = req.body as { name: string; email: string; priceKey: string };
+      const { name, email, priceKey, couponCode } = req.body as {
+        name: string;
+        email: string;
+        priceKey: string;
+        couponCode?: string;
+      };
       const provisioned = await authService.provisionCheckoutAccount({ name, email });
+      const cancelParams = new URLSearchParams({
+        canceled: '1',
+        priceKey,
+      });
+      if (couponCode?.trim()) {
+        cancelParams.set('coupon', couponCode.trim());
+      }
       const url = await stripeService.createCheckoutSession(
         provisioned.workspaceId,
         priceKey,
         `${config.frontend.url}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
-        `${config.frontend.url}/checkout?canceled=1&priceKey=${encodeURIComponent(priceKey)}`,
+        `${config.frontend.url}/checkout?${cancelParams.toString()}`,
+        {
+          userId: provisioned.user.id,
+          couponCode: couponCode?.trim() || undefined,
+        },
       );
       res.json({ success: true, data: { url } });
     } catch (err) {
@@ -85,14 +118,15 @@ billingRouter.post(
         });
       }
 
-      const { tier, priceKey } = req.body as { tier?: string; priceKey?: string };
+      const { tier, priceKey, couponCode } = req.body as { tier?: string; priceKey?: string; couponCode?: string };
       const result = await stripeService.changePlan(
         req.workspaceId,
-        { tier, priceKey },
+        { tier, priceKey, couponCode: couponCode?.trim() || undefined },
         {
           checkoutSuccessUrl: `${config.frontend.url}/billing?success=true`,
           checkoutCancelUrl: `${config.frontend.url}/billing?canceled=true`,
         },
+        req.userId,
       );
 
       res.json({ success: true, data: result });
@@ -115,7 +149,7 @@ billingRouter.post(
         });
       }
 
-      const { priceKey } = req.body;
+      const { priceKey, couponCode } = req.body as { priceKey?: string; couponCode?: string };
       if (!priceKey) {
         return res.status(400).json({
           success: false,
@@ -128,6 +162,10 @@ billingRouter.post(
         priceKey,
         `${config.frontend.url}/billing?success=true`,
         `${config.frontend.url}/billing?canceled=true`,
+        {
+          userId: req.userId,
+          couponCode: couponCode?.trim() || undefined,
+        },
       );
 
       res.json({ success: true, data: { url } });

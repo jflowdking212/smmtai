@@ -3,6 +3,7 @@ import { config } from '../config/index.js';
 import { prisma } from '../config/database.js';
 import { AppError } from '../middleware/errorHandler.js';
 import { emailService } from './email.service.js';
+import { couponService } from './coupon.service.js';
 
 let _stripe: Stripe | null = null;
 
@@ -70,34 +71,105 @@ export class StripeService {
     priceKey: string,
     successUrl: string,
     cancelUrl: string,
+    options?: {
+      userId?: string;
+      couponCode?: string;
+    },
   ): Promise<string> {
     const priceId = PRICE_IDS[priceKey];
     if (!priceId) throw new AppError('Invalid price plan', 400, 'INVALID_PRICE');
 
     const customerId = await this.getOrCreateCustomer(workspaceId);
+    let couponRedemptionId: string | undefined;
+    let couponCode: string | undefined;
+    let discountPercent: number | null = null;
+    let discountDurationMonths: number | null = null;
+    let requireCardForFreeCheckout = true;
+    let trialPeriodDays = 14;
 
-    const session = await getStripe().checkout.sessions.create({
-      customer: customerId,
-      mode: 'subscription',
-      payment_method_types: ['card'],
-      line_items: [{ price: priceId, quantity: 1 }],
-      success_url: successUrl,
-      cancel_url: cancelUrl,
-      subscription_data: {
-        trial_period_days: 14,
-        metadata: { workspaceId },
-      },
-      metadata: { workspaceId },
-      allow_promotion_codes: true,
-    });
+    if (options?.couponCode) {
+      if (!options.userId) {
+        throw new AppError('Authenticated user context is required for coupon redemption', 400, 'COUPON_USER_REQUIRED');
+      }
+      const reservation = await couponService.reserveForCheckout({
+        code: options.couponCode,
+        userId: options.userId,
+        workspaceId,
+        priceKey,
+      });
+      couponRedemptionId = reservation.redemptionId;
+      couponCode = reservation.code;
+      discountPercent = reservation.discountPercent;
+      discountDurationMonths = reservation.discountDurationMonths;
+      requireCardForFreeCheckout = reservation.requireCardForFreeCheckout;
+      trialPeriodDays = reservation.freeDurationDays ?? 14;
+    }
 
-    return session.url!;
+    try {
+      let stripeCouponId: string | undefined;
+      if (discountPercent && discountPercent > 0) {
+        const stripeCoupon = await getStripe().coupons.create({
+          duration: discountDurationMonths && discountDurationMonths > 0 ? 'repeating' : 'forever',
+          duration_in_months: discountDurationMonths && discountDurationMonths > 0 ? discountDurationMonths : undefined,
+          percent_off: discountPercent,
+          name: couponCode ? `EE PostMind ${couponCode}` : 'EE PostMind Discount',
+          metadata: {
+            workspaceId,
+            couponRedemptionId: couponRedemptionId || '',
+            couponCode: couponCode || '',
+          },
+        });
+        stripeCouponId = stripeCoupon.id;
+      }
+
+      const freeAtCheckout = (trialPeriodDays > 0) || ((discountPercent ?? 0) >= 100);
+      const paymentMethodCollection: 'always' | 'if_required' = (!requireCardForFreeCheckout && freeAtCheckout)
+        ? 'if_required'
+        : 'always';
+
+      const session = await getStripe().checkout.sessions.create({
+        customer: customerId,
+        mode: 'subscription',
+        payment_method_collection: paymentMethodCollection,
+        payment_method_types: ['card'],
+        line_items: [{ price: priceId, quantity: 1 }],
+        success_url: successUrl,
+        cancel_url: cancelUrl,
+        discounts: stripeCouponId ? [{ coupon: stripeCouponId }] : undefined,
+        subscription_data: {
+          trial_period_days: trialPeriodDays > 0 ? trialPeriodDays : undefined,
+          metadata: {
+            workspaceId,
+            ...(couponRedemptionId ? { couponRedemptionId } : {}),
+            ...(couponCode ? { couponCode } : {}),
+          },
+        },
+        metadata: {
+          workspaceId,
+          ...(couponRedemptionId ? { couponRedemptionId } : {}),
+          ...(couponCode ? { couponCode } : {}),
+        },
+        allow_promotion_codes: true,
+      });
+
+      if (couponRedemptionId) {
+        await couponService.bindCheckoutSession(couponRedemptionId, session.id);
+      }
+
+      return session.url!;
+    } catch (error) {
+      if (couponRedemptionId) {
+        await couponService.releaseReservation(couponRedemptionId);
+      }
+      throw error;
+    }
   }
 
   async changePlan(
     workspaceId: string,
-    input: { tier?: string; priceKey?: string },
+    input: { tier?: string; priceKey?: string; couponCode?: string },
     urls: { checkoutSuccessUrl: string; checkoutCancelUrl: string },
+    userId?: string,
   ): Promise<{ action: 'redirect'; url: string } | ({ action: 'updated' } & Awaited<ReturnType<StripeService['getSubscriptionStatus']>>)> {
     const subscription = await prisma.subscription.findUnique({ where: { workspaceId } });
     if (!subscription) throw new AppError('Subscription not found', 404, 'SUB_NOT_FOUND');
@@ -128,8 +200,20 @@ export class StripeService {
         priceKey,
         urls.checkoutSuccessUrl,
         urls.checkoutCancelUrl,
+        {
+          userId,
+          couponCode: input.couponCode,
+        },
       );
       return { action: 'redirect', url };
+    }
+
+    if (input.couponCode) {
+      throw new AppError(
+        'Coupons are only supported when starting a new paid checkout. This workspace already has an active paid subscription.',
+        400,
+        'COUPON_NOT_SUPPORTED_FOR_ACTIVE_SUBSCRIPTION',
+      );
     }
 
     const priceId = PRICE_IDS[priceKey];
@@ -245,6 +329,12 @@ export class StripeService {
         },
       });
     }
+
+    await couponService.finalizeReservationFromCheckoutSession({
+      id: session.id,
+      metadata: session.metadata as Record<string, string> | null,
+      subscription: session.subscription as string | null,
+    });
   }
 
   private async handleSubscriptionUpdated(sub: Stripe.Subscription) {

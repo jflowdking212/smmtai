@@ -6,6 +6,12 @@ import { ComposePage } from '../pages/ComposePage';
 const mockApi = vi.hoisted(() => ({
   connections: {
     list: vi.fn(),
+    facebookPages: vi.fn(),
+    entreprenrsPages: vi.fn(),
+    chrxstiansPages: vi.fn(),
+    chrxstiansGroups: vi.fn(),
+    iohahPages: vi.fn(),
+    iohahGroups: vi.fn(),
   },
   posts: {
     list: vi.fn(),
@@ -65,6 +71,12 @@ describe('ComposePage draft flows', () => {
     window.sessionStorage.clear();
 
     mockApi.connections.list.mockResolvedValue({ success: true, data: baseConnection });
+    mockApi.connections.facebookPages.mockResolvedValue({ success: true, data: [] });
+    mockApi.connections.entreprenrsPages.mockResolvedValue({ success: true, data: [] });
+    mockApi.connections.chrxstiansPages.mockResolvedValue({ success: true, data: [] });
+    mockApi.connections.chrxstiansGroups.mockResolvedValue({ success: true, data: [] });
+    mockApi.connections.iohahPages.mockResolvedValue({ success: true, data: [] });
+    mockApi.connections.iohahGroups.mockResolvedValue({ success: true, data: [] });
     mockApi.posts.create.mockResolvedValue({ success: true, data: { id: 'draft-autosave-1' } });
     mockApi.posts.update.mockResolvedValue({ success: true, data: {} });
     mockApi.posts.get.mockResolvedValue({ success: true, data: makeDraft('draft-1', 'Loaded draft content') });

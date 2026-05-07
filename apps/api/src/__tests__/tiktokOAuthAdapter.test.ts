@@ -8,6 +8,8 @@ const ORIGINAL_TIKTOK_REDIRECT_URI = process.env.TIKTOK_REDIRECT_URI;
 const ORIGINAL_TIKTOK_CLIENT_ID = process.env.TIKTOK_CLIENT_ID;
 const ORIGINAL_TIKTOK_APP_SECRET = process.env.TIKTOK_APP_SECRET;
 const ORIGINAL_TIKTOK_CALLBACK_URL = process.env.TIKTOK_CALLBACK_URL;
+const ORIGINAL_TIKTOK_AUTH_SCOPE = process.env.TIKTOK_AUTH_SCOPE;
+const ORIGINAL_TIKTOK_SCOPES = process.env.TIKTOK_SCOPES;
 
 function buildPkceCodeVerifier(state: string, clientSecret: string, clientKey: string): string {
   return crypto
@@ -32,6 +34,8 @@ describe('TikTokAdapter OAuth', () => {
     process.env.TIKTOK_CLIENT_KEY = 'tiktok-client-key';
     process.env.TIKTOK_CLIENT_SECRET = 'tiktok-client-secret';
     process.env.TIKTOK_REDIRECT_URI = 'http://localhost:4016/api/v1/connections/tiktok/callback';
+    process.env.TIKTOK_AUTH_SCOPE = '';
+    process.env.TIKTOK_SCOPES = '';
   });
 
   afterEach(() => {
@@ -42,6 +46,8 @@ describe('TikTokAdapter OAuth', () => {
     process.env.TIKTOK_CLIENT_ID = ORIGINAL_TIKTOK_CLIENT_ID;
     process.env.TIKTOK_APP_SECRET = ORIGINAL_TIKTOK_APP_SECRET;
     process.env.TIKTOK_CALLBACK_URL = ORIGINAL_TIKTOK_CALLBACK_URL;
+    process.env.TIKTOK_AUTH_SCOPE = ORIGINAL_TIKTOK_AUTH_SCOPE;
+    process.env.TIKTOK_SCOPES = ORIGINAL_TIKTOK_SCOPES;
   });
 
   it('builds OAuth URL with configured callback URI', () => {
@@ -57,6 +63,8 @@ describe('TikTokAdapter OAuth', () => {
     expect(authUrl.searchParams.get('client_key')).toBe(process.env.TIKTOK_CLIENT_KEY);
     expect(authUrl.searchParams.get('redirect_uri')).toBe(process.env.TIKTOK_REDIRECT_URI);
     expect(authUrl.searchParams.get('response_type')).toBe('code');
+    expect(authUrl.searchParams.get('scope')).toBe('user.info.profile,user.info.stats,video.list,video.publish');
+    expect(authUrl.searchParams.get('disable_auto_auth')).toBe('1');
     expect(authUrl.searchParams.get('code_challenge_method')).toBe('S256');
     expect(authUrl.searchParams.get('code_challenge')).toBe(buildPkceCodeChallenge(expectedVerifier));
   });
@@ -73,6 +81,12 @@ describe('TikTokAdapter OAuth', () => {
 
     expect(authUrl.searchParams.get('client_key')).toBe(process.env.TIKTOK_CLIENT_ID);
     expect(authUrl.searchParams.get('redirect_uri')).toBe(process.env.TIKTOK_CALLBACK_URL);
+  });
+
+  it('accepts custom OAuth scopes from environment', () => {
+    process.env.TIKTOK_AUTH_SCOPE = 'user.info.profile video.list  video.list';
+    const authUrl = new URL(new TikTokAdapter().getAuthUrl('signed-state-token'));
+    expect(authUrl.searchParams.get('scope')).toBe('user.info.profile,video.list');
   });
 
   it('exchanges auth code using configured callback URI', async () => {

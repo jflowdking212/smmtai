@@ -1,0 +1,96 @@
+Goal:
+Enable external publishing from EE PostMind to Iohah timeline, page, and group.
+Current issue: auth endpoints work, but publish endpoints either 404 or return "Bad Request, invalid parameters".
+
+What I need you to do:
+
+1) Discover current API architecture
+- Locate where these routes are implemented:
+  - /apis/php/auth/signin
+  - /apis/php/ping
+  - /apis/php/chat/message
+- Return exact file paths for router/dispatcher/controller/middleware used by /apis/php/* routes.
+- Confirm how x-api-key, x-timestamp, x-signature, x-auth-token are validated.
+
+2) Find if post publishing endpoint already exists
+- Search for route handlers or controller methods related to:
+  - posts/create
+  - post/create
+  - publish
+  - timeline/page/group post creation
+- Return exact route path(s), method(s), accepted payload field names, and response shape.
+- If existing route is found, provide 3 tested cURL examples:
+  - timeline post
+  - page post
+  - group post
+- Include raw JSON responses (success and error).
+
+3) If endpoint does NOT exist, implement one
+Create a stable API route for external apps:
+- Method: POST
+- Path: /apis/php/posts/create
+- Auth: same signed-header + x-auth-token mechanism used by /apis/php/ping
+- Accept both Content-Types:
+  - application/json
+  - application/x-www-form-urlencoded
+- Required fields:
+  - one text alias: postText OR text OR message
+- Optional fields:
+  - post_on = timeline|page|group (default timeline)
+  - page_id (required when post_on=page)
+  - group_id (required when post_on=group)
+  - link (optional)
+  - media_url (optional)
+  - media_type=image|video (optional)
+
+4) Permission checks
+- timeline: authenticated user can post to own timeline.
+- page: user must be page admin/owner.
+- group: user must be allowed to post in group.
+- Return clear JSON errors for permission/validation failures.
+
+5) Response contract (important)
+On success return JSON like:
+{
+  "status": "success",
+  "data": {
+    "id": "<post_id>",
+    "url": "<absolute_post_url>"
+  }
+}
+Also include post_id alias if possible:
+{
+  "post_id": "<post_id>"
+}
+On error return JSON (not HTML):
+{
+  "status": "error",
+  "message": "<clear message>"
+}
+
+6) No web-session dependencies
+- Endpoint must work with API headers/token only.
+- Must not require browser cookie, CSRF token, or web form flow.
+
+7) Provide verification output
+Return these after patch:
+- file paths changed
+- route registration snippet
+- handler snippet
+- 6 cURL tests + responses:
+  - timeline success
+  - page success
+  - group success
+  - invalid token (401)
+  - page without permission (403/400)
+  - group without permission (403/400)
+
+8) Provide final endpoint info for PostMind
+At the end, output exactly:
+- publish_endpoint = <full path>
+- method = POST
+- required_headers = [...]
+- required_body = [...]
+- optional_body = [...]
+- success_response_example = ...
+- error_response_example = ...

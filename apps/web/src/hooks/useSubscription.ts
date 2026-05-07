@@ -13,8 +13,20 @@ export function useSubscription() {
   const tier = useAuthStore((s) => s.tier) as SubscriptionTier;
   const role = useAuthStore((s) => s.role) as WorkspaceRole;
   const usage = useAuthStore((s) => s.usage);
+  const setSubscription = useAuthStore((s) => s.setSubscription);
 
   const [limits, setLimits] = useState(SUBSCRIPTION_LIMITS[tier]);
+
+  // Refresh tier from billing status so admin plan changes take effect immediately
+  useEffect(() => {
+    api.billing.status()
+      .then((res) => {
+        if (res.data?.tier && res.data.tier !== tier) {
+          setSubscription(res.data.tier as SubscriptionTier, role, usage);
+        }
+      })
+      .catch(() => { /* keep cached tier */ });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     api.billing.getLimits()

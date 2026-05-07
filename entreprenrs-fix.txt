@@ -1,0 +1,97 @@
+You are debugging the Entreprenrs backend on this server.
+
+Objective
+Fix API publishing so external clients (EE PostMind) can create posts without:
+Error: 404 API Type Not Found
+
+Current verified behavior
+1. Authentication works:
+- POST /api/auth returns access_token
+- POST /api/get-user-data works with access_token + server_key + user_id
+
+2. Posting fails on all tested variants:
+- /api/create-post
+- /api/create_post
+- /api?type=create_post
+- /api?type=create-post
+All return API Type Not Found.
+
+3. External client payload includes:
+- access_token
+- server_key
+- user_id
+- postText
+Optional:
+- postLink
+- postPhoto / postVideo
+- post_on=page or group
+- page_id
+- group_id
+
+Interpretation
+The API type/route for post creation is missing, disabled, or not registered in backend dispatch.
+
+Tasks
+1. Find API dispatcher/router and the code that emits "API Type Not Found".
+2. Identify the canonical create-post API type/route expected by this build.
+3. Implement/fix a working post-create endpoint/type.
+4. Keep existing auth/session validation.
+5. Map incoming fields correctly:
+- postText -> post body
+- postLink -> link
+- postPhoto/postVideo -> media
+- post_on + page_id/group_id -> destination
+6. Return success JSON with post_id.
+7. Return clear errors.error_text on failure.
+
+Required investigation commands
+- rg -n "API Type Not Found|api_status|type=create|create_post|create-post|post-actions|get-user-data" .
+- rg -n "switch.*type|dispatch|router|api.php|api/v2|endpoint" .
+
+Required validation after fix
+Use real valid credentials and show responses (redact secrets):
+
+1. Timeline create test
+curl -X POST 'https://entreprenrs.com/api/<working-endpoint-or-type>' \
+  -d 'access_token=REDACTED' \
+  -d 'server_key=REDACTED' \
+  -d 'user_id=REDACTED' \
+  -d 'postText=API timeline publish test'
+
+2. Page create test
+curl -X POST 'https://entreprenrs.com/api/<working-endpoint-or-type>' \
+  -d 'access_token=REDACTED' \
+  -d 'server_key=REDACTED' \
+  -d 'user_id=REDACTED' \
+  -d 'postText=API page publish test' \
+  -d 'post_on=page' \
+  -d 'page_id=REDACTED'
+
+3. Group create test
+curl -X POST 'https://entreprenrs.com/api/<working-endpoint-or-type>' \
+  -d 'access_token=REDACTED' \
+  -d 'server_key=REDACTED' \
+  -d 'user_id=REDACTED' \
+  -d 'postText=API group publish test' \
+  -d 'post_on=group' \
+  -d 'group_id=REDACTED'
+
+Acceptance criteria
+1. Post-create request returns success with post_id.
+2. No API Type Not Found for publish requests.
+3. Post is visible in target destination.
+4. Existing endpoints still work:
+- /api/get-user-data
+- /api/post-actions
+
+Output format I want from you
+1. Root cause found.
+2. Exact files changed.
+3. Patch summary.
+4. Curl proof (request format + response).
+5. Any config flags/toggles needed.
+
+Constraints
+- Minimal safe patch.
+- Do not print secrets.
+- Preserve backward compatibility where possible.

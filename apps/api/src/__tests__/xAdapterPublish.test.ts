@@ -30,7 +30,7 @@ describe('XAdapter publishing', () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock).toHaveBeenCalledWith(
-      'https://api.twitter.com/2/tweets',
+      'https://api.x.com/2/tweets',
       expect.objectContaining({
         method: 'POST',
         headers: {

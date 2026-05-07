@@ -95,10 +95,13 @@ function formatPrice(monthlyPrice: number, yearly: boolean, yearlyDiscountPct: n
 
 export function BillingPage() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const couponFromQuery = searchParams.get('coupon') || '';
   const [loading, setLoading] = useState<string | null>(null);
   const [yearly, setYearly] = useState(false);
   const [planConfig, setPlanConfig] = useState<Record<string, any>>({});
   const [billingStatus, setBillingStatus] = useState<any>(null);
+  const [couponCode, setCouponCode] = useState(couponFromQuery);
+  const [actionError, setActionError] = useState('');
   const autoUpgradeRef = useRef(false);
   const { tier: storeTier, role } = useSubscription();
   const setSubscription = useAuthStore((s) => s.setSubscription);
@@ -125,6 +128,10 @@ export function BillingPage() {
     void refreshStatus();
   }, []);
 
+  useEffect(() => {
+    setCouponCode(couponFromQuery);
+  }, [couponFromQuery]);
+
   function getMonthlyPrice(tier: SubscriptionTier): number {
     return planConfig?.pricing?.[tier]?.monthlyPrice ?? DEFAULT_PRICES[tier];
   }
@@ -139,19 +146,21 @@ export function BillingPage() {
     [],
   );
 
-  async function handlePlanChange(target: { tier: SubscriptionTier; priceKey?: string }) {
+  async function handlePlanChange(target: { tier: SubscriptionTier; priceKey?: string; couponCode?: string }) {
     const isDowngrade = (tierOrder[target.tier] ?? 0) < (tierOrder[currentTier] ?? 0);
     if (isDowngrade) {
       const ok = window.confirm(`Downgrade to ${target.tier}? Your data will remain intact, but features will be limited to the ${target.tier} plan.`);
       if (!ok) return;
     }
 
+    setActionError('');
     const loadingKey = target.tier === 'basic' ? 'basic' : (target.priceKey || target.tier);
     setLoading(loadingKey);
     try {
       const res = await api.billing.changePlan({
         tier: target.tier === 'basic' ? 'basic' : undefined,
         priceKey: target.tier === 'basic' ? undefined : target.priceKey,
+        couponCode: target.couponCode,
       });
       if (res.data?.action === 'redirect' && res.data?.url) {
         window.location.href = res.data.url as string;
@@ -160,7 +169,7 @@ export function BillingPage() {
       setBillingStatus(res.data);
       setSubscription(res.data.tier || currentTier, role, res.data.usage || {});
     } catch (err) {
-      console.error('Plan change error:', err);
+      setActionError(err instanceof Error ? err.message : 'Plan change failed');
     } finally {
       setLoading(null);
     }
@@ -168,12 +177,14 @@ export function BillingPage() {
 
   useEffect(() => {
     const upgradeKey = searchParams.get('upgrade');
+    const coupon = searchParams.get('coupon') || undefined;
     if (!upgradeKey || autoUpgradeRef.current) return;
     autoUpgradeRef.current = true;
-    void handlePlanChange({ tier: upgradeKey.split('_')[0] as SubscriptionTier, priceKey: upgradeKey });
+    void handlePlanChange({ tier: upgradeKey.split('_')[0] as SubscriptionTier, priceKey: upgradeKey, couponCode: coupon });
 
     const next = new URLSearchParams(searchParams);
     next.delete('upgrade');
+    next.delete('coupon');
     setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams, currentTier]);
 
@@ -220,6 +231,20 @@ export function BillingPage() {
           Yearly <span className="text-success-600 font-semibold">(Save {getYearlyDiscount()}%)</span>
         </span>
       </div>
+
+      {couponCode && (
+        <Card className="p-4 border-emerald-200 bg-emerald-50">
+          <p className="text-sm text-emerald-800">
+            Coupon active: <span className="font-semibold">{couponCode}</span>. Choose a plan to apply it.
+          </p>
+        </Card>
+      )}
+
+      {actionError && (
+        <Card className="p-4 border-red-200 bg-red-50">
+          <p className="text-sm text-red-700">{actionError}</p>
+        </Card>
+      )}
 
       {/* Pricing Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
@@ -323,7 +348,11 @@ export function BillingPage() {
                   variant={isDowngrade ? 'secondary' : plan.popular ? 'primary' : 'secondary'}
                   className="w-full"
                   loading={loading === (plan.tier === 'basic' ? 'basic' : priceKey)}
-                  onClick={() => void handlePlanChange(plan.tier === 'basic' ? { tier: 'basic' } : { tier: plan.tier, priceKey })}
+                  onClick={() => void handlePlanChange(
+                    plan.tier === 'basic'
+                      ? { tier: 'basic' }
+                      : { tier: plan.tier, priceKey, couponCode: couponCode || undefined },
+                  )}
                 >
                   {isDowngrade ? 'Downgrade' : plan.popular && currentTier === 'basic' ? 'Start 14-Day Trial' : 'Upgrade'}
                 </Button>

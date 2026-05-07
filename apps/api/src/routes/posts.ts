@@ -1,7 +1,8 @@
 import { Router, Response, NextFunction } from 'express';
 import multer from 'multer';
-import { randomUUID } from 'crypto';
+import { createHmac, randomUUID, timingSafeEqual } from 'crypto';
 import { extname, resolve } from 'path';
+import { Readable } from 'stream';
 import { authenticate, AuthRequest, requireRole } from '../middleware/auth.js';
 import { checkUsage, incrementUsage } from '../middleware/usage.js';
 import { postService } from '../services/post.service.js';
@@ -12,6 +13,15 @@ export const postRouter = Router();
 const MEDIA_UPLOAD_DIR = resolve(process.env.MEDIA_UPLOAD_DIR || 'uploads');
 const MEDIA_UPLOAD_LIMIT_MB = Number.parseInt(process.env.MEDIA_UPLOAD_LIMIT_MB || '250', 10);
 const MEDIA_UPLOAD_MAX_BYTES = (Number.isFinite(MEDIA_UPLOAD_LIMIT_MB) && MEDIA_UPLOAD_LIMIT_MB > 0 ? MEDIA_UPLOAD_LIMIT_MB : 250) * 1024 * 1024;
+const TIKTOK_MEDIA_PROXY_SECRET = process.env.TIKTOK_MEDIA_PROXY_SECRET || process.env.JWT_SECRET || 'ee-postmind-tiktok-media-proxy';
+const TIKTOK_MEDIA_PROXY_MAX_TTL_SECONDS = Math.max(
+  60,
+  Number.parseInt(process.env.TIKTOK_MEDIA_PROXY_MAX_TTL_SECONDS || '86400', 10) || 86400,
+);
+const TIKTOK_MEDIA_PROXY_FETCH_TIMEOUT_MS = Math.max(
+  2000,
+  Number.parseInt(process.env.TIKTOK_MEDIA_PROXY_FETCH_TIMEOUT_MS || '20000', 10) || 20000,
+);
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: MEDIA_UPLOAD_MAX_BYTES },
@@ -30,6 +40,105 @@ function inferFileExtension(mimeType: string, originalName: string): string {
   if (mimeType === 'video/webm') return '.webm';
   return '';
 }
+
+function buildTikTokMediaProxySignature(url: string, expiresAt: number): string {
+  return createHmac('sha256', TIKTOK_MEDIA_PROXY_SECRET)
+    .update(`${url}|${expiresAt}`)
+    .digest('hex');
+}
+
+function isValidTikTokMediaProxySignature(url: string, expiresAt: number, signature: string): boolean {
+  const normalizedSignature = signature.trim().toLowerCase();
+  if (!/^[0-9a-f]{64}$/.test(normalizedSignature)) return false;
+  const expected = buildTikTokMediaProxySignature(url, expiresAt);
+  return timingSafeEqual(Buffer.from(normalizedSignature), Buffer.from(expected));
+}
+
+postRouter.get(
+  '/media/tiktok-proxy',
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const rawUrl = typeof req.query.url === 'string' ? req.query.url.trim() : '';
+      const rawExpires = typeof req.query.expires === 'string' ? req.query.expires.trim() : '';
+      const rawSignature = typeof req.query.sig === 'string' ? req.query.sig.trim() : '';
+
+      if (!rawUrl || !rawExpires || !rawSignature) {
+        return res.status(400).json({
+          success: false,
+          error: { code: 'INVALID_INPUT', message: 'url, expires and sig are required' },
+        });
+      }
+
+      let parsedUrl: URL;
+      try {
+        parsedUrl = new URL(rawUrl);
+      } catch {
+        return res.status(400).json({
+          success: false,
+          error: { code: 'INVALID_INPUT', message: 'url must be a valid absolute URL' },
+        });
+      }
+
+      if (parsedUrl.protocol !== 'https:') {
+        return res.status(400).json({
+          success: false,
+          error: { code: 'INVALID_INPUT', message: 'url must use https' },
+        });
+      }
+
+      const expiresAt = Number.parseInt(rawExpires, 10);
+      const now = Math.floor(Date.now() / 1000);
+      if (!Number.isFinite(expiresAt) || expiresAt <= now || expiresAt > now + TIKTOK_MEDIA_PROXY_MAX_TTL_SECONDS) {
+        return res.status(400).json({
+          success: false,
+          error: { code: 'INVALID_INPUT', message: 'expires is invalid or out of range' },
+        });
+      }
+
+      if (!isValidTikTokMediaProxySignature(rawUrl, expiresAt, rawSignature)) {
+        return res.status(403).json({
+          success: false,
+          error: { code: 'INVALID_SIGNATURE', message: 'Invalid media proxy signature' },
+        });
+      }
+
+      const abortController = new AbortController();
+      const timeoutHandle = setTimeout(() => abortController.abort(), TIKTOK_MEDIA_PROXY_FETCH_TIMEOUT_MS);
+      const upstream = await fetch(rawUrl, {
+        method: 'GET',
+        signal: abortController.signal,
+      }).finally(() => {
+        clearTimeout(timeoutHandle);
+      });
+
+      if (!upstream.ok || !upstream.body) {
+        return res.status(502).json({
+          success: false,
+          error: { code: 'UPSTREAM_FETCH_FAILED', message: `Upstream media fetch failed (${upstream.status})` },
+        });
+      }
+
+      const contentType = upstream.headers.get('content-type') || 'application/octet-stream';
+      if (!contentType.startsWith('image/') && !contentType.startsWith('video/')) {
+        return res.status(415).json({
+          success: false,
+          error: { code: 'INVALID_MEDIA_TYPE', message: 'Upstream media must be image or video content' },
+        });
+      }
+
+      const contentLength = upstream.headers.get('content-length');
+      res.setHeader('Content-Type', contentType);
+      if (contentLength) {
+        res.setHeader('Content-Length', contentLength);
+      }
+      res.setHeader('Cache-Control', 'public, max-age=300');
+
+      Readable.fromWeb(upstream.body as any).pipe(res);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
 
 postRouter.post(
   '/media/upload',
@@ -148,6 +257,18 @@ postRouter.post(
       }
 
       const scheduledDate = scheduledAt ? new Date(scheduledAt) : undefined;
+      if (scheduledAt && (!scheduledDate || Number.isNaN(scheduledDate.getTime()))) {
+        return res.status(400).json({
+          success: false,
+          error: { code: 'INVALID_DATE', message: 'scheduledAt must be a valid datetime' },
+        });
+      }
+      if (!isDraft && scheduledDate && scheduledDate <= new Date()) {
+        return res.status(400).json({
+          success: false,
+          error: { code: 'PAST_DATE', message: 'scheduledAt must be in the future' },
+        });
+      }
 
       const post = await postService.createPost({
         workspaceId: req.workspaceId,
@@ -304,6 +425,27 @@ postRouter.post(
       const result = await postService.publishPost(req.params.postId as string);
       if (req.workspaceId) await incrementUsage(req.workspaceId, 'posts');
       res.json({ success: true, data: result });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+// Per-post analytics (live fetch from platforms)
+postRouter.get(
+  '/:postId/analytics',
+  authenticate,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      if (!req.workspaceId) {
+        return res.status(400).json({ success: false, error: { code: 'NO_WORKSPACE', message: 'Workspace required' } });
+      }
+
+      const data = await (await import('../services/analytics.service.js')).analyticsService.getPostAnalytics(
+        req.params.postId as string,
+        req.workspaceId,
+      );
+      res.json({ success: true, data });
     } catch (err) {
       next(err);
     }

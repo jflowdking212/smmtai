@@ -1,6 +1,7 @@
 import { render, type RenderOptions } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import type { ReactElement } from 'react';
+import { ToastProvider } from '@/components/Toast';
 
 export function renderWithRouter(
   ui: ReactElement,
@@ -9,9 +10,11 @@ export function renderWithRouter(
   const { route = '/', ...renderOptions } = options;
 
   return render(
-    <MemoryRouter initialEntries={[route]}>
-      {ui}
-    </MemoryRouter>,
+    <ToastProvider>
+      <MemoryRouter initialEntries={[route]}>
+        {ui}
+      </MemoryRouter>
+    </ToastProvider>,
     renderOptions,
   );
 }

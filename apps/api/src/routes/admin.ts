@@ -1,4 +1,5 @@
 import { Router, Response, NextFunction } from 'express';
+import bcrypt from 'bcryptjs';
 import multer from 'multer';
 import { randomUUID } from 'crypto';
 import { extname, resolve } from 'path';
@@ -19,6 +20,7 @@ import {
   getPlanConfig,
   savePlanConfig,
 } from '../services/admin-settings.service.js';
+import { couponService } from '../services/coupon.service.js';
 import { uploadPublicFile } from '../services/storage.service.js';
 import { prisma } from '../config/database.js';
 
@@ -233,6 +235,44 @@ adminRouter.put('/settings/plans', async (req: AuthRequest, res: Response, next:
   }
 });
 
+// ----- Coupons -----
+
+adminRouter.get('/coupons', async (_req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const coupons = await couponService.listCoupons();
+    res.json({ success: true, data: coupons });
+  } catch (err) {
+    next(err);
+  }
+});
+
+adminRouter.post('/coupons', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    if (!req.userId) {
+      return res.status(401).json({ success: false, error: { message: 'Authentication required', code: 'UNAUTHORIZED' } });
+    }
+    const coupon = await couponService.createCoupon(req.userId, req.body);
+    await logAdminAction(req.userId, 'coupon.create', 'coupon', coupon.id, { code: coupon.code });
+    res.status(201).json({ success: true, data: coupon });
+  } catch (err) {
+    next(err);
+  }
+});
+
+adminRouter.patch('/coupons/:id', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    if (!req.userId) {
+      return res.status(401).json({ success: false, error: { message: 'Authentication required', code: 'UNAUTHORIZED' } });
+    }
+    const couponId = req.params.id as string;
+    const coupon = await couponService.updateCoupon(couponId, req.body);
+    await logAdminAction(req.userId, 'coupon.update', 'coupon', coupon.id, { code: coupon.code });
+    res.json({ success: true, data: coupon });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // ============================================================
 // Admin Dashboard Stats
 // ============================================================
@@ -422,6 +462,107 @@ adminRouter.put('/users/:id/plan', async (req: AuthRequest, res: Response, next:
     }
 
     res.json({ success: true, data: { message: `User plan updated to ${tier}` } });
+  } catch (err) {
+    next(err);
+  }
+});
+
+adminRouter.put('/users/:id/role', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const id = req.params.id as string;
+    const { role } = req.body; // 'owner' | 'admin' | 'editor' | 'viewer'
+
+    if (!['owner', 'admin', 'editor', 'viewer'].includes(role)) {
+      return res.status(400).json({ success: false, error: { message: 'Invalid role', code: 'VALIDATION_ERROR' } });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id },
+      include: { workspaces: true },
+    });
+
+    if (!user) {
+      return res.status(404).json({ success: false, error: { message: 'User not found', code: 'NOT_FOUND' } });
+    }
+
+    // Prevent changing own role
+    if (id === req.userId) {
+      return res.status(403).json({ success: false, error: { message: 'Cannot change your own role', code: 'FORBIDDEN' } });
+    }
+
+    // Prevent demoting the last owner
+    const membership = user.workspaces[0];
+    if (membership && membership.role === 'owner' && role !== 'owner') {
+      const ownerCount = await prisma.workspaceMember.count({ where: { role: 'owner' } });
+      if (ownerCount <= 1) {
+        return res.status(403).json({
+          success: false,
+          error: { message: 'Cannot demote the last admin. Transfer admin privileges to another user first.', code: 'LAST_OWNER' },
+        });
+      }
+    }
+
+    if (membership) {
+      const oldRole = membership.role;
+      await prisma.workspaceMember.update({
+        where: { userId_workspaceId: { userId: id, workspaceId: membership.workspaceId } },
+        data: { role },
+      });
+      await logAdminAction(req.userId!, 'user.role_change', 'user', id, { oldRole, newRole: role });
+    }
+
+    res.json({ success: true, data: { message: `User role updated to ${role}` } });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Delete a user — requires admin password confirmation; cannot delete last owner
+adminRouter.delete('/users/:id', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const id = req.params.id as string;
+    const { password } = req.body;
+
+    if (!password) {
+      return res.status(400).json({ success: false, error: { message: 'Admin password required to delete a user', code: 'VALIDATION_ERROR' } });
+    }
+
+    // Verify admin's own password
+    const admin = await prisma.user.findUnique({ where: { id: req.userId! } });
+    if (!admin?.passwordHash) {
+      return res.status(403).json({ success: false, error: { message: 'Cannot verify credentials', code: 'FORBIDDEN' } });
+    }
+    const valid = await bcrypt.compare(password, admin.passwordHash);
+    if (!valid) {
+      return res.status(403).json({ success: false, error: { message: 'Incorrect password', code: 'FORBIDDEN' } });
+    }
+
+    // Cannot delete yourself
+    if (id === req.userId) {
+      return res.status(403).json({ success: false, error: { message: 'Cannot delete your own account', code: 'FORBIDDEN' } });
+    }
+
+    const user = await prisma.user.findUnique({ where: { id }, include: { workspaces: true } });
+    if (!user) {
+      return res.status(404).json({ success: false, error: { message: 'User not found', code: 'NOT_FOUND' } });
+    }
+
+    // Cannot delete the last owner
+    const isOwner = user.workspaces.some((m) => m.role === 'owner');
+    if (isOwner) {
+      const ownerCount = await prisma.workspaceMember.count({ where: { role: 'owner' } });
+      if (ownerCount <= 1) {
+        return res.status(403).json({
+          success: false,
+          error: { message: 'Cannot delete the last admin. Transfer admin privileges to another user first.', code: 'LAST_OWNER' },
+        });
+      }
+    }
+
+    await prisma.user.delete({ where: { id } });
+    await logAdminAction(req.userId!, 'user.delete', 'user', id, { email: user.email });
+
+    res.json({ success: true, data: { message: 'User deleted' } });
   } catch (err) {
     next(err);
   }

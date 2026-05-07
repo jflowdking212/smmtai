@@ -74,11 +74,13 @@ export const publicCheckoutSchema = z.object({
     'enterprise_monthly',
     'enterprise_yearly',
   ]),
+  couponCode: z.string().trim().min(1).max(64).optional(),
 });
 
 export const changePlanSchema = z.object({
   tier: z.enum(['basic', 'pro', 'business', 'enterprise']).optional(),
   priceKey: z.string().optional(),
+  couponCode: z.string().trim().min(1).max(64).optional(),
 }).refine((value) => Boolean(value.tier || value.priceKey), {
   message: 'tier or priceKey is required',
 });

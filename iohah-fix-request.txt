@@ -1,0 +1,80 @@
+Goal: make SMMT auto-list Iohah pages/groups for the connected user.
+
+Current production issue to fix:
+- GET /apis/php/data/load?get=pages&offset=0 returns 500
+- GET /apis/php/data/load?get=groups&offset=0 returns 500
+- GET /apis/php/pages/manage returns 404
+- GET /apis/php/groups/manage returns 404
+
+Please do this end-to-end:
+
+1) Root cause and fix
+- Find why /apis/php/data/load with get=pages and get=groups throws 500.
+- Fix it so it returns valid JSON (not blank 500).
+
+2) Add stable API endpoints for SMMT
+- GET /apis/php/pages/manage
+- GET /apis/php/groups/manage
+- Keep auth/middleware same as other /apis/php routes (x-api-key, x-timestamp, x-signature, x-auth-token).
+
+3) Response contract (must be JSON only)
+Success:
+{
+  "status": "success",
+  "data": [
+    {
+      "id": "1",
+      "name": "Jay bliss tech",
+      "description": "...",
+      "avatar": "...",
+      "url": "..."
+    }
+  ],
+  "timestamp": "YYYY-MM-DD HH:MM:SS"
+}
+
+Empty:
+{
+  "status": "success",
+  "data": [],
+  "timestamp": "..."
+}
+
+Error:
+{
+  "status": "error",
+  "message": "...",
+  "timestamp": "..."
+}
+
+4) Also support data/load aliases without 500
+- get=pages
+- get=my_pages
+- get=managed_pages
+- get=liked_pages
+- get=groups
+- get=my_groups
+- get=managed_groups
+- get=joined_groups
+If unsupported, return clean JSON 400 (not 500).
+
+5) Reuse existing web logic
+- Trace how /pages/manage and /groups/manage web pages load items.
+- Reuse the same data source/permission logic so API output matches what user sees in web UI.
+
+6) Tests and proof
+Run and include raw output for:
+- curl -i GET /apis/php/pages/manage (signed headers + user JWT)
+- curl -i GET /apis/php/groups/manage (signed headers + user JWT)
+- curl -i GET /apis/php/data/load?get=pages&offset=0
+- curl -i GET /apis/php/data/load?get=groups&offset=0
+
+Expected proof:
+- pages includes "Jay bliss tech"
+- groups includes "Bliss Tech"
+
+7) Return to me
+- files changed
+- exact route registration lines
+- exact controller function names
+- sample JSON responses from production runtime

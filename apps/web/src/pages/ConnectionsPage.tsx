@@ -21,6 +21,7 @@ interface ManualField {
   placeholder?: string;
   type?: 'text' | 'password';
   helpText?: string;
+  required?: boolean;
 }
 
 const MANUAL_FIELDS: Partial<Record<PlatformType, ManualField[]>> = {
@@ -37,11 +38,62 @@ const MANUAL_FIELDS: Partial<Record<PlatformType, ManualField[]>> = {
     { key: 'chatId', label: 'Default chat ID', placeholder: '@mychannel or -1001234567890', helpText: 'Required for publishing. Use a channel username or numeric chat ID.' },
   ],
   entreprenrs: [
-    { key: 'accessToken', label: 'Access token', type: 'password' },
-    { key: 'serverKey', label: 'Server key', type: 'password' },
+    {
+      key: 'usernameEmail',
+      label: 'Username or Email',
+      placeholder: 'you@example.com',
+      helpText: 'Use your Entreprenrs login username/email. API credentials are managed by admin.',
+    },
+    {
+      key: 'password',
+      label: 'Password',
+      type: 'password',
+      helpText: 'Use your Entreprenrs account password.',
+    },
   ],
-  chrxstians: [{ key: 'accessToken', label: 'Access token', type: 'password' }],
-  iohah: [{ key: 'accessToken', label: 'Access token', type: 'password' }],
+  chrxstians: [
+    {
+      key: 'usernameEmail',
+      label: 'Username or Email',
+      placeholder: 'you@example.com',
+      helpText: 'Use your Chrxstians login username/email. API credentials are managed by admin.',
+    },
+    {
+      key: 'password',
+      label: 'Password',
+      type: 'password',
+      helpText: 'Use your Chrxstians account password.',
+    },
+  ],
+  iohah: [
+    {
+      key: 'usernameEmail',
+      label: 'Username or Email',
+      placeholder: 'judeobidozie@gmail.com',
+      helpText: 'Use your Iohah login username/email. API credentials are managed by admin.',
+    },
+    {
+      key: 'password',
+      label: 'Password',
+      type: 'password',
+      helpText: 'Use your Iohah account password.',
+    },
+  ],
+};
+
+const PLATFORM_ONBOARDING: Partial<Record<PlatformType, { description: string; signupUrl: string }>> = {
+  chrxstians: {
+    description: 'A Christian social platform to connect, share the gospel, and build faith-centered communities.',
+    signupUrl: 'https://chrxstians.com/signup',
+  },
+  iohah: {
+    description: 'A health practitioner network for verified natural medicine knowledge sharing and collaboration.',
+    signupUrl: 'https://iohah.com/signup',
+  },
+  entreprenrs: {
+    description: 'A platform where entrepreneurs collaborate, share growth content, and promote genuine businesses.',
+    signupUrl: 'https://entreprenrs.com/register',
+  },
 };
 
 interface Connection {
@@ -81,14 +133,32 @@ function buildCredentials(platform: PlatformType, values: Record<string, string>
         chatId: values.chatId?.trim() || '',
       });
     case 'entreprenrs':
-      return JSON.stringify({
-        accessToken: values.accessToken?.trim() || '',
-        serverKey: values.serverKey?.trim() || '',
-      });
+      {
+        const username = values.usernameEmail?.trim() || values.username?.trim() || values.email?.trim() || '';
+        const password = values.password || '';
+        return JSON.stringify({
+          ...(username ? { username } : {}),
+          ...(password ? { password } : {}),
+        });
+      }
     case 'chrxstians':
-      return JSON.stringify({ accessToken: values.accessToken?.trim() || '' });
+      {
+        const usernameEmail = values.usernameEmail?.trim() || values.username?.trim() || values.email?.trim() || '';
+        const password = values.password || '';
+        return JSON.stringify({
+          ...(usernameEmail ? { usernameEmail } : {}),
+          ...(password ? { password } : {}),
+        });
+      }
     case 'iohah':
-      return JSON.stringify({ accessToken: values.accessToken?.trim() || '' });
+      {
+        const usernameEmail = values.usernameEmail?.trim() || values.username?.trim() || values.email?.trim() || '';
+        const password = values.password || '';
+        return JSON.stringify({
+          ...(usernameEmail ? { usernameEmail } : {}),
+          ...(password ? { password } : {}),
+        });
+      }
     default:
       return '';
   }
@@ -101,7 +171,9 @@ function getInitialForm(platform: PlatformType): Record<string, string> {
   return {};
 }
 
-function formatCallbackError(error: string): string {
+function formatCallbackError(error: string, reason?: string | null): string {
+  const normalizedReason = typeof reason === 'string' ? reason.trim() : '';
+
   switch (error) {
     case 'invalid_platform':
       return 'That platform is not supported for connection.';
@@ -112,7 +184,9 @@ function formatCallbackError(error: string): string {
     case 'invalid_state':
       return 'The authorization request has expired. Please try again.';
     case 'connection_failed':
-      return 'Connection failed. Please retry or verify your credentials.';
+      return normalizedReason
+        ? `Connection failed: ${normalizedReason}`
+        : 'Connection failed. Please retry or verify your credentials.';
     default:
       return 'Connection failed. Please try again.';
   }
@@ -125,6 +199,7 @@ export function ConnectionsPage() {
   const [manualValues, setManualValues] = useState<Record<string, string>>({});
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [globalPlatforms, setGlobalPlatforms] = useState<Set<string>>(new Set());
+  const [instagramChoice, setInstagramChoice] = useState(false);
   const { tier } = useSubscription();
 
   const allowedPlatforms = new Set<string>(TIER_PLATFORMS[tier] || TIER_PLATFORMS.basic);
@@ -148,12 +223,13 @@ export function ConnectionsPage() {
     const params = new URLSearchParams(window.location.search);
     const connected = params.get('connected');
     const error = params.get('error');
+    const reason = params.get('reason');
 
     if (connected && isPlatformType(connected)) {
       setMessage({ type: 'success', text: `${PLATFORMS[connected].name} connected successfully.` });
       fetchConnections();
     } else if (error) {
-      setMessage({ type: 'error', text: formatCallbackError(error) });
+      setMessage({ type: 'error', text: formatCallbackError(error, reason) });
     }
 
     if (connected || error) {
@@ -161,21 +237,43 @@ export function ConnectionsPage() {
     }
   }, [fetchConnections]);
 
-  async function handleConnect(platform: PlatformType) {
+  async function handleConnect(platform: PlatformType, mode?: string) {
     setLoading(platform);
     setMessage(null);
     try {
+      if (platform === 'instagram' && !mode) {
+        setInstagramChoice(true);
+        setLoading(null);
+        return;
+      }
       if (OAUTH_PLATFORMS.includes(platform)) {
-        const res = await api.connections.initiateOAuth(platform);
+        const res = await api.connections.initiateOAuth(platform, mode);
         window.location.href = res.data.authUrl;
         return;
       }
       // If this platform has global credentials, connect directly without prompting
-      if (globalPlatforms.has(platform)) {
-        await api.connections.manualConnect(platform, '');
-        await fetchConnections();
-        setMessage({ type: 'success', text: `${PLATFORMS[platform].name} connected successfully.` });
-        return;
+      if (
+        globalPlatforms.has(platform)
+        && platform !== 'entreprenrs'
+        && platform !== 'iohah'
+        && platform !== 'chrxstians'
+      ) {
+        try {
+          await api.connections.manualConnect(platform, '');
+          await fetchConnections();
+          setMessage({ type: 'success', text: `${PLATFORMS[platform].name} connected successfully.` });
+          return;
+        } catch (error) {
+          // If global credentials are missing/invalid, always fall back to manual input.
+          const errorMessage = error instanceof ApiError ? error.message : 'Global credentials could not be used';
+          setManualPlatform(platform);
+          setManualValues(getInitialForm(platform));
+          setMessage({
+            type: 'error',
+            text: `Global ${PLATFORMS[platform].name} credentials could not be used (${errorMessage}). Enter credentials manually.`,
+          });
+          return;
+        }
       }
       if (MANUAL_CONNECTION_PLATFORMS.includes(platform)) {
         setManualPlatform(platform);
@@ -245,10 +343,34 @@ export function ConnectionsPage() {
   async function handleManualConnect() {
     if (!manualPlatform) return;
     const fields = MANUAL_FIELDS[manualPlatform] || [];
-    const missingField = fields.find((field) => !manualValues[field.key]?.trim());
+    const missingField = fields.find((field) => field.required !== false && !manualValues[field.key]?.trim());
     if (missingField) {
       setMessage({ type: 'error', text: `${missingField.label} is required.` });
       return;
+    }
+    if (manualPlatform === 'entreprenrs') {
+      const hasUsernamePassword = Boolean(
+        (manualValues.usernameEmail?.trim() || manualValues.username?.trim() || manualValues.email?.trim())
+        && manualValues.password?.trim(),
+      );
+      if (!hasUsernamePassword) {
+        setMessage({ type: 'error', text: 'Provide Entreprenrs username/email and password.' });
+        return;
+      }
+    }
+    if (manualPlatform === 'chrxstians') {
+      const hasUsernamePassword = Boolean(manualValues.usernameEmail?.trim() && manualValues.password?.trim());
+      if (!hasUsernamePassword) {
+        setMessage({ type: 'error', text: 'Provide Chrxstians username/email and password.' });
+        return;
+      }
+    }
+    if (manualPlatform === 'iohah') {
+      const hasUsernamePassword = Boolean(manualValues.usernameEmail?.trim() && manualValues.password?.trim());
+      if (!hasUsernamePassword) {
+        setMessage({ type: 'error', text: 'Provide Iohah username/email and password.' });
+        return;
+      }
     }
 
     setLoading(manualPlatform);
@@ -301,6 +423,7 @@ export function ConnectionsPage() {
           const isConnected = !!connection;
           const needsReconnect = isConnected && (!connection.isActive || connection.tokenExpired);
           const isLocked = !allowedPlatforms.has(platformId);
+          const onboarding = PLATFORM_ONBOARDING[platformId];
 
           return (
             <Card key={platformId} hover className={`p-5 ${isLocked ? 'opacity-60' : ''}`}>
@@ -339,6 +462,19 @@ export function ConnectionsPage() {
                   <Badge variant="default">Not connected</Badge>
                 )}
               </div>
+              {!isConnected && onboarding && (
+                <div className="mb-4 rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2.5">
+                  <p className="text-xs text-neutral-600">{onboarding.description}</p>
+                  <a
+                    href={onboarding.signupUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-1.5 inline-block text-xs font-medium text-blue-700 hover:text-blue-800"
+                  >
+                    No account yet? Create one
+                  </a>
+                </div>
+              )}
               {isConnected ? (
                 <div className="grid grid-cols-2 gap-2">
                   {needsReconnect ? (
@@ -413,6 +549,12 @@ export function ConnectionsPage() {
               <p className="text-sm text-neutral-500 mt-1">Enter your credentials to securely connect this account.</p>
             </div>
 
+            {message?.type === 'error' && (
+              <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                {message.text}
+              </div>
+            )}
+
             <div className="space-y-3">
               {manualFields.map((field) => (
                 <div key={field.key} className="space-y-1.5">
@@ -445,6 +587,54 @@ export function ConnectionsPage() {
                 Connect account
               </Button>
             </div>
+          </Card>
+        </div>
+      )}
+
+      {instagramChoice && (
+        <div
+          className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
+          onClick={() => setInstagramChoice(false)}
+        >
+          <Card className="w-full max-w-md p-6 space-y-5" onClick={(e) => e.stopPropagation()}>
+            <div>
+              <h2 className="text-lg font-heading font-semibold text-neutral-900">
+                Connect Instagram
+              </h2>
+              <p className="text-sm text-neutral-500 mt-1">Choose how you'd like to connect your Instagram account.</p>
+            </div>
+
+            <div className="space-y-3">
+              <button
+                onClick={() => { setInstagramChoice(false); handleConnect('instagram', 'direct'); }}
+                className="w-full text-left rounded-xl border-2 border-neutral-200 p-4 hover:border-pink-400 hover:bg-pink-50/50 transition group"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 via-pink-500 to-orange-400 flex items-center justify-center text-white font-bold text-sm shrink-0">IG</div>
+                  <div>
+                    <p className="text-sm font-semibold text-neutral-800 group-hover:text-pink-700">Instagram Direct Login</p>
+                    <p className="text-xs text-neutral-500 mt-0.5">Sign in with your Instagram account directly. No Facebook required.</p>
+                  </div>
+                </div>
+              </button>
+
+              <button
+                onClick={() => { setInstagramChoice(false); handleConnect('instagram', 'facebook'); }}
+                className="w-full text-left rounded-xl border-2 border-neutral-200 p-4 hover:border-blue-400 hover:bg-blue-50/50 transition group"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-[#1877F2] flex items-center justify-center text-white font-bold text-sm shrink-0">FB</div>
+                  <div>
+                    <p className="text-sm font-semibold text-neutral-800 group-hover:text-blue-700">Connect via Facebook</p>
+                    <p className="text-xs text-neutral-500 mt-0.5">Use your Facebook account. Requires an Instagram Business account linked to a Facebook Page.</p>
+                  </div>
+                </div>
+              </button>
+            </div>
+
+            <Button variant="ghost" size="sm" className="w-full" onClick={() => setInstagramChoice(false)}>
+              Cancel
+            </Button>
           </Card>
         </div>
       )}

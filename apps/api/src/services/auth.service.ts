@@ -108,7 +108,7 @@ export class AuthService {
       include: {
         workspaces: {
           include: { workspace: true },
-          where: { role: 'owner' },
+          orderBy: { workspaceId: 'asc' },
           take: 1,
         },
       },
@@ -350,13 +350,14 @@ export class AuthService {
   }
 
   private async getWorkspaceIdForUser(tx: any, userId: string, userName: string): Promise<string> {
-    const ownerMembership = await tx.workspaceMember.findFirst({
-      where: { userId, role: 'owner' },
-      orderBy: { id: 'asc' },
+    // Find any workspace membership (prefer owner, then any role)
+    const membership = await tx.workspaceMember.findFirst({
+      where: { userId },
+      orderBy: [{ role: 'asc' }, { workspaceId: 'asc' }],
     });
 
-    if (ownerMembership?.workspaceId) {
-      return ownerMembership.workspaceId;
+    if (membership?.workspaceId) {
+      return membership.workspaceId;
     }
 
     return this.createDefaultWorkspace(tx, userId, userName);

@@ -1,9 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, Badge, Button } from '@/components/ui';
+import { useToast } from '@/components/Toast';
 import { api } from '@/lib/api';
+import { saveComposeSeed } from '@/lib/composeSeed';
 import { buildPostListParams, formatStatusLabel, getStatusBadgeVariant, summarizePlatformOutcomes } from '@/lib/postHistory';
 import { PLATFORMS, type PlatformType } from '@ee-postmind/shared';
-import { ChevronLeft, ChevronRight, Clock, RefreshCw } from 'lucide-react';
+import {
+  ChevronLeft, ChevronRight, Clock, RefreshCw,
+  Trash2, StopCircle, BarChart3, X, Eye, ThumbsUp,
+  MessageCircle, Share2, MousePointerClick, Bookmark, Loader2,
+  RotateCcw, Pencil, Repeat2,
+} from 'lucide-react';
 
 const PAGE_SIZE = 20;
 const STATUS_OPTIONS = [
@@ -24,6 +32,7 @@ interface PlatformPostHistory {
   platform: string;
   status: string;
   platformPostId: string | null;
+  url: string | null;
   publishedAt: string | null;
   error: string | null;
 }
@@ -35,7 +44,7 @@ interface PostHistoryItem {
   createdAt: string;
   scheduledAt: string | null;
   publishedAt: string | null;
-  media: Array<{ id: string }>;
+  media: Array<{ id: string; url?: string; type?: string; mimeType?: string; fileSize?: number; fileName?: string }>;
   platformPosts: PlatformPostHistory[];
 }
 
@@ -54,10 +63,32 @@ function formatDateTime(value: string | null): string {
   return date.toLocaleString();
 }
 
+function instagramMediaIdToShortcode(mediaId: string): string {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+  try {
+    // If it already looks like a shortcode (not purely numeric), return as-is
+    if (!/^\d+$/.test(mediaId)) return mediaId;
+    let n = BigInt(mediaId);
+    let s = '';
+    while (n > 0n) { s = alphabet[Number(n % 64n)] + s; n = n / 64n; }
+    return s;
+  } catch {
+    return mediaId;
+  }
+}
+
 function buildPlatformPostUrl(platform: PlatformType, platformPostId: string): string | null {
   const id = platformPostId.trim();
   if (!id) return null;
   if (platform === 'facebook') return `https://facebook.com/${id}`;
+  if (platform === 'instagram') {
+    const shortcode = instagramMediaIdToShortcode(id);
+    return `https://www.instagram.com/p/${shortcode}/`;
+  }
+  if (platform === 'entreprenrs') return `https://entreprenrs.com/post/${encodeURIComponent(id)}`;
+  if (platform === 'iohah') return `https://iohah.com/posts/${encodeURIComponent(id)}`;
+  if (platform === 'chrxstians') return `https://chrxstians.com/posts/${encodeURIComponent(id)}`;
+  if (platform === 'tiktok' && /^\d+$/.test(id)) return `https://www.tiktok.com/video/${id}`;
   if (platform === 'twitter') return `https://x.com/i/status/${id}`;
   if (platform === 'youtube') return `https://www.youtube.com/watch?v=${id}`;
   if (platform === 'linkedin') return `https://www.linkedin.com/feed/update/${encodeURIComponent(id)}/`;
@@ -71,7 +102,145 @@ function buildPlatformPostUrl(platform: PlatformType, platformPostId: string): s
   return null;
 }
 
+interface PlatformAnalyticsData {
+  platformPostId: string;
+  platform: string;
+  status: string;
+  metrics: {
+    impressions: number;
+    reach: number;
+    likes: number;
+    comments: number;
+    shares: number;
+    clicks: number;
+    saves: number;
+  } | null;
+  error: string | null;
+  fetchedLive: boolean;
+}
+
+const METRIC_ICONS: Record<string, typeof Eye> = {
+  impressions: Eye,
+  reach: Eye,
+  likes: ThumbsUp,
+  comments: MessageCircle,
+  shares: Share2,
+  clicks: MousePointerClick,
+  saves: Bookmark,
+};
+
+function MetricCard({ label, value }: { label: string; value: number }) {
+  const Icon = METRIC_ICONS[label] || Eye;
+  return (
+    <div className="flex items-center gap-2 rounded-lg bg-neutral-50 border border-neutral-100 px-3 py-2">
+      <Icon className="w-4 h-4 text-neutral-400 shrink-0" />
+      <div className="min-w-0">
+        <p className="text-lg font-semibold text-neutral-900">{value.toLocaleString()}</p>
+        <p className="text-[11px] text-neutral-500 capitalize">{label}</p>
+      </div>
+    </div>
+  );
+}
+
+function AnalyticsModal({
+  postId,
+  onClose,
+}: {
+  postId: string;
+  onClose: () => void;
+}) {
+  const [loading, setLoading] = useState(true);
+  const [platforms, setPlatforms] = useState<PlatformAnalyticsData[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setLoading(true);
+    setError(null);
+    api.posts
+      .analytics(postId)
+      .then((res) => setPlatforms(res.data?.platforms || []))
+      .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load analytics'))
+      .finally(() => setLoading(false));
+  }, [postId]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-5 py-4 border-b border-neutral-100">
+          <h2 className="text-lg font-semibold text-neutral-900">Post Analytics</h2>
+          <button onClick={onClose} className="p-1 rounded-lg hover:bg-neutral-100 transition">
+            <X className="w-5 h-5 text-neutral-500" />
+          </button>
+        </div>
+
+        <div className="p-5 space-y-5">
+          {loading && (
+            <div className="flex items-center justify-center gap-2 py-8">
+              <Loader2 className="w-5 h-5 animate-spin text-neutral-400" />
+              <span className="text-sm text-neutral-500">Fetching live analytics...</span>
+            </div>
+          )}
+
+          {error && (
+            <div className="rounded-lg bg-red-50 border border-red-100 px-4 py-3 text-sm text-red-700">{error}</div>
+          )}
+
+          {!loading && !error && platforms.length === 0 && (
+            <p className="text-sm text-neutral-400 text-center py-6">No platform data available for this post.</p>
+          )}
+
+          {!loading &&
+            platforms.map((p) => {
+              const platform = PLATFORMS[p.platform as PlatformType];
+              const platformName = platform?.name || p.platform;
+              const platformColor = platform?.color || '#6B7280';
+
+              return (
+                <div key={p.platformPostId} className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: platformColor }} />
+                    <span className="text-sm font-semibold text-neutral-800">{platformName}</span>
+                    <Badge variant={getStatusBadgeVariant(p.status)}>{formatStatusLabel(p.status)}</Badge>
+                    {p.fetchedLive && (
+                      <span className="text-[10px] text-green-600 font-medium ml-auto">● Live</span>
+                    )}
+                    {!p.fetchedLive && p.metrics && (
+                      <span className="text-[10px] text-neutral-400 ml-auto">Cached</span>
+                    )}
+                  </div>
+
+                  {p.error && (
+                    <p className="text-xs text-amber-600 bg-amber-50 rounded px-2 py-1">{p.error}</p>
+                  )}
+
+                  {p.metrics ? (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      <MetricCard label="impressions" value={p.metrics.impressions} />
+                      <MetricCard label="reach" value={p.metrics.reach} />
+                      <MetricCard label="likes" value={p.metrics.likes} />
+                      <MetricCard label="comments" value={p.metrics.comments} />
+                      <MetricCard label="shares" value={p.metrics.shares} />
+                      <MetricCard label="clicks" value={p.metrics.clicks} />
+                      {p.metrics.saves > 0 && <MetricCard label="saves" value={p.metrics.saves} />}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-neutral-400">No analytics data available yet.</p>
+                  )}
+                </div>
+              );
+            })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function PostHistoryPage() {
+  const toast = useToast();
+  const navigate = useNavigate();
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [posts, setPosts] = useState<PostHistoryItem[]>([]);
   const [total, setTotal] = useState(0);
@@ -79,6 +248,9 @@ export function PostHistoryPage() {
   const [pages, setPages] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [analyticsPostId, setAnalyticsPostId] = useState<string | null>(null);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
   const loadPosts = useCallback(async () => {
     setLoading(true);
@@ -107,6 +279,69 @@ export function PostHistoryPage() {
   useEffect(() => {
     void loadPosts();
   }, [loadPosts]);
+
+  const handleStop = useCallback(async (postId: string) => {
+    setActionLoading(postId);
+    try {
+      await api.schedule.cancel(postId);
+      toast.success('Post Cancelled', 'Scheduled post has been cancelled.');
+      void loadPosts();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to cancel post';
+      setError(msg);
+      toast.error('Cancel Failed', msg);
+    } finally {
+      setActionLoading(null);
+    }
+  }, [loadPosts, toast]);
+
+  const handleDelete = useCallback(async (postId: string) => {
+    setActionLoading(postId);
+    try {
+      await api.posts.delete(postId);
+      setConfirmDelete(null);
+      toast.success('Post Deleted');
+      void loadPosts();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to delete post';
+      setError(msg);
+      toast.error('Delete Failed', msg);
+    } finally {
+      setActionLoading(null);
+    }
+  }, [loadPosts, toast]);
+
+  const handleRetry = useCallback(async (postId: string) => {
+    setActionLoading(postId);
+    try {
+      await api.posts.publish(postId);
+      toast.success('Retry Successful', 'Post has been re-published.');
+      void loadPosts();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Retry failed';
+      toast.error('Retry Failed', msg);
+    } finally {
+      setActionLoading(null);
+    }
+  }, [loadPosts, toast]);
+
+  const handleEditInCompose = useCallback((post: PostHistoryItem) => {
+    const media = (post.media || [])
+      .filter((m: any) => m.url)
+      .map((m: any) => ({
+        url: m.url as string,
+        type: (m.type || 'image') as 'image' | 'video',
+        fileName: (m.fileName || m.url?.split('/').pop() || 'file') as string,
+        mimeType: (m.mimeType || 'image/png') as string,
+        size: (m.size || 0) as number,
+      }));
+    saveComposeSeed({
+      source: 'ai',
+      content: post.content || '',
+      media,
+    });
+    navigate('/compose');
+  }, [navigate]);
 
   const platformOutcomeSummary = useMemo(
     () => posts.reduce((acc, post) => {
@@ -185,14 +420,23 @@ export function PostHistoryPage() {
           </div>
         ) : (
           <div className="space-y-3">
-            {posts.map((post) => (
+            {posts.map((post) => {
+              const isScheduled = post.status === 'scheduled';
+              const isPublished = post.status === 'published' || post.status === 'partial';
+              const hasFailed = post.status === 'failed' || post.platformPosts.some((pp) => pp.status === 'failed');
+              const isDeleting = confirmDelete === post.id;
+              const isBusy = actionLoading === post.id;
+
+              return (
               <div key={post.id} className="rounded-xl border border-neutral-200 p-4 bg-neutral-50/50 space-y-3">
-                <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                  <div className="min-w-0">
+                <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                  <div className="min-w-0 flex-1">
                     <p className="text-xs text-neutral-500 truncate">Post ID: {post.id}</p>
-                    <p className="text-sm text-neutral-800 whitespace-pre-wrap break-words">{post.content}</p>
+                    <p className="text-sm text-neutral-800 whitespace-pre-wrap break-words line-clamp-3">{post.content}</p>
                   </div>
-                  <Badge variant={getStatusBadgeVariant(post.status)}>{formatStatusLabel(post.status)}</Badge>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Badge variant={getStatusBadgeVariant(post.status)}>{formatStatusLabel(post.status)}</Badge>
+                  </div>
                 </div>
 
                 <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-neutral-500">
@@ -207,9 +451,10 @@ export function PostHistoryPage() {
                     const platform = PLATFORMS[platformPost.platform as PlatformType];
                     const platformName = platform?.name || platformPost.platform;
                     const platformColor = platform?.color || '#6B7280';
-                    const platformUrl = platformPost.platformPostId
-                      ? buildPlatformPostUrl(platformPost.platform as PlatformType, platformPost.platformPostId)
-                      : null;
+                    const platformUrl = platformPost.url?.trim()
+                      || (platformPost.platformPostId
+                        ? buildPlatformPostUrl(platformPost.platform as PlatformType, platformPost.platformPostId)
+                        : null);
 
                     return (
                       <div key={platformPost.id} className="rounded-lg border border-neutral-200 bg-white px-3 py-2">
@@ -246,8 +491,86 @@ export function PostHistoryPage() {
                     );
                   })}
                 </div>
+
+                {/* Action buttons */}
+                <div className="flex items-center gap-2 pt-1 border-t border-neutral-100">
+                  {isPublished && (
+                    <button
+                      onClick={() => setAnalyticsPostId(post.id)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-neutral-700 bg-white border border-neutral-200 rounded-lg hover:bg-neutral-50 hover:border-neutral-300 transition"
+                    >
+                      <BarChart3 className="w-3.5 h-3.5" /> Analytics
+                    </button>
+                  )}
+
+                  {isPublished && (
+                    <button
+                      onClick={() => handleEditInCompose(post)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition"
+                    >
+                      <Repeat2 className="w-3.5 h-3.5" /> Repost
+                    </button>
+                  )}
+
+                  {hasFailed && (
+                    <>
+                      <button
+                        onClick={() => void handleRetry(post.id)}
+                        disabled={isBusy}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition disabled:opacity-50"
+                      >
+                        {isBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />}
+                        Retry
+                      </button>
+                      <button
+                        onClick={() => handleEditInCompose(post)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-purple-700 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100 transition"
+                      >
+                        <Pencil className="w-3.5 h-3.5" /> Edit in Compose
+                      </button>
+                    </>
+                  )}
+
+                  {isScheduled && (
+                    <button
+                      onClick={() => void handleStop(post.id)}
+                      disabled={isBusy}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition disabled:opacity-50"
+                    >
+                      {isBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <StopCircle className="w-3.5 h-3.5" />}
+                      Stop
+                    </button>
+                  )}
+
+                  {isDeleting ? (
+                    <div className="flex items-center gap-2 ml-auto">
+                      <span className="text-xs text-red-600">Delete this post?</span>
+                      <button
+                        onClick={() => void handleDelete(post.id)}
+                        disabled={isBusy}
+                        className="px-3 py-1.5 text-xs font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition disabled:opacity-50"
+                      >
+                        {isBusy ? 'Deleting...' : 'Confirm'}
+                      </button>
+                      <button
+                        onClick={() => setConfirmDelete(null)}
+                        className="px-3 py-1.5 text-xs font-medium text-neutral-600 bg-white border border-neutral-200 rounded-lg hover:bg-neutral-50 transition"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setConfirmDelete(post.id)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-600 bg-white border border-neutral-200 rounded-lg hover:bg-red-50 hover:border-red-200 transition ml-auto"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" /> Delete
+                    </button>
+                  )}
+                </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </Card>
@@ -273,6 +596,13 @@ export function PostHistoryPage() {
           Next <ChevronRight className="w-4 h-4" />
         </Button>
       </div>
+
+      {analyticsPostId && (
+        <AnalyticsModal
+          postId={analyticsPostId}
+          onClose={() => setAnalyticsPostId(null)}
+        />
+      )}
     </div>
   );
 }

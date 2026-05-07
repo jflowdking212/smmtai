@@ -326,7 +326,7 @@ test('sign up, connect account, schedule post, and view analytics', async ({ pag
     .slice(0, 16);
   await page.locator('input[type="datetime-local"]').first().fill(localFutureValue);
 
-  await page.getByRole('button', { name: 'Schedule' }).click();
+  await page.getByRole('button', { name: 'Schedule Post' }).click();
   await expect(page.getByText('Post scheduled!')).toBeVisible();
 
   await page.getByRole('link', { name: 'Analytics' }).click();

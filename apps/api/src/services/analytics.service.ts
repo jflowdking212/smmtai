@@ -406,6 +406,90 @@ export class AnalyticsService {
     };
   }
 
+  // Fetch live analytics for a single post across all its platforms
+  async getPostAnalytics(postId: string, workspaceId: string) {
+    const post = await prisma.post.findFirst({
+      where: { id: postId, workspaceId },
+      include: {
+        platformPosts: {
+          include: { analytics: { orderBy: { capturedAt: 'desc' }, take: 1 } },
+        },
+      },
+    });
+    if (!post) throw new Error('Post not found');
+
+    const results: Array<{
+      platformPostId: string;
+      platform: string;
+      status: string;
+      metrics: SnapshotMetrics | null;
+      error: string | null;
+      fetchedLive: boolean;
+    }> = [];
+
+    for (const pp of post.platformPosts) {
+      if (pp.status !== 'published' || !pp.platformPostId) {
+        const cached = pp.analytics[0] || null;
+        results.push({
+          platformPostId: pp.id,
+          platform: pp.platform,
+          status: pp.status,
+          metrics: cached ? {
+            impressions: cached.impressions, reach: cached.reach,
+            likes: cached.likes, comments: cached.comments,
+            shares: cached.shares, clicks: cached.clicks, saves: cached.saves,
+          } : null,
+          error: null,
+          fetchedLive: false,
+        });
+        continue;
+      }
+
+      try {
+        const adapter = getPlatformAdapter(pp.platform as PlatformType);
+        if (!adapter.getPostAnalytics) throw new Error('Analytics not supported');
+        const accessToken = await connectionService.getAccessToken(pp.socialConnectionId);
+        const live = await adapter.getPostAnalytics(accessToken, pp.platformPostId);
+
+        const metrics: SnapshotMetrics = {
+          impressions: live.impressions || 0,
+          reach: live.reach || 0,
+          likes: live.likes || 0,
+          comments: live.comments || 0,
+          shares: live.shares || 0,
+          clicks: live.clicks || 0,
+          saves: live.saves || 0,
+        };
+
+        // Store snapshot
+        const engagementRate = metrics.impressions > 0
+          ? ((metrics.likes + metrics.comments + metrics.shares) / metrics.impressions) * 100 : 0;
+        await prisma.analyticsSnapshot.create({
+          data: { platformPostId: pp.id, ...metrics, engagementRate },
+        });
+
+        results.push({ platformPostId: pp.id, platform: pp.platform, status: pp.status, metrics, error: null, fetchedLive: true });
+      } catch (err) {
+        // Fall back to cached snapshot
+        const cached = pp.analytics[0] || null;
+        results.push({
+          platformPostId: pp.id,
+          platform: pp.platform,
+          status: pp.status,
+          metrics: cached ? {
+            impressions: cached.impressions, reach: cached.reach,
+            likes: cached.likes, comments: cached.comments,
+            shares: cached.shares, clicks: cached.clicks, saves: cached.saves,
+          } : null,
+          error: err instanceof Error ? err.message : 'Failed to fetch analytics',
+          fetchedLive: false,
+        });
+      }
+    }
+
+    return { postId, platforms: results };
+  }
+
   // Get top-performing posts
   async getTopPosts(workspaceId: string, limit = 10) {
     const posts = await prisma.platformPost.findMany({

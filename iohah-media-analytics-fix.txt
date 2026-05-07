@@ -1,0 +1,90 @@
+Iohah backend fixes required for SMMT (verified 2026-03-13)
+
+Context
+- SMMT page/group posting works using custom endpoint:
+  POST /apis/php/posts/create
+- Current problems:
+  1) image posts render as raw links instead of media attachments
+  2) analytics requests fail (404/500), so no post metrics
+
+What was verified from official Sngine API docs (Postman collection)
+- Docs source: https://api.sngine.com/
+- Collection endpoint list includes:
+  - GET /apis/php/data/load
+  - POST /apis/php/data/upload
+  - POST /apis/php/chat/message
+  - ...
+- No official post analytics endpoint is documented (no /posts/:id analytics route).
+
+Live probe results on iohah.com using signed headers + valid x-auth-token
+- GET /apis/php/posts/{post_id} -> 404 JSON
+  {"status":"error","message":"404 Not Found"}
+- GET /apis/php/posts/view/{post_id} -> 404 JSON
+  {"status":"error","message":"404 Not Found"}
+- GET /apis/php/data/load?get=post&post_id={id} -> 500 HTML
+- GET /apis/php/data/load?get=posts&post_id={id} -> 500 HTML
+- POST /apis/php/data/upload (multipart) -> 500 HTML
+
+Root cause
+1) Media pipeline is incomplete on Iohah:
+   - /data/upload is failing with 500 (HTML)
+   - /posts/create currently accepts media_url but does not attach/render uploaded media as post media
+2) Analytics pipeline is missing on Iohah:
+   - there is no JSON endpoint returning per-post metrics for a post id
+
+Required backend changes on Iohah (must be implemented there)
+1) Fix data upload endpoint
+   - Route: POST /apis/php/data/upload
+   - Must accept multipart/form-data fields per docs:
+     - multiple (false/true)
+     - handle (x-image or x-video)
+     - type (photos or videos)
+     - files (file)
+     - optional name, guid
+   - Must return JSON (not HTML), for example:
+     {
+       "status":"success",
+       "data": {
+         "src":"photos/2026/03/abc123.jpg",
+         "url":"https://iohah.com/content/uploads/photos/2026/03/abc123.jpg",
+         "name":"abc123.jpg",
+         "guid":"..."
+       }
+     }
+
+2) Make /posts/create publish real media attachments
+   - Route: POST /apis/php/posts/create
+   - Must support one or both patterns:
+     A) direct multipart file in request (postFile/postPhoto/postVideo/files)
+     B) previously uploaded file reference (src/url/name/guid) from /data/upload
+   - Must attach media via publisher so it renders as image/video in timeline/page/group feed (not plain URL text)
+
+3) Add post analytics endpoint (JSON)
+   - Recommended route:
+     GET /apis/php/posts/{id}/analytics
+   - Required response contract:
+     {
+       "status":"success",
+       "data": {
+         "id":"707",
+         "impressions": 0,
+         "reach": 0,
+         "likes": 0,
+         "comments": 0,
+         "shares": 0,
+         "clicks": 0,
+         "saves": 0
+       }
+     }
+   - Optional aliases are okay, but MUST return JSON and include post id + metric fields.
+
+4) JSON-only errors for API routes
+   - Ensure all /apis/php/* endpoints return JSON errors via apiError() (not HTML fatal output)
+
+SMMT side already prepared
+- SMMT now tries signed requests and multipart publish variants for Iohah.
+- SMMT supports env override for analytics endpoint:
+  IOHAH_ANALYTICS_ENDPOINT
+  IOHAH_ANALYTICS_ENDPOINTS (comma-separated)
+- Until Iohah provides a real JSON analytics route and working media upload/attach flow,
+  analytics and image attachment cannot be completed end-to-end.

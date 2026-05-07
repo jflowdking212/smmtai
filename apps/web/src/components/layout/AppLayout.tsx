@@ -6,7 +6,6 @@ import { useAuthStore } from '@/stores/authStore';
 import { useSubscription } from '@/hooks/useSubscription';
 import { api } from '@/lib/api';
 import { FeedbackWidget } from '@/components/FeedbackWidget';
-import { AIChatbot } from '@/components/AIChatbot';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import type { AppFeature } from '@ee-postmind/shared';
 import {
@@ -16,6 +15,8 @@ import {
   Calendar,
   BarChart3,
   Link2,
+  MessageCircle,
+  MessageSquare,
   Palette,
   Sparkles,
   Settings,
@@ -40,6 +41,9 @@ const navigation: { name: string; href: string; icon: typeof LayoutDashboard; fe
   { name: 'Calendar', href: '/calendar', icon: Calendar, feature: 'calendar' },
   { name: 'Analytics', href: '/analytics', icon: BarChart3, feature: 'analytics' },
   { name: 'Connections', href: '/connections', icon: Link2, feature: 'connections' },
+  { name: 'Entrepreneurs', href: '/entrepreneurs', icon: Users, feature: 'connections' },
+  { name: 'Inbox', href: '/inbox', icon: MessageCircle, feature: 'connections' },
+  { name: 'Comments', href: '/comments', icon: MessageSquare, feature: 'connections' },
   { name: 'Templates', href: '/templates', icon: Palette, feature: 'templates' },
   { name: 'AI Assistant', href: '/ai', icon: Sparkles, feature: 'ai_assistant' },
 ];
@@ -167,12 +171,12 @@ export function AppLayout() {
             <button
               onClick={() => navigate('/admin/dashboard')}
               className={cn(
-                'flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm font-medium text-amber-600 hover:text-amber-500 hover:bg-amber-50 transition-all duration-200',
+                'flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm font-semibold bg-amber-50 text-amber-700 hover:bg-amber-100 hover:text-amber-800 border border-amber-200 transition-all duration-200',
                 collapsed && 'justify-center px-0',
               )}
             >
               <Monitor className="w-5 h-5 flex-shrink-0" />
-              {!collapsed && <span>Admin Mode</span>}
+              {!collapsed && <span>Admin Panel</span>}
             </button>
           )}
           <button
@@ -235,8 +239,6 @@ export function AppLayout() {
 
       {/* Feedback widget */}
       {/* <FeedbackWidget /> */}
-      {/* AI Chatbot */}
-      <AIChatbot />
     </div>
   );
 }

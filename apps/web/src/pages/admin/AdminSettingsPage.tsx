@@ -265,6 +265,9 @@ export function AdminSettingsPage() {
                   const platform = PLATFORMS[platformKey as PlatformType] || { name: platformKey };
                   const creds = platformCreds[platformKey] || { access_token: '', server_key: '', client_id: '', client_secret: '' };
                   const isWoWonder = ['entreprenrs', 'chrxstians', 'iohah'].includes(platformKey);
+                  const isSngine = platformKey === 'chrxstians' || platformKey === 'iohah';
+                  const isEntreprenrs = platformKey === 'entreprenrs';
+                  const isTelegram = platformKey === 'telegram';
                   const isOAuth = ['facebook', 'instagram', 'tiktok', 'linkedin', 'twitter', 'youtube', 'pinterest'].includes(platformKey);
                   return (
                     <div key={platformKey} className="p-4 rounded-xl bg-neutral-800/50 border border-neutral-700/50 space-y-2">
@@ -288,23 +291,27 @@ export function AdminSettingsPage() {
                         ) : isWoWonder ? (
                           <>
                             <div>
-                              <label className="block text-xs text-neutral-500 mb-1">Server Key (API v2)</label>
-                              <input type="password" value={creds.access_token} onChange={(e) => setPlatformCreds((prev) => ({ ...prev, [platformKey]: { ...prev[platformKey], access_token: e.target.value } }))} className={inputClass} placeholder="Enter server key" />
+                              <label className="block text-xs text-neutral-500 mb-1">{isEntreprenrs ? 'Access Token (user)' : isSngine ? 'API Key' : 'Access Token'}</label>
+                              <input type="password" value={creds.access_token} onChange={(e) => setPlatformCreds((prev) => ({ ...prev, [platformKey]: { ...prev[platformKey], access_token: e.target.value } }))} className={inputClass} placeholder={isEntreprenrs ? 'Enter access token' : isSngine ? 'Enter API key' : 'Enter access token'} />
                             </div>
                             <div>
-                              <label className="block text-xs text-neutral-500 mb-1">Server Key (confirm)</label>
-                              <input type="password" value={creds.server_key} onChange={(e) => setPlatformCreds((prev) => ({ ...prev, [platformKey]: { ...prev[platformKey], server_key: e.target.value } }))} className={inputClass} placeholder="Confirm server key" />
+                              <label className="block text-xs text-neutral-500 mb-1">{isEntreprenrs ? 'Server Key (API v2)' : isSngine ? 'API Secret' : 'Server Key'}</label>
+                              <input type="password" value={creds.server_key} onChange={(e) => setPlatformCreds((prev) => ({ ...prev, [platformKey]: { ...prev[platformKey], server_key: e.target.value } }))} className={inputClass} placeholder={isEntreprenrs ? 'Enter server key' : isSngine ? 'Enter API secret' : 'Enter secret'} />
                             </div>
                           </>
                         ) : (
                           <>
                             <div>
-                              <label className="block text-xs text-neutral-500 mb-1">Access Token / Bot Token</label>
-                              <input type="password" value={creds.access_token} onChange={(e) => setPlatformCreds((prev) => ({ ...prev, [platformKey]: { ...prev[platformKey], access_token: e.target.value } }))} className={inputClass} placeholder="Enter token" />
+                              <label className="block text-xs text-neutral-500 mb-1">{isTelegram ? 'Bot Token' : 'Access Token / Bot Token'}</label>
+                              <input type="password" value={creds.access_token} onChange={(e) => setPlatformCreds((prev) => ({ ...prev, [platformKey]: { ...prev[platformKey], access_token: e.target.value } }))} className={inputClass} placeholder={isTelegram ? 'Enter bot token from @BotFather' : 'Enter token'} />
                             </div>
                             <div>
-                              <label className="block text-xs text-neutral-500 mb-1">App Password / Secret</label>
-                              <input type="password" value={creds.server_key} onChange={(e) => setPlatformCreds((prev) => ({ ...prev, [platformKey]: { ...prev[platformKey], server_key: e.target.value } }))} className={inputClass} placeholder="Enter secret (if needed)" />
+                              <label className="block text-xs text-neutral-500 mb-1">{isTelegram ? 'Default Chat ID / Channel Username' : 'App Password / Secret'}</label>
+                              {isTelegram ? (
+                                <input type="text" value={creds.client_id} onChange={(e) => setPlatformCreds((prev) => ({ ...prev, [platformKey]: { ...prev[platformKey], client_id: e.target.value } }))} className={inputClass} placeholder="@mychannel or -1001234567890" />
+                              ) : (
+                                <input type="password" value={creds.server_key} onChange={(e) => setPlatformCreds((prev) => ({ ...prev, [platformKey]: { ...prev[platformKey], server_key: e.target.value } }))} className={inputClass} placeholder="Enter secret (if needed)" />
+                              )}
                             </div>
                           </>
                         )}

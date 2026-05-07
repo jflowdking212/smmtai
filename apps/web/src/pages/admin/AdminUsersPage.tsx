@@ -10,6 +10,8 @@ import {
   ShieldOff,
   ArrowUpCircle,
   ArrowDownCircle,
+  Trash2,
+  X,
 } from 'lucide-react';
 
 interface AdminUser {
@@ -36,6 +38,9 @@ export function AdminUsersPage() {
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<AdminUser | null>(null);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deleteLoading, setDeleteLoading] = useState(false);
   const toast = useToast();
 
   const loadUsers = useCallback(async () => {
@@ -81,6 +86,35 @@ export function AdminUsersPage() {
     }
   }
 
+  async function handleRoleChange(userId: string, newRole: string) {
+    setActionLoading(userId);
+    try {
+      await api.admin.updateUserRole(userId, newRole);
+      toast.success('Success', `User role updated to ${newRole}`);
+      await loadUsers();
+    } catch (err) {
+      toast.error('Error', err instanceof ApiError ? err.message : 'Role change failed');
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleDeleteConfirm() {
+    if (!deleteTarget || !deletePassword.trim()) return;
+    setDeleteLoading(true);
+    try {
+      await api.admin.deleteUser(deleteTarget.id, deletePassword);
+      toast.success('Deleted', `${deleteTarget.name} has been removed`);
+      setDeleteTarget(null);
+      setDeletePassword('');
+      await loadUsers();
+    } catch (err) {
+      toast.error('Error', err instanceof ApiError ? err.message : 'Delete failed');
+    } finally {
+      setDeleteLoading(false);
+    }
+  }
+
   const totalPages = Math.ceil(total / 20);
 
   function getStatusVariant(status: string): 'success' | 'warning' | 'danger' | 'default' {
@@ -121,6 +155,7 @@ export function AdminUsersPage() {
             <thead>
               <tr className="border-b border-neutral-800">
                 <th className="text-left px-4 py-3 text-xs font-medium text-neutral-400 uppercase tracking-wider">User</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-neutral-400 uppercase tracking-wider">Role</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-neutral-400 uppercase tracking-wider">Plan</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-neutral-400 uppercase tracking-wider">Status</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-neutral-400 uppercase tracking-wider">Posts</th>
@@ -130,9 +165,9 @@ export function AdminUsersPage() {
             </thead>
             <tbody className="divide-y divide-neutral-800/50">
               {loading ? (
-                <tr><td colSpan={6} className="px-4 py-8 text-center text-neutral-500">Loading...</td></tr>
+                <tr><td colSpan={7} className="px-4 py-8 text-center text-neutral-500">Loading...</td></tr>
               ) : users.length === 0 ? (
-                <tr><td colSpan={6} className="px-4 py-8 text-center text-neutral-500">No users found.</td></tr>
+                <tr><td colSpan={7} className="px-4 py-8 text-center text-neutral-500">No users found.</td></tr>
               ) : (
                 users.map((user) => (
                   <tr key={user.id} className="hover:bg-neutral-800/30 transition-colors">
@@ -141,6 +176,11 @@ export function AdminUsersPage() {
                         <p className="text-sm font-medium text-neutral-200">{user.name}</p>
                         <p className="text-xs text-neutral-500">{user.email}</p>
                       </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <Badge variant={user.role === 'owner' ? 'brand' : 'default'} className="text-xs">
+                        {user.role === 'owner' ? 'Admin' : 'User'}
+                      </Badge>
                     </td>
                     <td className="px-4 py-3">
                       <select
@@ -166,8 +206,29 @@ export function AdminUsersPage() {
                     <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-2">
                         {user.role === 'owner' ? (
-                          <Badge variant="brand" className="text-xs">Admin</Badge>
-                        ) : user.subscriptionStatus === 'suspended' ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleRoleChange(user.id, 'viewer')}
+                            loading={actionLoading === user.id}
+                            className="text-amber-400 hover:bg-amber-500/10"
+                            title="Demote to regular user"
+                          >
+                            <ArrowDownCircle className="w-4 h-4" /> Make User
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleRoleChange(user.id, 'owner')}
+                            loading={actionLoading === user.id}
+                            className="text-blue-400 hover:bg-blue-500/10"
+                            title="Promote to admin"
+                          >
+                            <ArrowUpCircle className="w-4 h-4" /> Make Admin
+                          </Button>
+                        )}
+                        {user.subscriptionStatus === 'suspended' ? (
                           <Button
                             variant="ghost"
                             size="sm"
@@ -188,6 +249,15 @@ export function AdminUsersPage() {
                             <ShieldOff className="w-4 h-4" /> Suspend
                           </Button>
                         )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => { setDeleteTarget(user); setDeletePassword(''); }}
+                          className="text-red-500 hover:bg-red-500/10"
+                          title="Delete user"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
                       </div>
                     </td>
                   </tr>
@@ -212,6 +282,52 @@ export function AdminUsersPage() {
           </div>
         )}
       </Card>
+
+      {/* Delete confirmation modal */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="bg-neutral-900 border border-neutral-700 rounded-2xl p-6 w-full max-w-md shadow-2xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-white">Delete User</h3>
+              <button onClick={() => setDeleteTarget(null)} className="text-neutral-500 hover:text-white transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <p className="text-sm text-neutral-400 mb-1">
+              You are about to permanently delete <span className="text-white font-medium">{deleteTarget.name}</span> ({deleteTarget.email}).
+            </p>
+            {deleteTarget.role === 'owner' && (
+              <p className="text-xs text-amber-400 bg-amber-500/10 rounded-lg px-3 py-2 mb-3 mt-2">
+                ⚠ This user is an admin. You can only delete them if at least one other admin exists.
+              </p>
+            )}
+            <p className="text-sm text-neutral-400 mb-4 mt-2">Enter your admin password to confirm:</p>
+            <input
+              type="password"
+              value={deletePassword}
+              onChange={(e) => setDeletePassword(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleDeleteConfirm()}
+              placeholder="Your password"
+              autoFocus
+              className="w-full px-4 py-2.5 rounded-xl border border-neutral-700 bg-neutral-800 text-neutral-200 placeholder:text-neutral-500 text-sm focus:outline-none focus:ring-2 focus:ring-red-500/40 focus:border-red-500 mb-4"
+            />
+            <div className="flex gap-3">
+              <Button variant="ghost" className="flex-1 text-neutral-400" onClick={() => setDeleteTarget(null)}>
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+                loading={deleteLoading}
+                disabled={!deletePassword.trim()}
+                onClick={handleDeleteConfirm}
+              >
+                <Trash2 className="w-4 h-4" /> Delete User
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

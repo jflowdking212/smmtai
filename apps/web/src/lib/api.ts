@@ -2,6 +2,19 @@ import type { SubscriptionTier, WorkspaceRole } from '@ee-postmind/shared';
 
 const API_BASE = '/api/v1';
 const UNSAFE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+const AUTH_NO_REFRESH_PREFIXES = [
+  '/auth/login',
+  '/auth/register',
+  '/auth/forgot-password',
+  '/auth/reset-password',
+  '/auth/verify-email',
+  '/auth/oauth/',
+  '/auth/refresh',
+];
+
+function shouldAttemptRefresh(url: string): boolean {
+  return !AUTH_NO_REFRESH_PREFIXES.some((prefix) => url.startsWith(prefix));
+}
 
 function getCookieValue(name: string): string | null {
   if (typeof document === 'undefined') return null;
@@ -17,7 +30,7 @@ function getCookieValue(name: string): string | null {
   return null;
 }
 
-async function request<T>(url: string, options?: RequestInit): Promise<T> {
+async function request<T>(url: string, options?: RequestInit, retryOnUnauthorized = true): Promise<T> {
   const token = useAuthStore.getState().accessToken;
   const method = (options?.method || 'GET').toUpperCase();
   const csrfToken = UNSAFE_METHODS.has(method) ? getCookieValue('csrfToken') : null;
@@ -25,6 +38,7 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
 
   const res = await fetch(`${API_BASE}${url}`, {
     ...options,
+    cache: 'no-store',
     headers: {
       ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -37,12 +51,14 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const data = await res.json().catch(() => ({}));
 
   if (!res.ok) {
-    // Try token refresh on 401
-    if (res.status === 401) {
+    // Try one token refresh on 401 for non-auth endpoints only.
+    if (res.status === 401 && retryOnUnauthorized && shouldAttemptRefresh(url)) {
       const refreshed = await refreshTokens();
       if (refreshed) {
-        return request<T>(url, options);
+        return request<T>(url, options, false);
       }
+    }
+    if (res.status === 401 && shouldAttemptRefresh(url)) {
       useAuthStore.getState().logout();
     }
     throw new ApiError(data.error?.message || 'Request failed', data.error?.code, res.status);
@@ -51,7 +67,7 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
   return data;
 }
 
-async function requestBlob(url: string, options?: RequestInit): Promise<Blob> {
+async function requestBlob(url: string, options?: RequestInit, retryOnUnauthorized = true): Promise<Blob> {
   const token = useAuthStore.getState().accessToken;
   const method = (options?.method || 'GET').toUpperCase();
   const csrfToken = UNSAFE_METHODS.has(method) ? getCookieValue('csrfToken') : null;
@@ -59,6 +75,7 @@ async function requestBlob(url: string, options?: RequestInit): Promise<Blob> {
 
   const res = await fetch(`${API_BASE}${url}`, {
     ...options,
+    cache: 'no-store',
     headers: {
       ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -69,11 +86,13 @@ async function requestBlob(url: string, options?: RequestInit): Promise<Blob> {
   });
 
   if (!res.ok) {
-    if (res.status === 401) {
+    if (res.status === 401 && retryOnUnauthorized && shouldAttemptRefresh(url)) {
       const refreshed = await refreshTokens();
       if (refreshed) {
-        return requestBlob(url, options);
+        return requestBlob(url, options, false);
       }
+    }
+    if (res.status === 401 && shouldAttemptRefresh(url)) {
       useAuthStore.getState().logout();
     }
 
@@ -152,6 +171,22 @@ export const api = {
   },
   users: {
     getProfile: () => request<{ success: true; data: any }>('/users/profile'),
+    listEntrepreneurs: () =>
+      request<{
+        success: true;
+        data: Array<{
+          id: string;
+          name: string;
+          email: string;
+          avatar: string | null;
+          bio: string | null;
+          workspaceName: string;
+          tier: string;
+          accountName: string;
+          accountId: string;
+          connectedAt: string;
+        }>;
+      }>('/users/entrepreneurs'),
     updateProfile: (body: { name?: string; bio?: string; timezone?: string }) =>
       request<{ success: true; data: any }>('/users/profile', {
         method: 'PATCH',
@@ -221,21 +256,23 @@ export const api = {
   billing: {
     status: () =>
       request<{ success: true; data: any }>('/billing/status'),
-    checkout: (priceKey: string) =>
+    checkout: (priceKey: string, couponCode?: string) =>
       request<{ success: true; data: { url: string } }>('/billing/checkout', {
         method: 'POST',
-        body: JSON.stringify({ priceKey }),
+        body: JSON.stringify({ priceKey, ...(couponCode ? { couponCode } : {}) }),
       }),
-    checkoutPublic: (body: { name: string; email: string; priceKey: string }) =>
+    checkoutPublic: (body: { name: string; email: string; priceKey: string; couponCode?: string }) =>
       request<{ success: true; data: { url: string } }>('/billing/checkout/public', {
         method: 'POST',
         body: JSON.stringify(body),
       }),
-    changePlan: (body: { tier?: string; priceKey?: string }) =>
+    changePlan: (body: { tier?: string; priceKey?: string; couponCode?: string }) =>
       request<{ success: true; data: any }>('/billing/change-plan', {
         method: 'POST',
         body: JSON.stringify(body),
       }),
+    previewCoupon: (code: string, priceKey?: string) =>
+      request<{ success: true; data: any }>(`/billing/coupons/${encodeURIComponent(code)}${priceKey ? `?priceKey=${encodeURIComponent(priceKey)}` : ''}`),
     portal: () =>
       request<{ success: true; data: { url: string } }>('/billing/portal', {
         method: 'POST',
@@ -248,14 +285,30 @@ export const api = {
       request<{ success: true; data: any[] }>('/connections'),
     getGlobalPlatforms: () =>
       request<{ success: true; data: string[] }>('/connections/global-platforms'),
-    initiateOAuth: (platform: string) =>
+    initiateOAuth: (platform: string, mode?: string) =>
       request<{ success: true; data: { authUrl: string } }>(`/connections/${platform}/auth`, {
         method: 'POST',
+        body: mode ? JSON.stringify({ mode }) : undefined,
       }),
     manualConnect: (platform: string, credentials: string) =>
       request<{ success: true; data: any }>(`/connections/${platform}/connect`, {
         method: 'POST',
         body: JSON.stringify({ credentials }),
+      }),
+    getEntreprenrsAccessToken: (body: { username: string; password: string; serverKey?: string }) =>
+      request<{ success: true; data: { accessToken: string; serverKey: string; userId?: string } }>('/connections/entreprenrs/access-token', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    getChrxstiansAccessToken: (body: { usernameEmail: string; password: string; apiKey: string; apiSecret: string }) =>
+      request<{ success: true; data: { accessToken: string; apiKey: string; apiSecret: string; accountId?: string; accountName?: string } }>('/connections/chrxstians/access-token', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    getIohahAccessToken: (body: { usernameEmail: string; password: string; apiKey: string; apiSecret: string }) =>
+      request<{ success: true; data: { accessToken: string; apiKey: string; apiSecret: string; accountId?: string; accountName?: string } }>('/connections/iohah/access-token', {
+        method: 'POST',
+        body: JSON.stringify(body),
       }),
     healthCheck: (connectionId: string) =>
       request<{ success: true; data: {
@@ -271,6 +324,18 @@ export const api = {
       } }>(`/connections/${connectionId}/health-check`, { method: 'POST' }),
     disconnect: (connectionId: string) =>
       request(`/connections/${connectionId}`, { method: 'DELETE' }),
+    facebookPages: (connectionId: string) =>
+      request<{ success: true; data: Array<{ id: string; name: string; picture: string | null; accessToken: string }> }>(`/connections/${connectionId}/facebook-pages`),
+    entreprenrsPages: (connectionId: string) =>
+      request<{ success: true; data: Array<{ id: string; name: string; description?: string | null; avatar?: string | null }> }>(`/connections/${connectionId}/entreprenrs-pages`),
+    chrxstiansPages: (connectionId: string) =>
+      request<{ success: true; data: Array<{ id: string; name: string; description?: string | null; avatar?: string | null; url?: string | null }> }>(`/connections/${connectionId}/chrxstians-pages`),
+    chrxstiansGroups: (connectionId: string) =>
+      request<{ success: true; data: Array<{ id: string; name: string; description?: string | null; avatar?: string | null; url?: string | null }> }>(`/connections/${connectionId}/chrxstians-groups`),
+    iohahPages: (connectionId: string) =>
+      request<{ success: true; data: Array<{ id: string; name: string; description?: string | null; avatar?: string | null; url?: string | null }> }>(`/connections/${connectionId}/iohah-pages`),
+    iohahGroups: (connectionId: string) =>
+      request<{ success: true; data: Array<{ id: string; name: string; description?: string | null; avatar?: string | null; url?: string | null }> }>(`/connections/${connectionId}/iohah-groups`),
   },
   ai: {
     caption: (data: any) =>
@@ -326,6 +391,8 @@ export const api = {
     },
     delete: (postId: string) =>
       request(`/posts/${postId}`, { method: 'DELETE' }),
+    analytics: (postId: string) =>
+      request<{ success: true; data: { postId: string; platforms: Array<{ platformPostId: string; platform: string; status: string; metrics: { impressions: number; reach: number; likes: number; comments: number; shares: number; clicks: number; saves: number } | null; error: string | null; fetchedLive: boolean }> } }>(`/posts/${postId}/analytics`),
   },
   schedule: {
     calendar: (start?: string, end?: string) =>
@@ -505,6 +572,18 @@ export const api = {
         method: 'PUT',
         body: JSON.stringify(data, (_k, v) => (v === Infinity ? '__INFINITY__' : v)),
       }),
+    getCoupons: () =>
+      request<{ success: true; data: any[] }>('/admin/coupons'),
+    createCoupon: (data: Record<string, any>) =>
+      request<{ success: true; data: any }>('/admin/coupons', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    updateCoupon: (id: string, data: Record<string, any>) =>
+      request<{ success: true; data: any }>(`/admin/coupons/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
     // Admin dashboard & management
     getDashboard: () =>
       request<{ success: true; data: { totalUsers: number; scheduledPosts: number; activeSubscriptions: number; planBreakdown: Record<string, number> } }>('/admin/dashboard'),
@@ -514,6 +593,10 @@ export const api = {
       request<{ success: true; data: { message: string } }>(`/admin/users/${id}/status`, { method: 'PUT', body: JSON.stringify({ action }) }),
     updateUserPlan: (id: string, tier: string) =>
       request<{ success: true; data: { message: string } }>(`/admin/users/${id}/plan`, { method: 'PUT', body: JSON.stringify({ tier }) }),
+    updateUserRole: (id: string, role: string) =>
+      request<{ success: true; data: { message: string } }>(`/admin/users/${id}/role`, { method: 'PUT', body: JSON.stringify({ role }) }),
+    deleteUser: (id: string, password: string) =>
+      request<{ success: true; data: { message: string } }>(`/admin/users/${id}`, { method: 'DELETE', body: JSON.stringify({ password }) }),
     getAnalytics: () =>
       request<{ success: true; data: any }>('/admin/analytics'),
     getMessages: (params?: { status?: string; search?: string; page?: string; limit?: string }) =>
@@ -549,6 +632,34 @@ export const api = {
       request<{ success: true; data: any }>('/chat/knowledge/bulk-import', { method: 'POST', body: JSON.stringify({ entries }) }),
     searchKnowledge: (query: string, limit?: number) =>
       request<{ success: true; data: any[] }>('/chat/knowledge/search', { method: 'POST', body: JSON.stringify({ query, limit }) }),
+  },
+
+  messaging: {
+    getConversations: () =>
+      request<{ success: true; data: { conversations: any[]; connections: any[] } }>('/messaging/conversations'),
+    getMessages: (conversationId: string, connectionId: string) =>
+      request<{ success: true; data: any[] }>(`/messaging/conversations/${conversationId}/messages?connectionId=${connectionId}`),
+    sendMessage: (conversationId: string, connectionId: string, recipientId: string, message: string) =>
+      request<{ success: true; data: any }>(`/messaging/conversations/${conversationId}/messages`, {
+        method: 'POST',
+        body: JSON.stringify({ connectionId, recipientId, message }),
+      }),
+    getPostComments: (mediaId: string, connectionId: string) =>
+      request<{ success: true; data: any[] }>(`/messaging/posts/${mediaId}/comments?connectionId=${connectionId}`),
+    replyToComment: (commentId: string, connectionId: string, message: string) =>
+      request<{ success: true; data: any }>(`/messaging/comments/${commentId}/reply`, {
+        method: 'POST',
+        body: JSON.stringify({ connectionId, message }),
+      }),
+    hideComment: (commentId: string, connectionId: string, hide: boolean) =>
+      request<{ success: true; data: any }>(`/messaging/comments/${commentId}/hide`, {
+        method: 'POST',
+        body: JSON.stringify({ connectionId, hide }),
+      }),
+    deleteComment: (commentId: string, connectionId: string) =>
+      request<{ success: true; data: any }>(`/messaging/comments/${commentId}?connectionId=${connectionId}`, {
+        method: 'DELETE',
+      }),
   },
 };
 

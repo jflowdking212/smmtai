@@ -23,7 +23,7 @@ async function getToken() {
 const coreArticles = [
   {
     title: 'What is EE PostMind?',
-    content: `EE PostMind is an AI-powered social media management platform that helps creators, teams, and agencies create, schedule, and publish content across 13+ social media platforms from a single dashboard.\n\nKey features include:\n• AI Content Generation — Generate captions, hashtags, blog posts, and content ideas using advanced AI models\n• Visual Design Editor — Create stunning graphics with a built-in Fabric.js editor (templates, shapes, text, images)\n• Smart Scheduling — Plan and schedule posts with an intuitive calendar view, optimal time suggestions\n• Multi-Platform Publishing — Publish simultaneously to Facebook, Instagram, Twitter/X, LinkedIn, TikTok, YouTube, Pinterest, Threads, Mastodon, Bluesky, Tumblr, Reddit, and Google Business Profile\n• Analytics Dashboard — Track engagement, reach, impressions, and growth across all channels\n• Team Collaboration — Invite team members, assign roles (Admin, Editor, Viewer), manage approval workflows\n• AI Chatbot Assistant — Get instant help and answers from our AI-powered chatbot\n• Knowledge Base — Comprehensive guides and tutorials for all features\n\nEE PostMind is designed to save you time and help you grow your social media presence with intelligent automation and beautiful content creation tools.`,
+    content: `EE PostMind is an AI-powered social media management platform that helps creators, teams, and agencies create, schedule, and publish content across connected platforms from a single dashboard.\n\nKey features include:\n• AI Content Generation — Generate captions, hashtags, blog posts, and content ideas using advanced AI models\n• Visual Design Editor — Create stunning graphics with a built-in Fabric.js editor (templates, shapes, text, images)\n• Smart Scheduling — Plan and schedule posts with an intuitive calendar view, optimal time suggestions\n• Multi-Platform Publishing — Publish to Facebook, Instagram, TikTok, LinkedIn, Twitter/X, YouTube, Pinterest, Bluesky, Mastodon, Telegram, Entreprenrs, Chrxstians, and Iohah\n• Analytics Dashboard — Track engagement, reach, impressions, and growth across all channels\n• Team Collaboration — Invite team members, assign roles (Admin, Editor, Viewer), manage approval workflows\n• AI Chatbot Assistant — Get instant help and answers from our AI-powered chatbot\n• Knowledge Base — Comprehensive guides and tutorials for all features\n\nEE PostMind is designed to save you time and help you grow your social media presence with intelligent automation and beautiful content creation tools.`,
     category: 'General',
     tags: ['overview', 'about', 'what is', 'features', 'platform', 'introduction', 'ee postmind'],
     priority: 10,
@@ -107,23 +107,30 @@ const coreArticles = [
   },
   {
     title: 'Connecting Social Media Accounts — Overview',
-    content: `EE PostMind supports 13 platforms. To connect:\n\n1. Go to Connections\n2. Click "Add Connection"\n3. Select platform\n4. Follow OAuth flow\n5. Grant permissions\n\nSupported: Facebook, Instagram, Twitter/X, LinkedIn, TikTok, YouTube, Pinterest, Threads, Mastodon, Bluesky, Tumblr, Reddit, Google Business Profile.\n\nLimits: Free 3 accounts, Pro 10, Business 25, Enterprise unlimited.\n\nTroubleshooting: "Disconnected" → click to re-authorize. Tokens auto-refresh when possible. Need admin access for business pages.`,
+    content: `EE PostMind supports OAuth and manual connection flows.\n\nGeneral steps:\n1. Go to Connections\n2. Click "Connect" on a platform card\n3. Complete OAuth or enter manual credentials\n4. Confirm account shows as Connected\n\nCurrent platform connection modes:\n• OAuth: Facebook, Instagram, TikTok, LinkedIn, Twitter/X, YouTube, Pinterest\n• Manual credentials: Bluesky, Mastodon, Telegram, Entreprenrs, Chrxstians, Iohah\n\nInstagram has two OAuth options in the UI:\n• Instagram Direct Login\n• Connect via Facebook\n\nLimits: Free 3 accounts, Pro 10, Business 25, Enterprise unlimited.\n\nTroubleshooting: If a connection shows "Needs attention" or "Expired", reconnect from the Connections page and run Connection Check.`,
     category: 'Connections',
     tags: ['connect', 'connection', 'social media', 'link account', 'add account', 'platforms', 'oauth', 'authorize', 'how many accounts'],
     priority: 9,
   },
   {
     title: 'Connecting Facebook',
-    content: `Connect Facebook to EE PostMind:\n\nPrereqs: Facebook account with admin access to the Page.\n\nSteps: Connections → Add Connection → Facebook → Connect → Log in → Select Pages → Grant permissions (pages_manage_posts, pages_read_engagement, pages_manage_metadata, pages_read_user_content) → Done.\n\nCapabilities: Text, photos, videos, links, Stories. Schedule posts. View engagement.\n\nSpecs: Text up to 63,206 chars. Up to 10 images. Videos up to 240 min/10GB. Recommended image: 1200×630.\n\nTips: Post 1-4 PM weekdays. MP4/MOV format for video.\n\nTroubleshooting: "Permission denied" → need Page admin. "Token expired" → re-authorize. "Page not found" → ensure published/active.`,
+    content: `Connect Facebook to EE PostMind:\n\nPrereqs:\n• Facebook account with access to at least one managed Page\n• Permission to publish on that Page\n\nSteps:\n1. Go to Connections\n2. Click Connect on Facebook\n3. Sign in and authorize permissions\n4. Return to EE PostMind and confirm status is Connected\n\nCurrent OAuth scopes requested:\n• public_profile\n• email\n• pages_show_list\n• pages_manage_posts\n• pages_read_engagement\n\nPublishing behavior:\n• EE PostMind publishes to a managed Page\n• If no specific page is selected in metadata, it auto-resolves the first managed Page\n\nTroubleshooting:\n• "No Facebook Page found" → connect an account that manages at least one Page\n• "Token expired" or "Needs attention" → reconnect Facebook\n• Permission errors → verify Page role (admin/editor) in Facebook`,
     category: 'Connections',
     tags: ['facebook', 'fb', 'meta', 'page', 'connect facebook', 'facebook api', 'facebook page', 'facebook group'],
     priority: 8,
   },
   {
     title: 'Connecting Instagram',
-    content: `Connect Instagram to EE PostMind:\n\nPrereqs: Instagram Business or Creator account. Facebook Page linked to Instagram (required by Meta's API).\n\nConvert to Business: Instagram → Settings → Account → Switch to Professional → Choose Business/Creator → Connect Facebook Page.\n\nSteps: Connections → Add Connection → Instagram → Connect (via Facebook login) → Select linked Facebook Page → Grant permissions (instagram_basic, instagram_content_publish, instagram_manage_insights) → Select Instagram account → Confirm.\n\nCapabilities: Single images, carousels (up to 10), Reels. Schedule posts. View insights.\n\nSpecs: Images 1080×1080/1080×1350/1080×566. Videos 3-90s (Reels). Caption 2,200 chars. 30 hashtags max.\n\nTips: 1080px minimum width. Post Reels for max reach. Best times 11 AM-1 PM and 7-9 PM.\n\nTroubleshooting: "Not found" → needs Business/Creator account linked to Facebook Page. Same ratio for carousel images.`,
+    content: `Connect Instagram to EE PostMind:\n\nInstagram supports two connection paths in the current implementation.\n\nOption 1: Instagram Direct Login\n• Use this when you want direct Instagram OAuth\n• No Facebook login step in the UI\n• Current direct scopes: instagram_business_basic, instagram_business_manage_messages, instagram_business_manage_comments, instagram_business_content_publish, instagram_business_manage_insights\n\nOption 2: Connect via Facebook\n• Use this when your Instagram is linked to a Facebook Page\n• Current Facebook-mode scopes include: pages_show_list, pages_manage_posts, pages_read_engagement, instagram_basic, instagram_content_publish, instagram_manage_messages, pages_manage_metadata\n\nSteps:\n1. Go to Connections\n2. Click Connect on Instagram\n3. Choose "Instagram Direct Login" or "Connect via Facebook"\n4. Complete authorization and return to EE PostMind\n\nTroubleshooting:\n• If account is not found in Facebook mode, verify Instagram Business account is linked to a Facebook Page\n• If token expires, reconnect Instagram from Connections\n• If publishing fails, verify media format and required permissions`,
     category: 'Connections',
-    tags: ['instagram', 'ig', 'insta', 'connect instagram', 'instagram api', 'reels', 'carousel', 'stories', 'instagram business'],
+    tags: ['instagram', 'ig', 'insta', 'connect instagram', 'instagram api', 'reels', 'carousel', 'stories', 'instagram business', 'instagram direct', 'instagram via facebook'],
+    priority: 8,
+  },
+  {
+    title: 'Connecting Entreprenrs',
+    content: `Connect Entreprenrs to EE PostMind (manual credentials flow):\n\nConnection type:\n• Manual connect (not OAuth)\n\nSupported credential methods:\n1. Access token (preferred): provide accessToken + serverKey\n2. Username/password exchange: provide username + password + serverKey, then click "Get Access Token"\n\nNotes:\n• serverKey is optional in UI only if already configured in backend environment\n• userId is optional and auto-resolved during verification when missing\n• EE PostMind verifies credentials using Entreprenrs get-user-data\n\nPublishing mapping used by current implementation:\n• post text: postText\n• optional link: postLink\n• media upload: postFile (derived from image/video URL)\n• destination: timeline by default, or page/group using post_on + page_id/group_id\n\nTroubleshooting:\n• "Provide Entreprenrs access token, or username and password" → supply one complete credential method\n• "Could not verify entreprenrs credentials" → check server key and token validity\n• Publishing errors mentioning API type are auto-handled with endpoint fallback in current adapter`,
+    category: 'Connections',
+    tags: ['entreprenrs', 'connect entreprenrs', 'manual connection', 'server key', 'access token', 'postText', 'postLink', 'page_id', 'group_id'],
     priority: 8,
   },
   {
@@ -162,15 +169,8 @@ const coreArticles = [
     priority: 7,
   },
   {
-    title: 'Connecting Threads',
-    content: `Connect Threads to EE PostMind:\n\nPrereqs: Threads account linked to Instagram. Threads API access through Meta developer platform.\n\nSteps: Connections → Add Connection → Threads → Connect via Meta OAuth → Grant posting/reading permissions.\n\nCapabilities: Text posts, image posts, link posts. Schedule. Engagement metrics.\n\nSpecs: 500 chars. Up to 10 images. Links auto-preview. @username mentions.\n\nTips: Conversational content works best. Cross-post from Twitter/X. Engage with replies.\n\nTroubleshooting: "Not found" → needs active Threads linked to Instagram. "API denied" → check Meta developer dashboard.`,
-    category: 'Connections',
-    tags: ['threads', 'meta threads', 'connect threads', 'threads api', 'instagram threads'],
-    priority: 7,
-  },
-  {
     title: 'Connecting Mastodon',
-    content: `Connect Mastodon to EE PostMind:\n\nPrereqs: Mastodon account on any instance.\n\nSteps: Connections → Add Connection → Mastodon → Enter instance URL (e.g. mastodon.social) → Connect → Log in → Authorize.\n\nCapabilities: Toots (posts) with text, images, polls. Schedule. Content warnings. Post visibility (public, unlisted, followers-only, direct).\n\nSpecs: 500 chars (varies by instance). Up to 4 images. Polls 2-4 options.\n\nTips: Use content warnings for sensitive topics. Hashtags important for discovery. Engage with community. Respect instance rules.\n\nTroubleshooting: "Instance not found" → check URL. "Auth failed" → some instances block third-party apps.`,
+    content: `Connect Mastodon to EE PostMind (manual token flow):\n\nPrereqs:\n• Mastodon account on your server (example: https://mstdn.social)\n• App access token from that same server\n\nHow to create Mastodon token:\n1. Open your Mastodon server settings → Applications (example: https://mstdn.social/settings/applications).\n2. Create a new app (for example name it EE PostMind).\n3. Scope selection: choose top-level read + write (recommended).\n4. Save app and open it.\n5. Copy "Your access token" (or click Generate token if needed).\n\nConnect in EE PostMind:\n1. Go to Connections.\n2. Click Connect on Mastodon.\n3. Enter Instance URL (for example https://mstdn.social).\n4. Enter Access Token.\n5. Save connection and run Connection Check.\n\nPublishing behavior in EE PostMind:\n• Text posts supported.\n• Image/video attachments supported (up to 4 media items per post).\n• Posts publish to the connected account on that instance.\n\nSecurity and best practice:\n• Keep token private.\n• Use separate app/token for automation tools.\n• Revoke and regenerate token immediately if exposed.\n\nTroubleshooting:\n• "Could not verify Mastodon credentials" → token invalid, revoked, or generated on a different instance.\n• "Failed to upload Mastodon media" → media URL/file issue or instance media restrictions.\n• "Failed to publish Mastodon post" → token missing write scope or instance policy blocked request.\n• Instance URL errors → use full HTTPS URL and avoid extra path suffixes.`,
     category: 'Connections',
     tags: ['mastodon', 'fediverse', 'toot', 'connect mastodon', 'mastodon api', 'decentralized', 'instance'],
     priority: 6,
@@ -181,27 +181,6 @@ const coreArticles = [
     category: 'Connections',
     tags: ['bluesky', 'bsky', 'at protocol', 'connect bluesky', 'bluesky api', 'skeet', 'app password'],
     priority: 6,
-  },
-  {
-    title: 'Connecting Tumblr',
-    content: `Connect Tumblr to EE PostMind:\n\nPrereqs: Tumblr account. API credentials from tumblr.com/oauth/apps.\n\nAPI Setup: tumblr.com/oauth/apps → Register app → Set callback URL → Get Consumer Key/Secret.\n\nSteps: Connections → Add Connection → Tumblr → Connect → Log in → Authorize.\n\nCapabilities: Text, photo, quote, link, chat, audio, video posts. Post to specific blogs. Schedule. Tags.\n\nSpecs: No text limit. Photos up to 10MB. Up to 30 tags.\n\nTips: Creative/visual content works best. Use tags extensively. Queue for consistency.\n\nTroubleshooting: "Blog not found" → check name/active. "Auth failed" → regenerate API keys.`,
-    category: 'Connections',
-    tags: ['tumblr', 'blog', 'connect tumblr', 'tumblr api', 'microblogging', 'creative'],
-    priority: 6,
-  },
-  {
-    title: 'Connecting Reddit',
-    content: `Connect Reddit to EE PostMind:\n\nPrereqs: Reddit account. API access from reddit.com/prefs/apps.\n\nAPI Setup: reddit.com/prefs/apps → Create App → Choose "web app" → Set redirect URI → Note Client ID/Secret.\n\nSteps: Connections → Add Connection → Reddit → Connect → Log in → Authorize (submit, identity, read).\n\nCapabilities: Text posts, link posts to subreddits. Schedule. View performance.\n\nSpecs: Title 300 chars. Text 40,000 chars. Subreddit-specific flair.\n\nTips: Follow subreddit rules. Don't over-promote. Post 6-8 AM and 12-2 PM EST. Engage in comments.\n\nTroubleshooting: "Sub not found" → check spelling, not private. "Rate limited" → 1 post/10 min for new accounts. "Removed" → check sub rules.`,
-    category: 'Connections',
-    tags: ['reddit', 'subreddit', 'connect reddit', 'reddit api', 'upvote', 'post to reddit'],
-    priority: 6,
-  },
-  {
-    title: 'Connecting Google Business Profile',
-    content: `Connect Google Business Profile to EE PostMind:\n\nPrereqs: Verified Google Business Profile. Google Cloud project with Business Profile API.\n\nAPI Setup: console.cloud.google.com → Enable Business Profile API → Create OAuth 2.0 credentials → Add callback URL.\n\nSteps: Connections → Add Connection → Google Business → Connect → Log in → Select business → Grant permissions.\n\nCapabilities: Google Business posts (What's New, Offers, Events). Schedule. CTA buttons (Learn More, Book, Order). Analytics.\n\nSpecs: 1,500 chars. Images min 250×250, rec 1200×900. Offers with coupon codes.\n\nTips: Post regularly for local SEO. Use offers/events. Include photos. Best for local/brick-and-mortar businesses.\n\nTroubleshooting: "Not found" → ensure verified. "API not enabled" → enable in Cloud Console. "Rejected" → avoid promotional language.`,
-    category: 'Connections',
-    tags: ['google business', 'gmb', 'google my business', 'local', 'connect google business', 'google business profile', 'gbp', 'maps', 'local seo'],
-    priority: 7,
   },
   {
     title: 'Account Settings',
@@ -258,6 +237,107 @@ const coreArticles = [
     category: 'General',
     tags: ['tips', 'shortcuts', 'productivity', 'workflow', 'best practices', 'advice', 'recommendations', 'how to use', 'improve', 'optimize'],
     priority: 5,
+  },
+];
+
+const platformConnectionHowToArticles = [
+  {
+    title: 'Platform Connection Matrix (Current EE PostMind Setup)',
+    content: `EE PostMind currently supports 13 platforms.\n\nOAuth connect:\n• Facebook\n• Instagram\n• TikTok\n• LinkedIn\n• Twitter/X\n• YouTube\n• Pinterest\n\nManual connect:\n• Bluesky\n• Mastodon\n• Telegram\n• Entreprenrs\n• Chrxstians\n• Iohah\n\nCustom-platform login behavior:\n• Entreprenrs, Chrxstians, and Iohah are configured so users can connect with username/email + password.\n• API credentials are managed by admin globally.\n\nTelegram behavior:\n• Telegram uses Bot API.\n• Post destinations are channels/groups/chats where the bot is allowed.\n• Best SaaS flow is global bot token + per-user destination selection.`,
+    category: 'Connections',
+    tags: ['platform matrix', 'supported platforms', 'connection mode', 'oauth', 'manual connection', 'which platform', 'connect account'],
+    priority: 10,
+  },
+  {
+    title: 'How to Connect and Use Facebook',
+    content: `Connection type: OAuth.\n\nHow to connect:\n1. Go to Connections.\n2. Click Connect on Facebook.\n3. Authorize Meta permissions.\n4. Confirm status is Connected.\n\nHow to use:\n• Publish to managed Facebook Pages.\n• Ensure the connected account has Page admin/editor rights.\n\nIf it fails:\n• Reconnect if token expired.\n• Verify page permissions in Meta Business/Page roles.`,
+    category: 'Connections',
+    tags: ['facebook', 'connect facebook', 'facebook page', 'meta', 'how to post facebook'],
+    priority: 10,
+  },
+  {
+    title: 'How to Connect and Use Instagram',
+    content: `Connection type: OAuth (two paths).\n\nHow to connect:\n1. Go to Connections.\n2. Click Connect on Instagram.\n3. Choose Instagram Direct Login or Connect via Facebook.\n4. Complete authorization.\n\nHow to use:\n• Publish media-first posts with captions.\n• For Facebook-mode issues, ensure Instagram Business/Creator is linked to a Facebook Page.\n\nIf it fails:\n• Reconnect and approve all scopes.\n• Verify account type is eligible for API publishing.`,
+    category: 'Connections',
+    tags: ['instagram', 'connect instagram', 'instagram direct', 'instagram via facebook', 'how to post instagram'],
+    priority: 10,
+  },
+  {
+    title: 'How to Connect and Use TikTok',
+    content: `Connection type: OAuth.\n\nHow to connect:\n1. Create TikTok developer app credentials and set callback URI from EE PostMind.\n2. In Connections, click Connect on TikTok.\n3. Complete TikTok authorization.\n\nHow to use:\n• TikTok publishing is video-first.\n• Keep video format and size within TikTok requirements.\n\nKnown approval constraints:\n• Unaudited apps can face restrictions (for example private-account-only posting).\n• If app review/scopes are incomplete, connection can succeed but publish may fail until approval/settings are fixed.`,
+    category: 'Connections',
+    tags: ['tiktok', 'connect tiktok', 'tiktok review', 'video publishing', 'how to post tiktok'],
+    priority: 10,
+  },
+  {
+    title: 'How to Connect and Use LinkedIn',
+    content: `Connection type: OAuth.\n\nHow to connect:\n1. Go to Connections and click Connect on LinkedIn.\n2. Approve requested permissions.\n3. Reconnect if permissions/scopes were recently changed.\n\nHow to use:\n• Publish to personal profile and eligible organization contexts.\n• For company posting, user must have proper admin role.\n\nIf it fails:\n• Check app scopes and API version settings.\n• Reconnect after scope updates.`,
+    category: 'Connections',
+    tags: ['linkedin', 'connect linkedin', 'linkedin permissions', 'company page', 'how to post linkedin'],
+    priority: 10,
+  },
+  {
+    title: 'How to Connect and Use Twitter/X',
+    content: `Connection type: OAuth 2.0.\n\nHow to connect:\n1. Create X app attached to a Project.\n2. Set callback URL to EE PostMind callback.\n3. In Connections, click Connect on X and authorize.\n\nHow to use:\n• Publish text and supported media posts.\n\nIf it fails:\n• Error about app not attached to project means X developer app configuration is incomplete.\n• Reconfirm app type, scopes, callback URL, and project linkage in X Developer Portal.`,
+    category: 'Connections',
+    tags: ['twitter', 'x', 'connect x', 'connect twitter', 'x developer portal', 'how to post x'],
+    priority: 10,
+  },
+  {
+    title: 'How to Connect and Use YouTube',
+    content: `Connection type: OAuth.\n\nHow to connect:\n1. Configure Google OAuth client and callback URI from EE PostMind.\n2. Enable YouTube Data API v3 in the same Google project as the OAuth client.\n3. Connect YouTube from Connections.\n\nHow to use:\n• Publish video posts to YouTube.\n• Channel-level permissions and API enablement are required for full publish/analytics.\n\nIf it fails:\n• "API not enabled" means YouTube Data API v3 is disabled in the OAuth client's project.\n• Enable API, wait propagation, reconnect.`,
+    category: 'Connections',
+    tags: ['youtube', 'connect youtube', 'youtube data api v3', 'google oauth', 'how to post youtube'],
+    priority: 10,
+  },
+  {
+    title: 'How to Connect and Use Pinterest',
+    content: `Connection type: OAuth.\n\nHow to connect:\n1. Configure Pinterest app credentials and callback URI.\n2. In Connections, click Connect on Pinterest.\n3. Authorize board/pin scopes.\n\nHow to use:\n• Publish image-led pins with links and descriptions.\n\nIf it fails:\n• Reconnect after changing scopes or app settings.\n• Verify destination board availability and permissions.`,
+    category: 'Connections',
+    tags: ['pinterest', 'connect pinterest', 'pins', 'boards', 'how to post pinterest'],
+    priority: 10,
+  },
+  {
+    title: 'How to Connect and Use Bluesky',
+    content: `Connection type: Manual.\n\nHow to connect:\n1. In Connections, choose Bluesky.\n2. Enter handle (or email) and app password.\n3. Save connection.\n\nHow to use:\n• Publish text/media posts to connected Bluesky account.\n\nIf it fails:\n• Regenerate app password in Bluesky settings.\n• Ensure handle includes full domain when needed.`,
+    category: 'Connections',
+    tags: ['bluesky', 'connect bluesky', 'app password', 'manual connect', 'how to post bluesky'],
+    priority: 10,
+  },
+  {
+    title: 'How to Connect and Use Mastodon',
+    content: `Connection type: Manual (instance URL + access token).\n\nExact setup:\n1. Create app on your Mastodon server at /settings/applications.\n2. Select scopes read + write.\n3. Copy access token from that app.\n4. In EE PostMind Connections, enter:\n   Instance URL: your server URL (for example https://mstdn.social)\n   Access Token: token from app settings\n5. Save and test with a text-only post first.\n\nHow to use after connect:\n• Publish text posts.\n• Publish image/video posts (media uploads handled automatically).\n\nQuick token test (optional):\n• GET /api/v1/accounts/verify_credentials with Authorization: Bearer <token>\n• If 200 response returns account JSON, token is valid.\n\nIf it fails:\n• Invalid credentials error: regenerate token and reconnect.\n• Publish fails: ensure write scope exists.\n• Media fails: test a text-only post to isolate media issue.`,
+    category: 'Connections',
+    tags: ['mastodon', 'connect mastodon', 'instance url', 'manual connect', 'how to post mastodon'],
+    priority: 10,
+  },
+  {
+    title: 'How to Connect and Use Telegram',
+    content: `Connection type: Manual (Bot API).\n\nHow to connect:\n1. Create bot in Telegram via @BotFather and copy bot token.\n2. Decide destination chat ID (@channelusername or numeric chat ID).\n3. Add bot to target channel/group and grant post permissions.\n4. Connect Telegram in EE PostMind with bot token and chat ID.\n\nHow to use:\n• Publish text, image, and video messages to allowed destinations.\n• Best UX for SaaS is global bot credentials with user destination selection.\n\nImportant:\n• Telegram is bot-based, not standard user OAuth login.\n• Bot can only post where it has permission.`,
+    category: 'Connections',
+    tags: ['telegram', 'connect telegram', 'botfather', 'bot token', 'chat id', 'channel', 'group', 'how to post telegram'],
+    priority: 10,
+  },
+  {
+    title: 'How to Connect and Use Entreprenrs',
+    content: `Connection type: Manual (platform login flow).\n\nHow to connect:\n1. In Connections, choose Entreprenrs.\n2. Enter username/email and password.\n3. Save connection (server/API credentials are handled by admin config).\n\nHow to use:\n• Publish to timeline by default.\n• Support page/group destinations where metadata is provided and user has permission.\n\nIf it fails:\n• Recheck login details.\n• Ask admin to verify global platform credentials and API availability.`,
+    category: 'Connections',
+    tags: ['entreprenrs', 'connect entreprenrs', 'username password', 'manual connect', 'timeline page group'],
+    priority: 10,
+  },
+  {
+    title: 'How to Connect and Use Chrxstians',
+    content: `Connection type: Manual (platform login flow).\n\nHow to connect:\n1. In Connections, choose Chrxstians.\n2. Enter username/email and password.\n3. Save connection (API key/secret are globally managed by admin).\n\nHow to use:\n• Publish to timeline.\n• Publish to pages/groups by selecting destination ID where account has rights.\n\nIf it fails:\n• Recheck login details.\n• Ask admin to verify global CHRXSTIANS API credentials and endpoints.`,
+    category: 'Connections',
+    tags: ['chrxstians', 'connect chrxstians', 'username password', 'timeline', 'page', 'group'],
+    priority: 10,
+  },
+  {
+    title: 'How to Connect and Use Iohah',
+    content: `Connection type: Manual (platform login flow).\n\nHow to connect:\n1. In Connections, choose Iohah.\n2. Enter username/email and password.\n3. Save connection (API key/secret are globally managed by admin).\n\nHow to use:\n• Publish to timeline.\n• Publish to pages/groups by selecting destination ID where account has rights.\n\nIf it fails:\n• Recheck login details.\n• Ask admin to verify global IOHAH API credentials, publish endpoint, and permissions.`,
+    category: 'Connections',
+    tags: ['iohah', 'connect iohah', 'username password', 'timeline', 'page', 'group'],
+    priority: 10,
   },
 ];
 
@@ -766,13 +846,445 @@ const advancedGuideDefinitions = [
   },
 ];
 
-const platformDeepDiveArticles = platformProfiles.flatMap(buildPlatformDeepDiveArticles);
+const workflowAndAdminArticles = [
+  {
+    title: 'Using Instagram Inbox (DMs)',
+    content: `EE PostMind includes an Instagram Inbox page for direct message workflows.\n\nPrerequisites:\n• At least one active Instagram connection in Connections\n• The connected account must have messaging permissions\n\nHow to use:\n1. Go to Inbox.\n2. Select a conversation from the left panel.\n3. Read the thread and send a reply from the message box.\n4. Use Refresh to load latest conversations/messages.\n\nImportant behavior:\n• The UI is built for Human Agent messaging windows.\n• If recipient resolution fails, reconnect Instagram and reload conversations.`,
+    category: 'Features',
+    tags: ['instagram inbox', 'dm', 'direct messages', 'messaging', 'reply', 'human agent'],
+    priority: 8,
+  },
+  {
+    title: 'Instagram Inbox Troubleshooting',
+    content: `Use this checklist when Instagram Inbox does not work as expected.\n\nNo conversations shown:\n• Confirm at least one active Instagram connection exists.\n• Reconnect Instagram and approve messaging scopes.\n\nMessages fail to send:\n• Refresh conversation list and reopen the thread.\n• Confirm recipient can be resolved (non-self participant).\n• Reconnect account if token/permissions changed.\n\nCommon fixes:\n• Connections → Check/Reconnect.\n• Retry from Inbox after refreshing.\n• If still failing, capture exact error text from UI for support.`,
+    category: 'Troubleshooting',
+    tags: ['instagram inbox failed', 'dm failed', 'recipient error', 'messaging troubleshooting'],
+    priority: 8,
+  },
+  {
+    title: 'Managing Instagram Comments',
+    content: `EE PostMind Comment Manager lets you moderate Instagram comments from one place.\n\nHow it works:\n1. Open Comments page.\n2. Select a published Instagram post.\n3. View comments and threaded replies.\n4. Reply, hide/show, or delete comments.\n\nBest practices:\n• Refresh before moderation on high-activity posts.\n• Use hide for temporary moderation and delete for final removal.\n• Track recurring questions and turn answers into saved templates.`,
+    category: 'Features',
+    tags: ['comment manager', 'instagram comments', 'reply comment', 'hide comment', 'delete comment'],
+    priority: 8,
+  },
+  {
+    title: 'Comment Manager Troubleshooting',
+    content: `If Comment Manager is empty or actions fail, use this recovery flow.\n\nNo posts listed:\n• Publish at least one Instagram post first.\n• Ensure the post is in published status.\n\nNo comments returned:\n• Select the correct Instagram post.\n• Refresh comments for that media item.\n\nReply/hide/delete failing:\n• Reconnect Instagram to refresh permissions.\n• Confirm connection is active and belongs to current workspace.\n• Retry action after refresh.`,
+    category: 'Troubleshooting',
+    tags: ['comments troubleshooting', 'instagram moderation errors', 'failed to reply'],
+    priority: 8,
+  },
+  {
+    title: 'Using Entrepreneurs Directory',
+    content: `The Entrepreneurs page shows live profiles from active Entreprenrs connections.\n\nWhat you can do:\n• Search by name, workspace, account name, account ID, or bio.\n• Filter by subscription tier.\n• Open quick email contact from each profile card.\n\nData source:\n• Profiles are pulled from active Entreprenrs connections across workspaces.\n• Duplicate owners are deduplicated to one profile entry.`,
+    category: 'Features',
+    tags: ['entrepreneurs', 'directory', 'entreprenrs profiles', 'search', 'filter'],
+    priority: 7,
+  },
+  {
+    title: 'Custom Destinations: Timeline, Page, and Group',
+    content: `Custom platforms support destination-aware publishing in Compose.\n\nCurrent destination options:\n• Entreprenrs: timeline or page\n• Chrxstians: timeline, page, or group\n• Iohah: timeline, page, or group\n\nHow selection works:\n• Compose auto-loads available pages/groups when supported.\n• Selected destination is injected into platform metadata for publish.\n• If a destination is not selected, timeline is used by default.`,
+    category: 'Connections',
+    tags: ['destination', 'timeline', 'page', 'group', 'compose destination'],
+    priority: 9,
+  },
+  {
+    title: 'Fix Missing Pages or Groups in Compose',
+    content: `If page/group dropdowns are empty for custom platforms:\n\n1. Confirm the account actually has managed pages/groups.\n2. Confirm user has posting rights on that page/group.\n3. Reconnect the platform to refresh credentials.\n4. Refresh Compose and reselect connection.\n\nPlatform-specific notes:\n• Chrxstians and Iohah show create-page/group links when nothing is returned.\n• Entreprenrs falls back to manual page ID entry when page list is unavailable.`,
+    category: 'Troubleshooting',
+    tags: ['missing pages', 'missing groups', 'compose dropdown empty', 'destination list'],
+    priority: 9,
+  },
+  {
+    title: 'Global Credentials vs User Login (Entreprenrs, Chrxstians, Iohah)',
+    content: `EE PostMind supports global admin credentials plus user-level login.\n\nModel:\n• Admin configures platform API secrets globally in Admin Settings.\n• End users connect with username/email + password only.\n• Backend enriches credential flow with global secrets where required.\n\nBenefits:\n• Users do not need API keys/secrets.\n• Credential management stays centralized.\n• Faster onboarding for less technical users.`,
+    category: 'Connections',
+    tags: ['global credentials', 'admin secrets', 'user login', 'manual connect', 'custom platforms'],
+    priority: 10,
+  },
+  {
+    title: 'Admin Setup: Platform Credentials',
+    content: `Configure platform credentials in Admin Settings → Platform Credentials.\n\nWhat to enter:\n• OAuth platforms (Facebook, Instagram, TikTok, LinkedIn, X, YouTube, Pinterest): Client ID + Client Secret\n• Entreprenrs: Access Token + Server Key\n• Chrxstians/Iohah: API Key + API Secret\n• Telegram: Bot Token + default Chat ID (optional but recommended)\n\nTips:\n• Save credentials, then run a fresh connection flow.\n• Reconnect existing accounts after major credential changes.`,
+    category: 'Account',
+    tags: ['admin settings', 'platform credentials', 'client id', 'client secret', 'api key', 'api secret'],
+    priority: 9,
+  },
+  {
+    title: 'Admin Setup: SMTP Email',
+    content: `Configure outbound email in Admin Settings → SMTP / Email.\n\nRequired fields:\n• SMTP host\n• Port\n• Username\n• Password\n• From address\n• Secure mode (true/false)\n\nRecommended process:\n1. Fill SMTP values from your mail provider.\n2. Save configuration.\n3. Run Test Connection to a real inbox.\n4. Confirm delivery before enabling production notifications.`,
+    category: 'Account',
+    tags: ['smtp', 'email setup', 'notifications', 'mail server', 'admin email'],
+    priority: 8,
+  },
+  {
+    title: 'Admin Setup: Cloud Storage (DigitalOcean, Wasabi, MinIO)',
+    content: `Configure media storage in Admin Settings → Cloud Storage.\n\nSupported providers:\n• DigitalOcean Spaces\n• Wasabi\n• MinIO (S3-compatible)\n\nFields:\n• Provider\n• Endpoint\n• Region\n• Bucket\n• Access key\n• Secret key\n\nValidation flow:\n1. Save storage config.\n2. Run Test Connection.\n3. Confirm bucket access before large media publishing.`,
+    category: 'Account',
+    tags: ['storage', 'digitalocean spaces', 'wasabi', 'minio', 's3', 'media storage'],
+    priority: 8,
+  },
+  {
+    title: 'Testing SMTP and Storage Connections',
+    content: `After updating admin credentials, always run connection tests.\n\nSMTP test:\n• Uses provided SMTP values to send a test email.\n• Fix host/port/auth or secure mode if test fails.\n\nStorage test:\n• Validates endpoint/auth and bucket accessibility.\n• Fix endpoint format, region, key pair, or bucket policy on failure.\n\nBest practice:\n• Test immediately after every credential change.\n• Keep a short runbook with known good values per environment.`,
+    category: 'Troubleshooting',
+    tags: ['test smtp', 'test storage', 'admin diagnostics', 'credential validation'],
+    priority: 7,
+  },
+  {
+    title: 'Connection Health Checks and Reconnect Flow',
+    content: `Use Connection Check to validate active account tokens and permissions.\n\nHow to use:\n1. Open Connections.\n2. Click Check on connected accounts.\n3. If status is Expired or Needs attention, use Reconnect.\n\nWhen to reconnect:\n• Token expired\n• OAuth scopes changed\n• Platform permissions updated\n• Publishing or analytics suddenly fails`,
+    category: 'Connections',
+    tags: ['connection health', 'reconnect', 'expired token', 'needs attention', 'check account'],
+    priority: 8,
+  },
+  {
+    title: 'OAuth Callback Errors in Connections',
+    content: `Common callback error states and meaning:\n\n• invalid_platform: platform is unsupported\n• invalid_connection_mode: wrong connect method (OAuth vs manual)\n• missing_params: authorization callback returned incomplete data\n• invalid_state: expired/invalid state value\n• connection_failed: provider returned failure reason\n\nFix pattern:\n1. Verify callback URL in provider app settings.\n2. Ensure app credentials and scopes are correct.\n3. Start connection again from Connections page.`,
+    category: 'Troubleshooting',
+    tags: ['oauth callback', 'invalid_state', 'connection_failed', 'redirect uri', 'auth errors'],
+    priority: 8,
+  },
+  {
+    title: 'TikTok Publishing Error Playbook',
+    content: `TikTok errors often map to app review status, account privacy, and media-transfer rules.\n\nFrequent causes:\n• unaudited_client_can_only_post_to_private_accounts\n• url_ownership_unverified (for pull-from-URL flows)\n• missing scopes or sandbox/production mismatch\n\nFix checklist:\n1. Ensure correct TikTok app mode (sandbox vs production) and scopes.\n2. For unaudited app constraints, use private account mode where required.\n3. Complete URL ownership verification for publishing domain.\n4. Reconnect TikTok after changing app settings.\n\nNote:\n• Browser-only workspaces may disable MEDIA_UPLOAD fallback by design.`,
+    category: 'Troubleshooting',
+    tags: ['tiktok failed', 'unaudited client', 'url ownership unverified', 'scope error', 'browser-only'],
+    priority: 10,
+  },
+  {
+    title: 'YouTube Connection Error Playbook',
+    content: `Resolve common YouTube OAuth/API setup failures quickly.\n\nredirect_uri_mismatch:\n• Add exact EE PostMind callback URL in Google OAuth client.\n\naccess_denied in testing mode:\n• Add account as OAuth test user or publish app to production.\n\nYouTube Data API not enabled:\n• Enable YouTube Data API v3 in the same Google project as OAuth client.\n• Wait a few minutes, then reconnect.\n\nAlways reconnect after Google project changes.`,
+    category: 'Troubleshooting',
+    tags: ['youtube oauth', 'redirect_uri_mismatch', 'access_denied', 'youtube data api v3'],
+    priority: 10,
+  },
+  {
+    title: 'Twitter/X Connection Error Playbook',
+    content: `If X connection fails with HTTP 403 about Project attachment:\n\nRoot cause:\n• App keys/tokens are not from an app attached to a Project in X Developer Portal.\n\nFix steps:\n1. Ensure app is linked to a Project.\n2. Use correct app type (Web App confidential client for server OAuth).\n3. Set exact callback URL from EE PostMind.\n4. Confirm required app permissions and OAuth 2.0 settings.\n5. Reconnect from Connections page after updates.`,
+    category: 'Troubleshooting',
+    tags: ['twitter 403', 'x project required', 'x oauth', 'callback uri', 'developer portal'],
+    priority: 9,
+  },
+  {
+    title: 'LinkedIn Analytics Permission Warnings',
+    content: `LinkedIn analytics may return warnings even when publishing succeeds.\n\nTypical warning classes:\n• Not enough permissions\n• socialActions.GET.NO_VERSION\n• Temporary fetch/network failures\n\nCurrent behavior:\n• EE PostMind returns safe fallback metrics (zeros) plus warning context.\n• Post remains published; analytics may populate later.\n\nRecommended action:\n• Verify LinkedIn scopes/version settings.\n• Reconnect account after scope changes.\n• Retry analytics fetch later if warning indicates temporary failure.`,
+    category: 'Analytics',
+    tags: ['linkedin analytics', 'permissions', 'socialActions.GET.NO_VERSION', 'fallback metrics'],
+    priority: 8,
+  },
+  {
+    title: 'Understanding Post Analytics Modal',
+    content: `Post History → Analytics shows per-platform live or cached metrics.\n\nWhat each state means:\n• Live: metrics fetched from platform API now\n• Cached: last saved analytics snapshot used\n• Error message + No data: platform endpoint unavailable or not implemented\n\nDisplayed metrics:\n• Impressions, reach, likes, comments, shares, clicks, saves (platform dependent)\n\nIf a platform shows no analytics yet:\n• Wait for platform metric availability and retry.`,
+    category: 'Analytics',
+    tags: ['post analytics modal', 'live metrics', 'cached metrics', 'no analytics data'],
+    priority: 8,
+  },
+  {
+    title: 'Where to Open Published Post Links',
+    content: `EE PostMind stores platform references and tries to provide a View link per platform outcome.\n\nWhere to find links:\n1. Open Post History.\n2. Open a published/partial post.\n3. In each platform card, use the View link when available.\n\nIf View is missing:\n• Platform may not have returned a URL.\n• EE PostMind still stores platform reference ID for tracing and support.`,
+    category: 'Features',
+    tags: ['view post link', 'published url', 'post history', 'platform reference'],
+    priority: 7,
+  },
+  {
+    title: 'Draft Autosave and Draft Management',
+    content: `Compose supports both autosave and manual draft workflows.\n\nAutosave behavior:\n• Triggers while editing content/media/platform selections.\n• Pauses if advanced metadata JSON is invalid.\n\nManual draft actions:\n• Save Draft to persist changes immediately.\n• Open any saved draft from the Drafts panel.\n• Delete old drafts you no longer need.\n\nTip:\n• Keep metadata JSON valid to avoid autosave pause state.`,
+    category: 'Features',
+    tags: ['draft autosave', 'save draft', 'open draft', 'delete draft', 'compose'],
+    priority: 8,
+  },
+  {
+    title: 'Approval Workflow: Submit, Approve, Reject',
+    content: `Team approval workflows help control publishing quality.\n\nFlow:\n1. Contributor creates draft.\n2. Submit for approval.\n3. Admin/owner reviews and approves or rejects.\n4. Approved posts can be published/scheduled.\n\nRejected posts:\n• Cannot be published until edited and resubmitted.\n\nBest practice:\n• Define approval criteria (copy, media, compliance, links) so reviews stay consistent.`,
+    category: 'Collaboration',
+    tags: ['approval workflow', 'submit approval', 'approve post', 'reject post', 'team governance'],
+    priority: 8,
+  },
+  {
+    title: 'Advanced Platform Metadata JSON (Compose)',
+    content: `Compose supports optional advanced metadata JSON for per-platform overrides.\n\nValidation rules:\n• Must be valid JSON\n• Root must be an object\n• Each entry value must be an object\n\nKeying options:\n• By connection ID\n• By platform name\n• Platform-specific keys (for example page/group destination fields)\n\nUse cases:\n• Force destination overrides\n• Attach platform-specific flags\n• Pass advanced publish options when supported`,
+    category: 'Features',
+    tags: ['advanced metadata', 'compose json', 'platform overrides', 'connection metadata'],
+    priority: 7,
+  },
+  {
+    title: 'Billing Operations: Upgrade, Downgrade, and Portal',
+    content: `Billing page supports plan upgrades, downgrades, and Stripe customer portal access.\n\nWhat to expect:\n• Upgrade: usually immediate\n• Downgrade: confirmation required; feature limits reduce to target tier\n• Manage Billing: opens Stripe portal for payment method and invoices\n\nOperational tip:\n• Check platform and usage limits before downgrading to avoid workflow interruptions.`,
+    category: 'Account',
+    tags: ['billing portal', 'upgrade', 'downgrade', 'subscription operations', 'plan limits'],
+    priority: 7,
+  },
+  {
+    title: 'Telegram Setup Best Practice for SaaS Workspaces',
+    content: `Telegram integration is bot-based, not user OAuth.\n\nRecommended model:\n• Admin sets global bot token once\n• Users choose destination chat/channel/group they control\n• Bot must be added to destination with posting rights\n\nWhy this is best:\n• Faster onboarding for users\n• Centralized bot governance\n• Consistent publishing behavior across workspace users`,
+    category: 'Connections',
+    tags: ['telegram bot', 'botfather', 'chat id', 'channel posting', 'best practice'],
+    priority: 8,
+  },
+  {
+    title: 'Iohah, Chrxstians, and Entreprenrs Account Onboarding',
+    content: `Users must have accounts on custom platforms before connecting them.\n\nCurrent onboarding links in Connections:\n• Iohah: https://iohah.com/signup\n• Chrxstians: https://chrxstians.com/signup\n• Entreprenrs: https://entreprenrs.com/register\n\nHow to use:\n1. Create account on target platform.\n2. Return to Connections.\n3. Connect with username/email and password.\n4. Start publishing to supported destinations.`,
+    category: 'Getting Started',
+    tags: ['custom platform onboarding', 'signup links', 'iohah signup', 'chrxstians signup', 'entreprenrs register'],
+    priority: 8,
+  },
+  {
+    title: 'Telegram Channels and Groups: Complete Connection Guide',
+    content: `Use this end-to-end flow to connect Telegram correctly in EE PostMind.\n\nWhat Telegram uses:\n• Telegram connection is Bot API based (not normal user OAuth login).\n• A bot can only post in chats/channels/groups where it has permission.\n\nStep 1: Create a bot\n1. Open Telegram and message @BotFather.\n2. Run /newbot and complete setup.\n3. Copy the bot token.\n\nStep 2: Add bot to destination\n1. Open your channel or group.\n2. Add your bot account (for example @postmind_helper_bot).\n3. Promote bot to admin in channels and grant post permissions.\n4. In groups, ensure bot can send messages and media.\n\nStep 3: Set credentials in EE PostMind\n• Admin path: Settings → Admin → Platform Credentials → Telegram.\n• Set global bot token once (recommended for SaaS).\n• Optional: set a default chat ID/channel username.\n\nStep 4: User connection flow\n1. User opens Connections → Telegram.\n2. Enter destination chat value (channel username or numeric chat ID).\n3. Save and run Connection Check.\n4. Send a test post from Compose.\n\nDestination examples:\n• Public channel: @yourchannelusername\n• Private channel/group/supergroup: numeric chat ID (usually starts with -100)\n\nMedia behavior:\n• Telegram supports text, photo, and video.\n• If Telegram rejects remote media URL fetch, EE PostMind falls back to safe message delivery where possible.`,
+    category: 'Connections',
+    tags: ['telegram', 'telegram channel', 'telegram group', 'botfather', 'bot token', 'chat id', 'connect telegram', 'telegram setup'],
+    priority: 10,
+  },
+  {
+    title: 'How to Get Telegram Chat ID (Channel, Group, or Private Chat)',
+    content: `If you do not know your Telegram destination ID, use this method.\n\nA. Verify your bot token first\nOpen in browser:\nhttps://api.telegram.org/bot<BOT_TOKEN>/getMe\nExpected: {"ok":true,...}\n\nB. Generate updates for target destination\n1. Add bot to the target channel/group.\n2. Send one message in that destination.\n3. If channel: post a message in channel after bot is admin.\n4. If group: send any message in group where bot is present.\n\nC. Read updates\nOpen:\nhttps://api.telegram.org/bot<BOT_TOKEN>/getUpdates\nFind result.message.chat.id or result.channel_post.chat.id.\n\nWhat value to use in EE PostMind:\n• Public channel: use @channelusername directly.\n• Private channel: use numeric chat ID from getUpdates.\n• Group/supergroup: use numeric chat ID from getUpdates.\n\nCommon errors and fixes:\n• "chat not found" → wrong ID/username or bot not added.\n• "not enough rights to send text messages" → promote bot and grant permissions.\n• "wrong type of the web page content" → media URL is not direct/compatible; retry with supported media URL or upload media directly.`,
+    category: 'Troubleshooting',
+    tags: ['telegram chat id', 'getupdates', 'channel_post', 'chat not found', 'telegram error', 'group id'],
+    priority: 10,
+  },
+  {
+    title: 'Connection Checklist for All Supported Platforms',
+    content: `Use this checklist to connect any platform in EE PostMind with fewer errors.\n\nUniversal flow:\n1. Confirm platform app credentials are configured by admin.\n2. Open Connections and start a fresh connect flow.\n3. Approve all requested scopes/permissions.\n4. Run Connection Check.\n5. Send one test post before production scheduling.\n\nOAuth platforms:\n• Facebook\n• Instagram\n• TikTok\n• LinkedIn\n• Twitter/X\n• YouTube\n• Pinterest\n\nManual/login platforms:\n• Telegram (bot token + destination)\n• Entreprenrs (username/email + password; admin secrets global)\n• Chrxstians (username/email + password; admin secrets global)\n• Iohah (username/email + password; admin secrets global)\n• Bluesky (handle/email + app password)\n• Mastodon (instance URL + token)\n\nCustom platform onboarding links:\n• Entreprenrs: https://entreprenrs.com/register\n• Chrxstians: https://chrxstians.com/signup\n• Iohah: https://iohah.com/signup\n\nIf connection succeeds but posting fails:\n• Recheck destination permissions (page/group/channel).\n• Verify media format/size and platform limits.\n• Review exact error text in Post History and reconnect after permission changes.`,
+    category: 'Connections',
+    tags: ['connection checklist', 'oauth setup', 'manual setup', 'platform onboarding', 'post failed after connect'],
+    priority: 10,
+  },
+  {
+    title: 'Custom Platform Publishing: Timeline, Page, and Group Selection',
+    content: `EE PostMind supports destination-aware posting for custom platforms.\n\nSupported destinations:\n• Entreprenrs: timeline, page\n• Chrxstians: timeline, page, group\n• Iohah: timeline, page, group\n\nHow to publish to the right destination:\n1. Connect account with username/email and password.\n2. Open Compose and select platform connection.\n3. Choose destination type (timeline/page/group).\n4. Select page/group from loaded list.\n5. Publish or schedule.\n\nHow destination loading works:\n• System fetches pages/groups tied to the connected account.\n• If nothing is returned, timeline is used by default.\n• If account has no pages/groups yet, create one on platform and refresh.\n\nWhy dropdown can be empty:\n• Account has no managed pages/groups.\n• Account lacks posting rights.\n• Token/session expired; reconnect needed.\n\nBest practice:\n• Run a timeline test first, then page/group test, then schedule automation.`,
+    category: 'Connections',
+    tags: ['timeline page group', 'destination selection', 'iohah pages groups', 'chrxstians pages groups', 'entreprenrs page'],
+    priority: 10,
+  },
+];
+
+const quickFixFaqArticles = [
+  {
+    title: 'FAQ: Why does Connections show "Needs attention"?',
+    content: `This usually means token expiry or revoked permissions.\n\nFix:\n1. Go to Connections.\n2. Click Check.\n3. If still unhealthy, click Reconnect and re-authorize all requested scopes.`,
+    category: 'FAQ',
+    tags: ['faq', 'needs attention', 'reconnect', 'token expired'],
+    priority: 7,
+  },
+  {
+    title: 'FAQ: Why is my account connected but post failed?',
+    content: `Connected status only confirms auth, not publish eligibility.\n\nCheck:\n• Media format/size limits\n• Platform permissions/roles\n• Destination rights (page/group)\n• Platform-side API or policy errors in Post History`,
+    category: 'FAQ',
+    tags: ['faq', 'post failed', 'connected but not posting'],
+    priority: 8,
+  },
+  {
+    title: 'FAQ: How do I reconnect a platform safely?',
+    content: `Reconnect flow:\n1. Open Connections.\n2. Click Reconnect on the platform card.\n3. Approve all permissions again.\n4. Return and run Check.\n\nThis keeps workspace history while refreshing credentials.`,
+    category: 'FAQ',
+    tags: ['faq', 'reconnect platform', 'refresh credentials'],
+    priority: 7,
+  },
+  {
+    title: 'FAQ: Why are Chrxstians/Iohah asking for API keys?',
+    content: `Users should connect with username/email + password only.\n\nIf API key fields appear:\n• Admin global credentials are likely missing or invalid.\n• Configure API key/secret in Admin Settings → Platform Credentials.\n• Retry connection after saving.`,
+    category: 'FAQ',
+    tags: ['faq', 'iohah', 'chrxstians', 'api credentials missing'],
+    priority: 8,
+  },
+  {
+    title: 'FAQ: Why are page/group selectors empty?',
+    content: `Page/group lists are loaded from the connected account.\n\nIf empty:\n• User has no managed pages/groups, or lacks permission\n• Connection token lacks required access\n• Reconnect and reload Compose`,
+    category: 'FAQ',
+    tags: ['faq', 'empty page list', 'empty group list', 'destination selector'],
+    priority: 8,
+  },
+  {
+    title: 'FAQ: Can I post to timeline without page/group ID?',
+    content: `Yes. Timeline is the default destination.\n\nPage/group ID is only required when destination is set to page or group.`,
+    category: 'FAQ',
+    tags: ['faq', 'timeline default', 'page id', 'group id'],
+    priority: 6,
+  },
+  {
+    title: 'FAQ: Why do image URLs appear as text on posts?',
+    content: `Raw links appear when media is sent as plain text instead of attached media.\n\nFix:\n• Upload media through Compose media upload\n• Ensure platform adapter maps media to attachment fields, not caption text`,
+    category: 'FAQ',
+    tags: ['faq', 'image link text', 'media attachment'],
+    priority: 8,
+  },
+  {
+    title: 'FAQ: Why does analytics show 404 or HTML/JSON parse errors?',
+    content: `This indicates the remote analytics endpoint is missing or returning non-JSON.\n\nFix:\n• Confirm platform analytics endpoint exists\n• Ensure endpoint returns JSON error/success payloads only\n• Retry analytics from Post History`,
+    category: 'FAQ',
+    tags: ['faq', 'analytics 404', 'invalid json', 'unexpected token'],
+    priority: 8,
+  },
+  {
+    title: 'FAQ: Why does LinkedIn analytics show permission errors?',
+    content: `LinkedIn can publish successfully while analytics permission remains limited.\n\nFix:\n• Verify LinkedIn scopes and API version settings\n• Reconnect after scope/version changes\n• Retry later for temporary fetch issues`,
+    category: 'FAQ',
+    tags: ['faq', 'linkedin analytics', 'not enough permissions'],
+    priority: 7,
+  },
+  {
+    title: 'FAQ: Why does TikTok fail with private-account or URL ownership errors?',
+    content: `Common TikTok blockers:\n• unaudited_client_can_only_post_to_private_accounts\n• url_ownership_unverified\n\nFix:\n• Set account private if app is unaudited\n• Complete domain URL ownership verification\n• Reconnect TikTok after settings updates`,
+    category: 'FAQ',
+    tags: ['faq', 'tiktok private account', 'url ownership unverified'],
+    priority: 9,
+  },
+  {
+    title: 'FAQ: What does "MEDIA_UPLOAD fallback is disabled" mean?',
+    content: `Your workspace is configured for browser-only TikTok publishing.\n\nMeaning:\n• Direct post mode is used\n• Upload fallback is intentionally disabled\n\nAction:\n• Fix direct-post prerequisites (scope, app mode, URL verification).`,
+    category: 'FAQ',
+    tags: ['faq', 'media upload fallback', 'browser-only', 'tiktok'],
+    priority: 8,
+  },
+  {
+    title: 'FAQ: Why does YouTube show redirect_uri_mismatch?',
+    content: `Google OAuth callback URL does not exactly match configured redirect URI.\n\nFix:\n• Add exact EE PostMind YouTube callback URI in Google OAuth client\n• Save and retry connection`,
+    category: 'FAQ',
+    tags: ['faq', 'youtube', 'redirect_uri_mismatch', 'google oauth'],
+    priority: 9,
+  },
+  {
+    title: 'FAQ: Why does YouTube say Data API v3 not enabled?',
+    content: `YouTube Data API v3 is disabled in the OAuth project.\n\nFix:\n1. Enable YouTube Data API v3 in the same Google project.\n2. Wait a few minutes for propagation.\n3. Reconnect and retry.`,
+    category: 'FAQ',
+    tags: ['faq', 'youtube data api v3', 'api disabled'],
+    priority: 9,
+  },
+  {
+    title: 'FAQ: Why does X/Twitter connection fail with 403 project error?',
+    content: `The app is not properly attached to a Project in X Developer Portal.\n\nFix:\n• Attach app to a Project\n• Verify app type/permissions/callback URL\n• Reconnect from EE PostMind`,
+    category: 'FAQ',
+    tags: ['faq', 'x 403', 'twitter project required'],
+    priority: 9,
+  },
+  {
+    title: 'FAQ: Why can’t users connect Telegram by normal login?',
+    content: `Telegram integration is bot-based, not user OAuth login.\n\nUsers need:\n• A bot token (or admin-provided global bot)\n• A destination chat/channel/group where bot has posting rights`,
+    category: 'FAQ',
+    tags: ['faq', 'telegram login', 'bot token', 'chat id'],
+    priority: 7,
+  },
+  {
+    title: 'FAQ: Where do I see the published post link?',
+    content: `Open Post History, then check each platform outcome row.\n\nUse the View link when available. If missing, use the platform reference ID for support tracing.`,
+    category: 'FAQ',
+    tags: ['faq', 'view published link', 'post history'],
+    priority: 6,
+  },
+  {
+    title: 'FAQ: Why does autosave stop in Compose?',
+    content: `Autosave pauses when advanced platform metadata JSON is invalid.\n\nFix:\n• Correct metadata JSON format\n• Keep root object and per-entry object values`,
+    category: 'FAQ',
+    tags: ['faq', 'autosave paused', 'compose metadata json'],
+    priority: 7,
+  },
+  {
+    title: 'FAQ: Why can’t I publish rejected posts?',
+    content: `Rejected posts are blocked from direct publish.\n\nFix:\n1. Edit the rejected post/draft.\n2. Resubmit for approval.\n3. Publish after approval.`,
+    category: 'FAQ',
+    tags: ['faq', 'rejected post', 'approval workflow'],
+    priority: 7,
+  },
+  {
+    title: 'FAQ: Why am I prompted to upgrade before connecting a platform?',
+    content: `Your current plan tier limits available platforms/features.\n\nFix:\n• Upgrade from Billing page to unlock the target platform.`,
+    category: 'FAQ',
+    tags: ['faq', 'upgrade required', 'plan limit', 'locked platform'],
+    priority: 6,
+  },
+  {
+    title: 'FAQ: What should users do before connecting custom platforms?',
+    content: `Users must create an account on the target platform first.\n\nSign-up links:\n• Iohah: iohah.com/signup\n• Chrxstians: chrxstians.com/signup\n• Entreprenrs: entreprenrs.com/register`,
+    category: 'FAQ',
+    tags: ['faq', 'custom platform signup', 'iohah', 'chrxstians', 'entreprenrs'],
+    priority: 6,
+  },
+];
+
+const ACTIVE_PLATFORM_PROFILE_SLUGS = new Set([
+  'facebook',
+  'instagram',
+  'twitter-x',
+  'linkedin',
+  'tiktok',
+  'youtube',
+  'pinterest',
+  'mastodon',
+  'bluesky',
+]);
+
+const platformDeepDiveArticles = platformProfiles
+  .filter((profile) => ACTIVE_PLATFORM_PROFILE_SLUGS.has(profile.slug))
+  .flatMap(buildPlatformDeepDiveArticles);
 const advancedGuides = advancedGuideDefinitions.map(({ overview, steps, metrics, pitfalls, ...article }) => ({
   ...article,
   content: buildGuideContent({ overview, steps, metrics, pitfalls }),
 }));
 
-const articles = [...coreArticles, ...platformDeepDiveArticles, ...advancedGuides];
+const articles = [
+  ...coreArticles,
+  ...platformConnectionHowToArticles,
+  ...platformDeepDiveArticles,
+  ...advancedGuides,
+  ...workflowAndAdminArticles,
+  ...quickFixFaqArticles,
+];
+
+const obsoleteKnowledgeTitles = new Set([
+  'Connecting Threads',
+  'Connecting Tumblr',
+  'Connecting Reddit',
+  'Connecting Google Business Profile',
+  'Threads Content Specs & Publishing Checklist',
+  'Threads Growth Strategy in EE PostMind',
+  'Threads Analytics Playbook',
+  'Troubleshooting Threads Connection and Publishing',
+  'Tumblr Content Specs & Publishing Checklist',
+  'Tumblr Growth Strategy in EE PostMind',
+  'Tumblr Analytics Playbook',
+  'Troubleshooting Tumblr Connection and Publishing',
+  'Reddit Content Specs & Publishing Checklist',
+  'Reddit Growth Strategy in EE PostMind',
+  'Reddit Analytics Playbook',
+  'Troubleshooting Reddit Connection and Publishing',
+  'Google Business Profile Content Specs & Publishing Checklist',
+  'Google Business Profile Growth Strategy in EE PostMind',
+  'Google Business Profile Analytics Playbook',
+  'Troubleshooting Google Business Profile Connection and Publishing',
+]);
+
+function normalizeTitle(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+async function sleep(ms) {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function apiJson(path, token, options = {}, attempt = 0) {
+  const res = await fetch(`${API_BASE}${path}`, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+      ...(options.headers || {}),
+    },
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || data.success === false) {
+    const message = data?.error?.message || data?.message || `${res.status} ${res.statusText}`;
+    const isRateLimit = res.status === 429 || /too many requests/i.test(message);
+    if (isRateLimit && attempt < 5) {
+      const delayMs = (attempt + 1) * 1200;
+      await sleep(delayMs);
+      return apiJson(path, token, options, attempt + 1);
+    }
+    throw new Error(message);
+  }
+  return data;
+}
 
 async function main() {
   if (!process.argv[2] || !process.argv[3]) {
@@ -783,20 +1295,100 @@ async function main() {
   const token = await getToken();
   console.log('Authenticated');
 
-  console.log(`Importing ${articles.length} knowledge base articles...`);
+  console.log(`Syncing ${articles.length} knowledge base articles (create/update by title)...`);
 
-  const res = await fetch(`${API_BASE}/chat/knowledge/bulk-import`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ entries: articles }),
-  });
+  const existingRes = await apiJson('/chat/knowledge', token, { method: 'GET' });
+  const existingEntries = Array.isArray(existingRes.data) ? existingRes.data : [];
+  let removed = 0;
+  for (const entry of existingEntries) {
+    const title = String(entry?.title || '').trim();
+    if (!title || !entry?.id || !obsoleteKnowledgeTitles.has(title)) continue;
+    try {
+      await apiJson(`/chat/knowledge/${entry.id}`, token, { method: 'DELETE' });
+      removed += 1;
+    } catch (error) {
+      console.warn(`Could not remove obsolete article "${title}":`, error instanceof Error ? error.message : error);
+    }
+  }
 
-  const data = await res.json();
-  if (data.success !== false) {
-    console.log(`Imported ${data.data?.imported || 0}/${data.data?.total || 0} articles`);
-    if (data.data?.errors) console.log('Errors:', JSON.stringify(data.data.errors, null, 2));
-  } else {
-    console.error('Import failed:', data);
+  const refreshedRes = await apiJson('/chat/knowledge', token, { method: 'GET' });
+  const refreshedEntries = Array.isArray(refreshedRes.data) ? refreshedRes.data : [];
+  const existingByTitle = new Map();
+  for (const entry of refreshedEntries) {
+    const key = normalizeTitle(entry?.title);
+    if (!key || existingByTitle.has(key)) continue;
+    existingByTitle.set(key, entry);
+  }
+
+  let created = 0;
+  let updated = 0;
+  let errors = [];
+
+  async function syncArticle(article) {
+    const key = normalizeTitle(article.title);
+    const existing = existingByTitle.get(key);
+    if (existing?.id) {
+      await apiJson(`/chat/knowledge/${existing.id}`, token, {
+        method: 'PUT',
+        body: JSON.stringify(article),
+      });
+      updated += 1;
+      return;
+    }
+    const createdRes = await apiJson('/chat/knowledge', token, {
+      method: 'POST',
+      body: JSON.stringify(article),
+    });
+    const createdEntry = createdRes?.data;
+    if (createdEntry?.id) existingByTitle.set(key, createdEntry);
+    created += 1;
+  }
+
+  for (const article of articles) {
+    try {
+      await syncArticle(article);
+    } catch (error) {
+      errors.push({
+        title: article.title,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+    await sleep(180);
+  }
+
+  if (errors.length > 0) {
+    const retryErrors = [];
+    for (const failed of errors) {
+      const article = articles.find((item) => item.title === failed.title);
+      if (!article) {
+        retryErrors.push(failed);
+        continue;
+      }
+
+      let resolved = false;
+      for (let attempt = 1; attempt <= 5; attempt += 1) {
+        try {
+          await sleep(attempt * 1500);
+          await syncArticle(article);
+          resolved = true;
+          break;
+        } catch (error) {
+          if (attempt === 5) {
+            retryErrors.push({
+              title: article.title,
+              error: error instanceof Error ? error.message : 'Unknown error',
+            });
+          }
+        }
+      }
+      if (!resolved) await sleep(200);
+    }
+    errors = retryErrors;
+  }
+
+  console.log(`Knowledge base sync complete. Created: ${created}, Updated: ${updated}, Removed obsolete: ${removed}, Errors: ${errors.length}`);
+  if (errors.length > 0) {
+    console.log('Errors:', JSON.stringify(errors, null, 2));
   }
 }
 
