@@ -14,3 +14,9 @@ __pycache__
 playwright-report
 test-results
 apps/ai-service/venv/
+
+# Database backups (track encrypted artifacts only)
+backups/*.dump
+backups/*.sql
+backups/*.key
+backups/*_key*.txt
