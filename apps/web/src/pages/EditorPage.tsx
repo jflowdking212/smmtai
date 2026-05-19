@@ -822,7 +822,7 @@ export function EditorPage() {
     const dataUrl = exportImage(format);
     if (!dataUrl) return;
     const link = document.createElement('a');
-    link.download = `postmind-${platform}-${postType}.${format}`;
+    link.download = `smmtai-${platform}-${postType}.${format}`;
     link.href = dataUrl;
     link.click();
   }
@@ -837,7 +837,7 @@ export function EditorPage() {
       format: [size.width, size.height],
     });
     pdf.addImage(dataUrl, 'PNG', 0, 0, size.width, size.height);
-    pdf.save(`postmind-${platform}-${postType}.pdf`);
+    pdf.save(`smmtai-${platform}-${postType}.pdf`);
   }
 
   async function pushDesignToCompose() {
@@ -851,7 +851,7 @@ export function EditorPage() {
     try {
       const response = await fetch(dataUrl);
       const blob = await response.blob();
-      const file = new File([blob], `postmind-${platform}-${postType}.png`, { type: 'image/png' });
+      const file = new File([blob], `smmtai-${platform}-${postType}.png`, { type: 'image/png' });
       const upload = await api.posts.uploadMedia(file);
 
       saveComposeSeed({

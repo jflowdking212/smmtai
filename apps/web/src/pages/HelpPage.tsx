@@ -31,7 +31,7 @@ const CATEGORY_ICONS: Record<string, React.ReactNode> = {
 
 const STATIC_FAQ = [
   { q: 'How many social accounts can I connect?', a: 'Depends on your plan: Free (3), Pro (15), Business (unlimited).' },
-  { q: 'Does EE PostMind post directly or via third-party?', a: 'We post directly via official platform APIs — no intermediaries.' },
+  { q: 'Does SmmtAI post directly or via third-party?', a: 'We post directly via official platform APIs — no intermediaries.' },
   { q: 'Can I schedule posts in different time zones?', a: 'Yes! Set your default timezone in Settings or override per-post in the scheduler.' },
   { q: 'Is my data secure?', a: 'All data is encrypted at rest and in transit. OAuth tokens are stored encrypted. We never store your social media passwords.' },
   { q: 'How does the AI assistant work?', a: 'We use OpenAI GPT models to generate captions, hashtags, and content suggestions based on your brand voice and audience.' },
@@ -47,7 +47,7 @@ const QUICK_SECTIONS = [
     sub: 'Guides & tutorials',
     color: 'brand-blue',
     items: [
-      { title: 'Quick Start Guide', desc: 'Learn the basics of EE PostMind in 5 minutes — connect accounts, create posts, and schedule content.' },
+      { title: 'Quick Start Guide', desc: 'Learn the basics of SmmtAI in 5 minutes — connect accounts, create posts, and schedule content.' },
       { title: 'Connecting Social Accounts', desc: 'Step-by-step guide to link your Facebook, Instagram, Twitter/X, LinkedIn, TikTok, and other platforms.' },
       { title: 'Your First Post', desc: 'Create, preview, and publish your first post across multiple platforms simultaneously.' },
       { title: 'Post Composer', desc: 'Write platform-specific captions, add media, preview layouts, and publish or schedule posts.' },
@@ -61,7 +61,7 @@ const QUICK_SECTIONS = [
     sub: 'Watch & learn',
     color: 'purple-600',
     items: [
-      { title: 'Getting Started with EE PostMind', desc: 'A walkthrough of the dashboard, navigation, and core features to get you up and running.' },
+      { title: 'Getting Started with SmmtAI', desc: 'A walkthrough of the dashboard, navigation, and core features to get you up and running.' },
       { title: 'How to Schedule Posts', desc: 'Learn how to compose, schedule, and manage posts across multiple platforms from a single view.' },
       { title: 'Using the AI Assistant', desc: 'Generate captions, hashtags, and content ideas using AI. Configure brand voice and audience personas.' },
       { title: 'Analytics & Reporting', desc: 'Track engagement, reach, and performance metrics. Get AI-driven insights and recommendations.' },
@@ -127,7 +127,7 @@ export function HelpPage() {
       {/* Header */}
       <div className="text-center">
         <h1 className="text-2xl font-heading font-bold text-neutral-900 dark:text-white">Help Center</h1>
-        <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">Find answers, learn features, and get the most out of EE PostMind.</p>
+        <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">Find answers, learn features, and get the most out of SmmtAI.</p>
 
         <div className="mt-4 max-w-md mx-auto relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />

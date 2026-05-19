@@ -57,7 +57,7 @@ export function OAuthCallbackPage() {
             <div className="w-10 h-10 bg-brand-500 rounded-xl flex items-center justify-center">
               <Sparkles className="w-5 h-5 text-white" />
             </div>
-            <span className="font-heading font-bold text-xl text-neutral-900">EE PostMind</span>
+            <span className="font-heading font-bold text-xl text-neutral-900">SmmtAI</span>
           </div>
           <Loader2 className="w-10 h-10 mx-auto mb-4 text-brand-500 animate-spin" />
           <h1 className="text-2xl font-heading font-bold text-neutral-900 mb-2">
@@ -76,7 +76,7 @@ export function OAuthCallbackPage() {
           <div className="w-10 h-10 bg-brand-500 rounded-xl flex items-center justify-center">
             <Sparkles className="w-5 h-5 text-white" />
           </div>
-          <span className="font-heading font-bold text-xl text-neutral-900">EE PostMind</span>
+          <span className="font-heading font-bold text-xl text-neutral-900">SmmtAI</span>
         </div>
         <AlertTriangle className="w-12 h-12 mx-auto mb-4 text-red-600" />
         <h1 className="text-2xl font-heading font-bold text-neutral-900 mb-2">

@@ -220,7 +220,7 @@ function resolveTikTokErrorMessage(data: any): string | undefined {
   if (normalizedCode === 'unaudited_client_can_only_post_to_private_accounts') {
     const advisory = [
       'TikTok blocked this request because the app is unaudited and the connected TikTok account is not in private-account mode.',
-      'Set the TikTok account to Private in TikTok settings, reconnect in EE PostMind, and retry.',
+      'Set the TikTok account to Private in TikTok settings, reconnect in SmmtAI, and retry.',
     ].join(' ');
     if (metadataParts.length > 0) {
       return `${advisory} (${metadataParts.join(', ')})`;
@@ -2321,8 +2321,8 @@ export class PinterestAdapter implements PlatformAdapter {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          name: 'EE PostMind',
-          description: 'Auto-created by EE PostMind for publishing.',
+          name: 'SmmtAI',
+          description: 'Auto-created by SmmtAI for publishing.',
         }),
       });
       const createdBoardId = createBoardData?.id || createBoardData?.data?.id;

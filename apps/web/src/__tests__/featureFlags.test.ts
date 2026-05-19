@@ -20,7 +20,7 @@ describe('Feature Flags', () => {
 
   it('persists overrides in localStorage', () => {
     setFeatureFlag('white_label', true);
-    const stored = JSON.parse(localStorage.getItem('postmind_feature_flags')!);
+    const stored = JSON.parse(localStorage.getItem('smmtai_feature_flags')!);
     expect(stored.white_label).toBe(true);
   });
 

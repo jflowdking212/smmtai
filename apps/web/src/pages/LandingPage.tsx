@@ -197,60 +197,114 @@ function PricingSection() {
 
 export function LandingPage() {
   const { settings } = useSiteSettings();
-  const siteName = settings.site_title || 'Postmind';
+  const siteName = settings.site_title || 'SmmtAI';
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
     <div className="min-h-screen bg-white">
       {/* Navigation */}
-      <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-lg border-b border-neutral-100">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
-          <div className="flex items-center gap-2">
-            {settings.site_logo ? (
-              <img src={settings.site_logo} alt={siteName} className="w-8 h-8 object-contain" />
-            ) : (
-              <Sparkles className="w-7 h-7 text-blue-600" />
-            )}
-            <span className="text-xl font-bold font-heading text-neutral-900">{siteName}</span>
+      <nav className="sticky top-0 z-50 bg-white/90 backdrop-blur-lg border-b border-neutral-100">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            {/* Logo */}
+            <div className="flex items-center gap-2">
+              {settings.site_logo ? (
+                <img src={settings.site_logo} alt={siteName} className="w-8 h-8 object-contain" />
+              ) : (
+                <Sparkles className="w-7 h-7 text-blue-600" />
+              )}
+              <span className="text-xl font-bold font-heading text-neutral-900">{siteName}</span>
+            </div>
+            {/* Desktop nav */}
+            <div className="hidden md:flex items-center gap-8">
+              <a href="#features" className="text-sm text-neutral-600 hover:text-neutral-900 transition-colors">Features</a>
+              <a href="#pricing" className="text-sm text-neutral-600 hover:text-neutral-900 transition-colors">Pricing</a>
+              <a href="#contact" className="text-sm text-neutral-600 hover:text-neutral-900 transition-colors">Contact</a>
+            </div>
+            {/* Desktop CTA */}
+            <div className="hidden md:flex items-center gap-3">
+              <Link to="/auth/login" className="text-sm font-medium text-neutral-700 hover:text-neutral-900 transition-colors px-4 py-2">Log In</Link>
+              <Link to="/auth/register" className="text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 px-5 py-2.5 rounded-lg transition-all shadow-sm">
+                Get Started Free
+              </Link>
+            </div>
+            {/* Mobile: Log In + Hamburger */}
+            <div className="flex md:hidden items-center gap-1">
+              <Link to="/auth/login" className="text-sm font-medium text-neutral-600 hover:text-neutral-900 px-3 py-2 rounded-lg transition-colors">
+                Log In
+              </Link>
+              <button
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                className="p-2 rounded-lg text-neutral-600 hover:bg-neutral-100 transition-colors"
+                aria-label="Toggle menu"
+              >
+                {mobileMenuOpen ? (
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                ) : (
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                  </svg>
+                )}
+              </button>
+            </div>
           </div>
-          <div className="hidden md:flex items-center gap-8">
-            <a href="#features" className="text-sm text-neutral-600 hover:text-neutral-900 transition-colors">Features</a>
-            <a href="#pricing" className="text-sm text-neutral-600 hover:text-neutral-900 transition-colors">Pricing</a>
-            <a href="#contact" className="text-sm text-neutral-600 hover:text-neutral-900 transition-colors">Contact</a>
-          </div>
-          <div className="flex items-center gap-3">
-            <Link to="/auth/login" className="text-sm font-medium text-neutral-700 hover:text-neutral-900 transition-colors px-4 py-2">
-              Log In
-            </Link>
-            <Link to="/auth/register" className="text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg transition-colors shadow-sm">
-              Get Started Free
-            </Link>
-          </div>
+          {/* Mobile dropdown */}
+          {mobileMenuOpen && (
+            <div className="md:hidden border-t border-neutral-100 py-3 space-y-1">
+              <a href="#features" onClick={() => setMobileMenuOpen(false)} className="flex items-center px-3 py-2.5 text-sm font-medium text-neutral-700 hover:bg-neutral-50 rounded-lg transition-colors">Features</a>
+              <a href="#pricing" onClick={() => setMobileMenuOpen(false)} className="flex items-center px-3 py-2.5 text-sm font-medium text-neutral-700 hover:bg-neutral-50 rounded-lg transition-colors">Pricing</a>
+              <a href="#contact" onClick={() => setMobileMenuOpen(false)} className="flex items-center px-3 py-2.5 text-sm font-medium text-neutral-700 hover:bg-neutral-50 rounded-lg transition-colors">Contact</a>
+              <div className="pt-2 pb-1">
+                <Link
+                  to="/auth/register"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex items-center justify-center gap-2 w-full py-3 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition-all shadow-md shadow-blue-600/20"
+                >
+                  Get Started Free <ArrowRight className="w-4 h-4" />
+                </Link>
+              </div>
+            </div>
+          )}
         </div>
       </nav>
 
       {/* Hero */}
       <section className="relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-white to-purple-50" />
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 sm:py-28 lg:py-36">
+        <div className="relative max-w-7xl mx-auto px-5 sm:px-6 lg:px-8 py-14 sm:py-24 lg:py-36">
           <div className="max-w-3xl mx-auto text-center">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-sm font-medium mb-6">
-              <Sparkles className="w-4 h-4" /> AI-Powered Social Media Management
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-50 border border-blue-100 text-blue-700 text-xs sm:text-sm font-medium mb-5">
+              <Sparkles className="w-3.5 h-3.5" /> AI-Powered Social Media Management
             </div>
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold font-heading text-neutral-900 leading-tight">
-              Create, Schedule & Publish <span className="text-blue-600">Everywhere</span>
+            <h1 className="text-3xl sm:text-5xl lg:text-6xl font-bold font-heading text-neutral-900 leading-tight tracking-tight">
+              Create, Schedule &amp; Publish <span className="text-blue-600">Everywhere</span>
             </h1>
-            <p className="mt-6 text-lg sm:text-xl text-neutral-600 leading-relaxed max-w-2xl mx-auto">
-              {settings.site_tagline || 'Postmind helps you craft stunning content with AI, design eye-catching visuals, and publish to all your social platforms — all from one dashboard.'}
+            <p className="mt-4 sm:mt-6 text-base sm:text-xl text-neutral-500 leading-relaxed max-w-2xl mx-auto">
+              {settings.site_tagline || 'SmmtAI helps you craft stunning content with AI, design eye-catching visuals, and publish to all your social platforms — all from one dashboard.'}
             </p>
-            <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
-              <Link to="/auth/register" className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl transition-all shadow-lg shadow-blue-600/25 hover:shadow-xl hover:shadow-blue-600/30 text-base">
-                Start Free Today <ArrowRight className="w-5 h-5" />
+            {/* CTA Buttons */}
+            <div className="mt-8 sm:mt-10 flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3">
+              <Link
+                to="/auth/register"
+                className="inline-flex items-center justify-center gap-2 px-7 py-3.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-semibold rounded-xl transition-all shadow-lg shadow-blue-600/25 text-sm sm:text-base"
+              >
+                Start Free Today <ArrowRight className="w-4 h-4" />
               </Link>
-              <a href="#features" className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-3.5 bg-white hover:bg-neutral-50 text-neutral-700 font-medium rounded-xl transition-all border border-neutral-200 text-base">
+              <a
+                href="#features"
+                className="inline-flex items-center justify-center gap-2 px-7 py-3.5 bg-white hover:bg-neutral-50 active:scale-95 text-neutral-700 font-semibold rounded-xl transition-all border border-neutral-200 text-sm sm:text-base"
+              >
                 See Features
               </a>
             </div>
-            <p className="mt-4 text-sm text-neutral-500">No credit card required · Free forever plan</p>
+            {/* Trust badges */}
+            <div className="mt-5 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-xs text-neutral-400">
+              <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5 text-green-500" /> No credit card</span>
+              <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5 text-green-500" /> Free forever plan</span>
+              <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5 text-green-500" /> Cancel anytime</span>
+            </div>
           </div>
         </div>
       </section>
@@ -285,7 +339,7 @@ export function LandingPage() {
       <section className="py-20 sm:py-28 bg-gradient-to-br from-blue-600 to-blue-800">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-3xl sm:text-4xl font-bold font-heading text-white">Ready to supercharge your social media?</h2>
-          <p className="mt-4 text-lg text-blue-100 max-w-2xl mx-auto">Join thousands of creators and teams who use Postmind to save time, create better content, and grow their audience.</p>
+          <p className="mt-4 text-lg text-blue-100 max-w-2xl mx-auto">Join thousands of creators and teams who use SmmtAI to save time, create better content, and grow their audience.</p>
           <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
             <Link to="/auth/register" className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-3.5 bg-white hover:bg-neutral-50 text-blue-700 font-medium rounded-xl transition-all shadow-lg text-base">
               Get Started Free <ArrowRight className="w-5 h-5" />
@@ -305,11 +359,11 @@ export function LandingPage() {
           <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-6">
             <div className="bg-white rounded-2xl p-6 border border-neutral-100">
               <h3 className="font-semibold text-neutral-900 mb-2">Email Support</h3>
-              <p className="text-sm text-neutral-500">support@postmind.app</p>
+              <p className="text-sm text-neutral-500">support@smmtai.app</p>
             </div>
             <div className="bg-white rounded-2xl p-6 border border-neutral-100">
               <h3 className="font-semibold text-neutral-900 mb-2">Sales</h3>
-              <p className="text-sm text-neutral-500">sales@postmind.app</p>
+              <p className="text-sm text-neutral-500">sales@smmtai.app</p>
             </div>
           </div>
         </div>

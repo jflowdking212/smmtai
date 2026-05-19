@@ -90,7 +90,7 @@ export function AdminLayout() {
             {!collapsed && (
               <div className="flex flex-col">
                 <span className="font-heading font-bold text-sm text-white">
-                  {siteSettings.site_title || 'EE PostMind'}
+                  {siteSettings.site_title || 'SmmtAI'}
                 </span>
                 <span className="text-[10px] font-semibold text-red-400 uppercase tracking-wider">Admin Panel</span>
               </div>

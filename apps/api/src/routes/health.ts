@@ -7,7 +7,7 @@ healthRouter.get('/', (_req: Request, res: Response) => {
     success: true,
     data: {
       status: 'healthy',
-      app: 'EE PostMind API',
+      app: 'SmmtAI API',
       version: '0.1.0',
       timestamp: new Date().toISOString(),
     },

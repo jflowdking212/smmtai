@@ -1,7 +1,7 @@
 You are debugging the Entreprenrs backend on this server.
 
 Objective
-Fix API publishing so external clients (EE PostMind) can create posts without:
+Fix API publishing so external clients (SmmtAI) can create posts without:
 Error: 404 API Type Not Found
 
 Current verified behavior

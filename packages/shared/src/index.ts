@@ -1,4 +1,4 @@
-// EE PostMind — Shared Types & Utilities
+// SmmtAI — Shared Types & Utilities
 
 // ============================================================
 // Platform Types

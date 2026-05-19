@@ -11,7 +11,7 @@ export interface SiteSettings {
 }
 
 const DEFAULTS: SiteSettings = {
-  site_title: 'Postmind',
+  site_title: 'SmmtAI',
   site_tagline: 'AI-Powered Social Media Management',
   site_favicon: '',
   site_logo: '',

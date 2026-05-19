@@ -1,4 +1,4 @@
-export const COMPOSE_SEED_KEY = '__postmindComposeSeed';
+export const COMPOSE_SEED_KEY = '__smmtaiComposeSeed';
 
 type ComposeSeedSource = 'ai' | 'editor';
 

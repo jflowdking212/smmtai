@@ -51,7 +51,7 @@ const STEPS: OnboardingStep[] = [
   },
 ];
 
-const STORAGE_KEY = 'postmind_onboarding';
+const STORAGE_KEY = 'smmtai_onboarding';
 
 function getCompletedSteps(): Set<string> {
   try {

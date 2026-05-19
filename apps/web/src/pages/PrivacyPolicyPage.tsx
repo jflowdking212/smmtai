@@ -7,7 +7,7 @@ import {
 
 export function PrivacyPolicyPage() {
   const { settings } = useSiteSettings();
-  const siteName = settings.site_title || 'EE PostMind';
+  const siteName = settings.site_title || 'SmmtAI';
 
   return (
     <LegalPageLayout

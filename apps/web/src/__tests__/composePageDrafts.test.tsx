@@ -129,7 +129,7 @@ describe('ComposePage draft flows', () => {
       data: {
         ...makeDraft('draft-1', 'Loaded draft content'),
         designData: {
-          __postmindPublishPayload: { link: 'https://example.com', hashtags: ['launch'] },
+          __smmtaiPublishPayload: { link: 'https://example.com', hashtags: ['launch'] },
         },
       },
     });
@@ -163,7 +163,7 @@ describe('ComposePage draft flows', () => {
   });
 
   it('hydrates composer from AI handoff payload', async () => {
-    window.sessionStorage.setItem('__postmindComposeSeed', JSON.stringify({
+    window.sessionStorage.setItem('__smmtaiComposeSeed', JSON.stringify({
       source: 'ai',
       content: 'Seeded caption from AI',
       hashtags: ['launch', 'growth'],
@@ -177,6 +177,6 @@ describe('ComposePage draft flows', () => {
     });
     expect((screen.getByPlaceholderText('launch, growth, product') as HTMLInputElement).value)
       .toBe('launch, growth');
-    expect(window.sessionStorage.getItem('__postmindComposeSeed')).toBeNull();
+    expect(window.sessionStorage.getItem('__smmtaiComposeSeed')).toBeNull();
   });
 });

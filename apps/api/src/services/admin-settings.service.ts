@@ -132,7 +132,7 @@ export async function testSmtpConnection(toEmail: string): Promise<{ success: bo
     await transport.sendMail({
       from: cfg.smtp_from || cfg.smtp_user,
       to: toEmail,
-      subject: 'EE PostMind — SMTP Test',
+      subject: 'SmmtAI — SMTP Test',
       text: 'This is a test email confirming your SMTP configuration works.',
       html: '<p>This is a test email confirming your <strong>SMTP configuration</strong> works.</p>',
     });

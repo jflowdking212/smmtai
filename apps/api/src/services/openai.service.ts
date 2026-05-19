@@ -1,4 +1,4 @@
-import OpenAI from 'openai';
+import OpenAI, { toFile } from 'openai';
 
 let openaiClient: OpenAI | null = null;
 
@@ -79,6 +79,71 @@ export async function chatWithRetry(
   throw lastError;
 }
 
+export async function chatWithTools(
+  messages: Array<any>,
+  tools: any[],
+  toolExecutor: (name: string, args: any) => Promise<any>,
+  options?: { model?: string; temperature?: number; maxTokens?: number; timeoutMs?: number; apiKey?: string },
+): Promise<string> {
+  const model = normalizeModel(options?.model || 'gpt-4o-mini');
+  const client = getClient(options?.apiKey);
+  
+  // Create a deep copy of messages to append to
+  const msgs = [...messages];
+  let iterations = 0;
+  const MAX_ITERATIONS = 5;
+
+  while (iterations < MAX_ITERATIONS) {
+    iterations++;
+    try {
+      const response = await client.chat.completions.create({
+        model,
+        messages: msgs,
+        temperature: options?.temperature ?? 0.7,
+        max_tokens: options?.maxTokens || 1000,
+        tools: tools.length > 0 ? tools : undefined,
+        tool_choice: tools.length > 0 ? 'auto' : 'none',
+      });
+
+      const message = response.choices[0]?.message;
+      if (!message) return '';
+
+      msgs.push(message);
+
+      if (message.tool_calls && message.tool_calls.length > 0) {
+        for (const toolCall of message.tool_calls) {
+          if (toolCall.type === 'function') {
+            try {
+              const args = JSON.parse(toolCall.function.arguments);
+              const result = await toolExecutor(toolCall.function.name, args);
+              msgs.push({
+                role: 'tool',
+                tool_call_id: toolCall.id,
+                content: typeof result === 'string' ? result : JSON.stringify(result)
+              });
+            } catch (err: any) {
+              msgs.push({
+                role: 'tool',
+                tool_call_id: toolCall.id,
+                content: `Error executing tool: ${err.message}`
+              });
+            }
+          }
+        }
+      } else {
+        return message.content || '';
+      }
+    } catch (error: any) {
+      const msg = String(error?.message || '').toLowerCase();
+      if (error.status === 429) throw new Error('Rate limit exceeded. Please try again later.');
+      if (error.status === 401) throw new Error('Invalid OpenAI API key');
+      throw new Error(`AI tool execution failed: ${msg}`);
+    }
+  }
+
+  return 'I needed too many steps to complete this request. Please try breaking it down into smaller parts.';
+}
+
 export async function generateEmbedding(text: string): Promise<number[]> {
   try {
     const apiKey = process.env.OPENAI_API_KEY;
@@ -92,4 +157,53 @@ export async function generateEmbedding(text: string): Promise<number[]> {
     console.error('OpenAI embedding error:', error);
     return new Array(1536).fill(0).map(() => Math.random());
   }
+}
+
+/**
+ * Transcribe audio using OpenAI Whisper.
+ * Accepts a Buffer (audio file bytes) and the MIME type/file extension.
+ */
+export async function transcribeAudio(
+  audioBuffer: Buffer,
+  filename: string,
+  apiKey?: string,
+): Promise<string> {
+  const client = getClient(apiKey || process.env.OPENAI_API_KEY);
+  
+  // Use the official toFile helper provided by OpenAI for Node.js
+  const file = await toFile(audioBuffer, filename, { type: getMimeType(filename) });
+
+  const response = await client.audio.transcriptions.create({
+    model: 'whisper-1',
+    file,
+    response_format: 'text',
+  });
+
+  return typeof response === 'string' ? response.trim() : (response as any).text?.trim() ?? '';
+}
+
+function getMimeType(filename: string): string {
+  const ext = filename.split('.').pop()?.toLowerCase();
+  const map: Record<string, string> = {
+    webm: 'audio/webm',
+    mp4: 'audio/mp4',
+    m4a: 'audio/mp4',
+    ogg: 'audio/ogg',
+    wav: 'audio/wav',
+    mp3: 'audio/mpeg',
+    flac: 'audio/flac',
+  };
+  return map[ext || ''] || 'audio/webm';
+}
+
+export async function generateSpeech(text: string, apiKey?: string): Promise<Buffer> {
+  const client = getClient(apiKey || process.env.OPENAI_API_KEY);
+  const response = await client.audio.speech.create({
+    model: 'tts-1',
+    voice: 'alloy',
+    input: text,
+  });
+  
+  const arrayBuffer = await response.arrayBuffer();
+  return Buffer.from(arrayBuffer);
 }

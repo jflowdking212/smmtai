@@ -129,7 +129,7 @@ describe('AIPage personalization', () => {
     await waitFor(() => expect(mockApi.ai.caption).toHaveBeenCalled());
     fireEvent.click(screen.getByRole('button', { name: 'Use in Compose' }));
 
-    expect(JSON.parse(window.sessionStorage.getItem('__postmindComposeSeed') || '{}')).toMatchObject({
+    expect(JSON.parse(window.sessionStorage.getItem('__smmtaiComposeSeed') || '{}')).toMatchObject({
       source: 'ai',
       content: 'Ready for compose',
       hashtags: ['product', 'launch'],

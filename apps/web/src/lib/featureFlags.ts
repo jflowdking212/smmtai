@@ -26,7 +26,7 @@ const DEFAULT_FLAGS: Record<FeatureFlag, boolean> = {
   threads_integration: false,
 };
 
-const STORAGE_KEY = 'postmind_feature_flags';
+const STORAGE_KEY = 'smmtai_feature_flags';
 
 function getOverrides(): Partial<Record<FeatureFlag, boolean>> {
   try {

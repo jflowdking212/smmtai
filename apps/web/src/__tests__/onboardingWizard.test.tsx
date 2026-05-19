@@ -24,7 +24,7 @@ describe('OnboardingWizard', () => {
   it('marks step complete and persists to localStorage', () => {
     renderWithRouter(<OnboardingWizard onDismiss={() => {}} />);
     fireEvent.click(screen.getByText('Skip'));
-    const stored = JSON.parse(localStorage.getItem('postmind_onboarding')!);
+    const stored = JSON.parse(localStorage.getItem('smmtai_onboarding')!);
     expect(stored).toContain('connect');
   });
 
@@ -51,7 +51,7 @@ describe('shouldShowOnboarding', () => {
   });
 
   it('returns false when dismissed', () => {
-    localStorage.setItem('postmind_onboarding_dismissed', 'true');
+    localStorage.setItem('smmtai_onboarding_dismissed', 'true');
     expect(shouldShowOnboarding()).toBe(false);
   });
 });

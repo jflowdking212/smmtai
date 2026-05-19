@@ -46,7 +46,7 @@ export function ResetPasswordPage() {
           <div className="w-10 h-10 bg-brand-500 rounded-xl flex items-center justify-center">
             <Sparkles className="w-5 h-5 text-white" />
           </div>
-          <span className="font-heading font-bold text-xl text-neutral-900">EE PostMind</span>
+          <span className="font-heading font-bold text-xl text-neutral-900">SmmtAI</span>
         </div>
 
         {done ? (

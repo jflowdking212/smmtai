@@ -1,11 +1,12 @@
 @import 'tailwindcss';
 
 /* ============================================================
-   EE PostMind — Design Tokens
+   SmmtAI — Design Tokens
    ============================================================ */
 
 @theme {
   /* Brand Colors */
+  --color-brand-blue: #2563EB;
   --color-brand-50: #EFF6FF;
   --color-brand-100: #DBEAFE;
   --color-brand-200: #BFDBFE;

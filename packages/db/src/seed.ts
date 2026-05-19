@@ -25,15 +25,15 @@ if (!process.env.DATABASE_URL) {
     process.env.DATABASE_URL = discovered.value;
     console.warn(`DATABASE_URL loaded from ${discovered.candidate}`);
   } else {
-    process.env.DATABASE_URL = 'postgresql://postmind:postmind@localhost:5432/ee_postmind?schema=public';
-    console.warn('DATABASE_URL not set. Using local default: postgresql://postmind@localhost:5432/ee_postmind');
+    process.env.DATABASE_URL = 'postgresql://smmtai:smmtai@localhost:5432/ee_smmtai?schema=public';
+    console.warn('DATABASE_URL not set. Using local default: postgresql://smmtai@localhost:5432/ee_smmtai');
   }
 }
 
 const prisma = new PrismaClient();
 
-const DEMO_EMAIL = process.env.SEED_DEMO_EMAIL || 'demo@eepostmind.local';
-const DEMO_NAME = process.env.SEED_DEMO_NAME || 'EE PostMind Demo';
+const DEMO_EMAIL = process.env.SEED_DEMO_EMAIL || 'demo@smmtai.local';
+const DEMO_NAME = process.env.SEED_DEMO_NAME || 'SmmtAI Demo';
 const DEMO_WORKSPACE_NAME = process.env.SEED_WORKSPACE_NAME || 'Demo Workspace';
 const DEMO_WORKSPACE_SLUG = process.env.SEED_WORKSPACE_SLUG || 'demo-workspace';
 

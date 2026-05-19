@@ -48,7 +48,7 @@ function buildPlatformCoverage(profile) {
     },
     {
       title: `${profile.name} Campaign QA Checklist Before Scheduling`,
-      content: `Run this QA checklist before scheduling ${profile.name} campaigns in EE PostMind.\n\nPre-schedule checks:\n1. Confirm objective and CTA are explicit.\n2. Validate media specs, thumbnail quality, and caption length.\n3. Verify links, tracking parameters, and destination page health.\n4. Review compliance items (claims, disclosures, legal copy).\n5. Preview final rendering and approve from the correct workspace.\n\nPost-schedule check:\n• Re-open Calendar and spot-check publish times and platform selection.`,
+      content: `Run this QA checklist before scheduling ${profile.name} campaigns in SmmtAI.\n\nPre-schedule checks:\n1. Confirm objective and CTA are explicit.\n2. Validate media specs, thumbnail quality, and caption length.\n3. Verify links, tracking parameters, and destination page health.\n4. Review compliance items (claims, disclosures, legal copy).\n5. Preview final rendering and approve from the correct workspace.\n\nPost-schedule check:\n• Re-open Calendar and spot-check publish times and platform selection.`,
       category: 'Getting Started',
       tags: [profile.slug, profile.name.toLowerCase(), 'qa checklist', 'campaign setup', 'scheduling quality', 'publish readiness'],
       priority: 6,
@@ -95,7 +95,7 @@ const globalCoverage = [
     priority: 7,
   },
   {
-    title: 'New Team Member Onboarding for EE PostMind',
+    title: 'New Team Member Onboarding for SmmtAI',
     content: `Use this onboarding checklist to ramp new contributors quickly and safely.\n\nFirst-week checklist:\n1. Grant minimum required role and workspace access.\n2. Share brand voice, approval rules, and compliance standards.\n3. Assign template library and campaign naming conventions.\n4. Shadow one content cycle from draft to publish.\n5. Complete a supervised publish simulation.\n\nSuccess criteria:\n• New member can draft, route, and schedule content without policy errors.`,
     category: 'Getting Started',
     tags: ['onboarding', 'team setup', 'new member', 'training', 'workspace roles'],

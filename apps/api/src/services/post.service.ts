@@ -19,8 +19,8 @@ export interface CreatePostInput {
   scheduledAt?: Date;
 }
 
-const PLATFORM_CAPTION_MAP_KEY = '__postmindPlatformCaptions';
-const PUBLISH_PAYLOAD_MAP_KEY = '__postmindPublishPayload';
+const PLATFORM_CAPTION_MAP_KEY = '__smmtaiPlatformCaptions';
+const PUBLISH_PAYLOAD_MAP_KEY = '__smmtaiPublishPayload';
 const VIDEO_MEDIA_URL_REGEX = /\.(mp4|mov|avi|webm|m4v|mkv)(\?.*)?$/i;
 const PLATFORM_CHAR_LIMITS: Partial<Record<PlatformType, number>> = {
   twitter: 280,

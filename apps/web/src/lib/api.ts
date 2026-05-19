@@ -607,6 +607,11 @@ export const api = {
   chat: {
     sendMessage: (data: { message: string; context?: string; sessionId?: string; customerInfo?: { name?: string; email?: string; phone?: string } }) =>
       request<any>('/chat/message', { method: 'POST', body: JSON.stringify(data) }),
+    transcribeVoice: (audioBlob: Blob, filename = 'voice.webm') => {
+      const formData = new FormData();
+      formData.append('audio', audioBlob, filename);
+      return request<{ success: true; transcript: string }>('/chat/transcribe', { method: 'POST', body: formData });
+    },
     getHistory: (sessionId: string) =>
       request<{ success: boolean; messages: any[]; customerInfo?: any }>(`/chat/conversations/history/${sessionId}`),
     getConversations: (params?: { status?: string; email?: string }) =>

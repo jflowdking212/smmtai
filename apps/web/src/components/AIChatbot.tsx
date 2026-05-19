@@ -1,5 +1,6 @@
-import { useState, useRef, useEffect } from 'react';
-import { MessageCircle, X, Send, Bot, User, Minimize2, Phone, Mail, UserIcon } from 'lucide-react';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { MessageCircle, X, Send, Bot, User, Minimize2, Phone, Mail, UserIcon, Mic, MicOff, Loader2 } from 'lucide-react';
+import { useAuthStore } from '@/stores/authStore';
 
 interface Message {
   id: string;
@@ -31,13 +32,20 @@ function getCookieValue(name: string): string | null {
 
 function getJsonHeaders(): HeadersInit {
   const csrfToken = getCookieValue(CSRF_COOKIE);
-  return csrfToken
-    ? { 'Content-Type': 'application/json', 'x-csrf-token': csrfToken }
-    : { 'Content-Type': 'application/json' };
+  const token = useAuthStore.getState().accessToken;
+  const headers: HeadersInit = { 'Content-Type': 'application/json' };
+  if (csrfToken) (headers as any)['x-csrf-token'] = csrfToken;
+  if (token) (headers as any)['Authorization'] = `Bearer ${token}`;
+  return headers;
 }
 
 export function AIChatbot() {
   const [isOpen, setIsOpen] = useState(false);
+
+  // Read auth state reactively from the store (persisted across page loads)
+  const authUser = useAuthStore((s) => s.user);
+  const authWorkspaceId = useAuthStore((s) => s.workspaceId);
+  const isLoggedIn = !!authUser; // Rely on persisted user object, not volatile isAuthenticated
 
   // Listen for external open requests (e.g., from Help page)
   useEffect(() => {
@@ -45,8 +53,13 @@ export function AIChatbot() {
     window.addEventListener('open-chatbot', handler);
     return () => window.removeEventListener('open-chatbot', handler);
   }, []);
-  const [messages, setMessages] = useState<Message[]>([
-    { id: '1', content: "Hi! I'm your Postmind assistant. I can help you with questions about social media management, scheduling, analytics, and more. How can I help?", sender: 'bot', timestamp: new Date() },
+
+  const greeting = isLoggedIn && authUser
+    ? `Hi ${authUser.name}! 👋 I'm your SmmtAI assistant. I have full visibility into your workspace — ask me about your posts, analytics, drafts, or just tell me to do something!`
+    : "Hi! I'm your SmmtAI assistant. I can help you with questions about social media management, scheduling, analytics, and more. How can I help?";
+
+  const [messages, setMessages] = useState<Message[]>(() => [
+    { id: '1', content: greeting, sender: 'bot', timestamp: new Date() },
   ]);
   const [inputMessage, setInputMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -60,6 +73,112 @@ export function AIChatbot() {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const scrollToBottom = () => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+
+  // ---- Voice recording ----
+  const [isRecording, setIsRecording] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const stopRecording = useCallback(() => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    }
+    if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+    setIsRecording(false);
+    setRecordingSeconds(0);
+  }, []);
+
+  const startRecording = useCallback(async () => {
+    if (isRecording) { stopRecording(); return; }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+        ? 'audio/webm;codecs=opus'
+        : MediaRecorder.isTypeSupported('audio/webm')
+        ? 'audio/webm'
+        : 'audio/ogg';
+      const recorder = new MediaRecorder(stream, { mimeType });
+      mediaRecorderRef.current = recorder;
+      audioChunksRef.current = [];
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+
+      recorder.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
+        if (audioBlob.size < 1000) return; // discard near-empty recordings
+
+        setIsTranscribing(true);
+        try {
+          const formData = new FormData();
+          const ext = mimeType.includes('webm') ? 'webm' : 'ogg';
+          formData.append('audio', audioBlob, `voice.${ext}`);
+
+          const csrfToken = getCookieValue(CSRF_COOKIE);
+          const headers: Record<string, string> = {};
+          if (csrfToken) headers['x-csrf-token'] = csrfToken;
+          const token = useAuthStore.getState().accessToken;
+          if (token) headers['Authorization'] = `Bearer ${token}`;
+
+          const res = await fetch(`${API_BASE}/chat/transcribe`, {
+            method: 'POST',
+            headers,
+            credentials: 'include',
+            body: formData,
+          });
+          const data = await res.json();
+          if (data.success && data.transcript) {
+            // Auto-fill the input and send immediately
+            sendMessage(data.transcript, true);
+          } else {
+            setMessages((prev) => [
+              ...prev,
+              { id: Date.now().toString(), content: data.error || 'Could not understand audio. Please try again.', sender: 'bot', timestamp: new Date() },
+            ]);
+          }
+        } catch {
+          setMessages((prev) => [
+            ...prev,
+            { id: Date.now().toString(), content: 'Voice transcription failed. Please check your connection.', sender: 'bot', timestamp: new Date() },
+          ]);
+        } finally {
+          setIsTranscribing(false);
+        }
+      };
+
+      recorder.start(250); // collect data every 250ms
+      setIsRecording(true);
+      setRecordingSeconds(0);
+      recordingTimerRef.current = setInterval(() => setRecordingSeconds((s) => s + 1), 1000);
+
+      // Auto-stop after 60 seconds
+      setTimeout(() => { if (mediaRecorderRef.current?.state === 'recording') stopRecording(); }, 60000);
+    } catch (err: any) {
+      const denied = err?.name === 'NotAllowedError' || err?.name === 'PermissionDeniedError';
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now().toString(),
+          content: denied
+            ? 'Microphone access was denied. Please allow microphone access in your browser settings.'
+            : 'Could not access your microphone. Please check your device.',
+          sender: 'bot',
+          timestamp: new Date(),
+        },
+      ]);
+    }
+  }, [isRecording, stopRecording]);
+
+  // Cleanup on unmount
+  useEffect(() => () => {
+    stopRecording();
+    if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+  }, [stopRecording]);
 
   useEffect(() => {
     const init = async () => {
@@ -79,7 +198,7 @@ export function AIChatbot() {
                 id: `loaded-${idx}`, content: msg.content, sender: msg.role as 'user' | 'bot', timestamp: new Date(msg.timestamp), sources: msg.sources,
               }));
               setMessages([
-                { id: '1', content: "Hi! I'm your Postmind assistant. I can help you with questions about social media management, scheduling, analytics, and more. How can I help?", sender: 'bot', timestamp: new Date() },
+                { id: '1', content: "Hi! I'm your SmmtAI assistant. I can help you with questions about social media management, scheduling, analytics, and more. How can I help?", sender: 'bot', timestamp: new Date() },
                 ...loaded,
               ]);
             }
@@ -143,7 +262,26 @@ export function AIChatbot() {
     }
   };
 
-  const sendMessage = async (content: string) => {
+  const playTTS = async (text: string) => {
+    try {
+      const res = await fetch(`${API_BASE}/chat/tts`, {
+        method: 'POST',
+        headers: getJsonHeaders(),
+        credentials: 'include',
+        body: JSON.stringify({ text }),
+      });
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const audio = new Audio(url);
+        audio.play().catch(console.error);
+      }
+    } catch (e) {
+      console.error('Failed to play TTS', e);
+    }
+  };
+
+  const sendMessage = async (content: string, isVoice = false) => {
     if (!content.trim()) return;
     const userMessage: Message = { id: Date.now().toString(), content: content.trim(), sender: 'user', timestamp: new Date() };
     setMessages(prev => [...prev, userMessage]);
@@ -161,7 +299,15 @@ export function AIChatbot() {
     setIsTyping(true);
     try {
       const requestBody: any = { message: content, context: 'customer_support', sessionId };
-      if (isContactSubmitted) requestBody.customerInfo = customerInfo;
+      if (isContactSubmitted && !isLoggedIn) requestBody.customerInfo = customerInfo;
+
+      // Include identity from the persisted auth store so the backend can
+      // set up agent tools even when the in-memory accessToken hasn't been
+      // refreshed yet (it is not persisted to localStorage by design).
+      if (isLoggedIn && authWorkspaceId && authUser) {
+        requestBody.workspaceId = authWorkspaceId;
+        requestBody.userId = authUser.id;
+      }
 
       const response = await fetch(`${API_BASE}/chat/message`, {
         method: 'POST',
@@ -181,7 +327,13 @@ export function AIChatbot() {
         setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), content: data.response, sender: 'bot', timestamp: new Date(), sources: data.sources || [] }]);
         const newCount = botResponseCount + 1;
         setBotResponseCount(newCount);
-        if (!isContactSubmitted && contactStage === 'none' && newCount >= 2) {
+        
+        if (isVoice) {
+          playTTS(data.response);
+        }
+        
+        // Only prompt for contact info for unauthenticated users
+        if (!isLoggedIn && !isContactSubmitted && contactStage === 'none' && newCount >= 2) {
           setTimeout(() => {
             setMessages(prev => [...prev, { id: (Date.now() + 5).toString(), content: 'For better personalized assistance, may I know your name?', sender: 'bot', timestamp: new Date() }]);
             setContactStage('name');
@@ -195,7 +347,7 @@ export function AIChatbot() {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); sendMessage(inputMessage); };
+  const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); sendMessage(inputMessage, false); };
 
   return (
     <>
@@ -218,7 +370,7 @@ export function AIChatbot() {
                 <Bot className="w-4 h-4" />
               </div>
               <div>
-                <h3 className="font-semibold text-sm">Postmind Assistant</h3>
+                <h3 className="font-semibold text-sm">SmmtAI Assistant</h3>
                 <p className="text-xs opacity-90">Online now</p>
               </div>
             </div>
@@ -313,19 +465,55 @@ export function AIChatbot() {
 
           {/* Input */}
           <div className="border-t border-neutral-200 dark:border-neutral-700 p-3 sm:p-4">
+            {/* Recording status bar */}
+            {isRecording && (
+              <div className="flex items-center justify-between mb-2 px-1">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                  <span className="text-xs text-red-500 font-medium">
+                    Recording… {recordingSeconds}s
+                  </span>
+                </div>
+                <span className="text-xs text-neutral-400">Tap mic to stop</span>
+              </div>
+            )}
+            {isTranscribing && (
+              <div className="flex items-center gap-2 mb-2 px-1">
+                <Loader2 className="w-3 h-3 text-blue-500 animate-spin" />
+                <span className="text-xs text-blue-500">Transcribing…</span>
+              </div>
+            )}
             <form onSubmit={handleSubmit} className="flex gap-2">
               <input ref={inputRef} type="text" value={inputMessage}
                 onChange={(e) => setInputMessage(e.target.value)}
-                placeholder="Type your message..."
+                placeholder={isRecording ? 'Listening…' : isTranscribing ? 'Transcribing…' : 'Type or use voice…'}
                 className="flex-1 px-3 sm:px-4 py-2 border border-neutral-300 dark:border-neutral-600 rounded-full focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-transparent text-sm bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 placeholder-neutral-500"
-                disabled={isTyping || contactStage !== 'none'} />
-              <button type="submit" disabled={!inputMessage.trim() || isTyping || contactStage !== 'none'}
-                className="w-10 h-10 bg-brand-blue text-white rounded-full hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center transition-all"
+                disabled={isTyping || contactStage !== 'none' || isRecording || isTranscribing} />
+
+              {/* Microphone button */}
+              <button
+                type="button"
+                onClick={startRecording}
+                disabled={isTyping || contactStage !== 'none' || isTranscribing}
+                className={`w-10 h-10 rounded-full flex items-center justify-center transition-all shrink-0 ${
+                  isRecording
+                    ? 'bg-red-500 text-white shadow-lg shadow-red-500/40 scale-110 animate-pulse'
+                    : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-700 disabled:opacity-40'
+                }`}
+                aria-label={isRecording ? 'Stop recording' : 'Start voice input'}
+                title={isRecording ? 'Tap to stop recording' : 'Voice input'}
+              >
+                {isRecording ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+              </button>
+
+              {/* Send button */}
+              <button type="submit" disabled={!inputMessage.trim() || isTyping || contactStage !== 'none' || isRecording}
+                className="w-10 h-10 bg-brand-blue text-white rounded-full hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center transition-all shrink-0"
                 aria-label="Send message">
                 <Send className="w-4 h-4" />
               </button>
             </form>
-            <p className="text-[10px] sm:text-xs text-neutral-500 mt-2 text-center">Powered by Postmind AI</p>
+            <p className="text-[10px] sm:text-xs text-neutral-500 mt-2 text-center">Powered by SmmtAI AI · Voice by Whisper</p>
           </div>
         </div>
       )}

@@ -112,7 +112,7 @@ export class StripeService {
           duration: discountDurationMonths && discountDurationMonths > 0 ? 'repeating' : 'forever',
           duration_in_months: discountDurationMonths && discountDurationMonths > 0 ? discountDurationMonths : undefined,
           percent_off: discountPercent,
-          name: couponCode ? `EE PostMind ${couponCode}` : 'EE PostMind Discount',
+          name: couponCode ? `SmmtAI ${couponCode}` : 'SmmtAI Discount',
           metadata: {
             workspaceId,
             couponRedemptionId: couponRedemptionId || '',

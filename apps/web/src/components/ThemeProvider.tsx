@@ -18,7 +18,7 @@ export function useTheme() {
   return useContext(ThemeContext);
 }
 
-const STORAGE_KEY = 'postmind_theme';
+const STORAGE_KEY = 'smmtai_theme';
 
 function getSystemTheme(): 'light' | 'dark' {
   if (typeof window === 'undefined') return 'light';

@@ -175,7 +175,7 @@ describe('PostService publish status integration', () => {
   it('uses per-connection caption overrides when publishing', async () => {
     const post = buildPost(['facebook', 'twitter']);
     post.designData = {
-      __postmindPlatformCaptions: {
+      __smmtaiPlatformCaptions: {
         'twitter:social_connection_2': 'Custom X caption',
       },
     };
@@ -258,7 +258,7 @@ describe('PostService publish status integration', () => {
   it('passes structured publish payload fields to platform adapters', async () => {
     const post = buildPost(['twitter']);
     post.designData = {
-      __postmindPublishPayload: {
+      __smmtaiPublishPayload: {
         link: 'https://example.com/story',
         hashtags: ['growth'],
         platformMetadata: {
@@ -301,7 +301,7 @@ describe('PostService publish status integration', () => {
       expect.objectContaining({
         data: expect.objectContaining({
           designData: expect.objectContaining({
-            __postmindPublishPayload: expect.objectContaining({
+            __smmtaiPublishPayload: expect.objectContaining({
               link: 'https://example.com/story',
               hashtags: ['growth', 'launch'],
               platformMetadata: {

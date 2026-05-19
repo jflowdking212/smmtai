@@ -98,7 +98,7 @@ if (config.sentry.dsn) {
 app.use(errorHandler);
 
 app.listen(config.port, () => {
-  console.log(`🚀 EE PostMind API running on port ${config.port}`);
+  console.log(`🚀 SmmtAI API running on port ${config.port}`);
   console.log(`   Environment: ${config.nodeEnv}`);
   void scheduleAnalyticsIngestion()
     .then(({ intervalMs }) => {

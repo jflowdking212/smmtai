@@ -10,7 +10,7 @@ interface SendEmailInput {
 
 export class EmailService {
   private resendApiKey = process.env.RESEND_API_KEY || '';
-  private from = process.env.EMAIL_FROM || 'EE PostMind <no-reply@smmt.local>';
+  private from = process.env.EMAIL_FROM || 'SmmtAI <no-reply@smmt.local>';
 
   async sendEmail(input: SendEmailInput): Promise<void> {
     // Try DB-configured SMTP first
@@ -83,12 +83,12 @@ export class EmailService {
     name: string,
     verificationLink: string,
   ): Promise<void> {
-    const subject = 'Verify your EE PostMind email';
+    const subject = 'Verify your SmmtAI email';
     const text = `Hi ${name},\n\nVerify your email by clicking this link:\n${verificationLink}\n\nIf you did not create this account, you can ignore this email.`;
     const html = `
       <div style="font-family:Inter,Arial,sans-serif;line-height:1.5;color:#111827">
         <p>Hi ${name},</p>
-        <p>Please verify your email address to secure your EE PostMind account.</p>
+        <p>Please verify your email address to secure your SmmtAI account.</p>
         <p>
           <a href="${verificationLink}" style="display:inline-block;background:#2563EB;color:#fff;padding:10px 16px;border-radius:8px;text-decoration:none">
             Verify Email
@@ -107,12 +107,12 @@ export class EmailService {
     name: string,
     resetLink: string,
   ): Promise<void> {
-    const subject = 'Reset your EE PostMind password';
+    const subject = 'Reset your SmmtAI password';
     const text = `Hi ${name},\n\nYou requested a password reset. Use this link to set a new password:\n${resetLink}\n\nIf you did not request this, you can ignore this email.`;
     const html = `
       <div style="font-family:Inter,Arial,sans-serif;line-height:1.5;color:#111827">
         <p>Hi ${name},</p>
-        <p>You requested a password reset for your EE PostMind account.</p>
+        <p>You requested a password reset for your SmmtAI account.</p>
         <p>
           <a href="${resetLink}" style="display:inline-block;background:#2563EB;color:#fff;padding:10px 16px;border-radius:8px;text-decoration:none">
             Reset Password
@@ -133,18 +133,18 @@ export class EmailService {
     loginLink: string;
     verifyEmailLink?: string;
   }): Promise<void> {
-    const subject = 'Welcome to EE PostMind — set your password';
+    const subject = 'Welcome to SmmtAI — set your password';
     const verifyLine = input.verifyEmailLink
       ? `\nVerify email (recommended): ${input.verifyEmailLink}`
       : '';
     const verifyHtml = input.verifyEmailLink
       ? `<p style="margin-top:12px">Verify email (recommended): <a href="${input.verifyEmailLink}">${input.verifyEmailLink}</a></p>`
       : '';
-    const text = `Hi ${input.name},\n\nWelcome to EE PostMind!\n\nSet your password to access your new account:\n${input.setPasswordLink}\n\nLogin: ${input.loginLink}${verifyLine}\n\nIf you did not request this, you can ignore this email.`;
+    const text = `Hi ${input.name},\n\nWelcome to SmmtAI!\n\nSet your password to access your new account:\n${input.setPasswordLink}\n\nLogin: ${input.loginLink}${verifyLine}\n\nIf you did not request this, you can ignore this email.`;
     const html = `
       <div style="font-family:Inter,Arial,sans-serif;line-height:1.5;color:#111827">
         <p>Hi ${input.name},</p>
-        <p>Welcome to <strong>EE PostMind</strong>! Your account has been created.</p>
+        <p>Welcome to <strong>SmmtAI</strong>! Your account has been created.</p>
         <p>
           <a href="${input.setPasswordLink}" style="display:inline-block;background:#2563EB;color:#fff;padding:10px 16px;border-radius:8px;text-decoration:none">
             Set Password
@@ -168,7 +168,7 @@ export class EmailService {
     acceptLink: string;
     declineLink: string;
   }): Promise<void> {
-    const subject = `${input.inviterName} invited you to ${input.workspaceName} on EE PostMind`;
+    const subject = `${input.inviterName} invited you to ${input.workspaceName} on SmmtAI`;
     const text = `You've been invited to join ${input.workspaceName} as ${input.role}.
 
 Accept invite: ${input.acceptLink}

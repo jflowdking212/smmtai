@@ -1,7 +1,8 @@
 import { prisma } from '../config/database.js';
-import { chatWithRetry } from './openai.service.js';
+import { chatWithRetry, chatWithTools } from './openai.service.js';
 import * as knowledgeBaseService from './knowledge-base.service.js';
 import * as conversationService from './conversation.service.js';
+import { adminTools, userTools } from './chat-tools.service.js';
 
 // In-memory cache
 const cache = new Map<string, { value: any; expires: number }>();
@@ -55,7 +56,7 @@ async function isSupportAgentOnline(): Promise<boolean> {
   }
 }
 
-export async function chatWithCustomer(message: string, context = 'general', sessionId?: string) {
+export async function chatWithCustomer(message: string, context = 'general', sessionId?: string, userId?: string, workspaceId?: string) {
   try {
     if (sessionId) {
       await conversationService.addMessage(sessionId, { role: 'user', content: message, timestamp: new Date() });
@@ -67,11 +68,11 @@ export async function chatWithCustomer(message: string, context = 'general', ses
     let contextInfo = '';
     const hasKBMatch = knowledgeResults.length > 0;
     if (hasKBMatch) {
-      contextInfo = '\n\n=== KNOWLEDGE BASE (USE THIS TO ANSWER) ===\n';
+      contextInfo = '\n\n=== KNOWLEDGE BASE ===\n';
       knowledgeResults.forEach((kb: any, i: number) => {
         contextInfo += `${i + 1}. ${kb.title}\n${kb.content}\n\n`;
       });
-      contextInfo += '=== END KNOWLEDGE BASE ===\n\nIMPORTANT: Answer ONLY using the knowledge base above. Do not make up information.';
+      contextInfo += '=== END KNOWLEDGE BASE ===\n';
     }
 
     // If no KB match, check for online support agents
@@ -98,7 +99,7 @@ export async function chatWithCustomer(message: string, context = 'general', ses
       return { success: true, response: 'Chatbot is currently disabled by the administrator.', usedKnowledgeBase: false, sources: [] };
     }
 
-    const defaultSystemPrompt = `ROLE: You are a helpful AI assistant for Postmind, a social media management platform.
+    const defaultSystemPrompt = `ROLE: You are a helpful AI assistant for SmmtAI, a social media management platform.
 
 PERSONA:
 You help users with questions about social media management, post scheduling, analytics, content creation, and platform connections.
@@ -114,7 +115,7 @@ ${hasKBMatch
 ${contextInfo}`;
 
     const systemPrompt = chatConfig.systemPrompt?.trim() || defaultSystemPrompt;
-    const finalPrompt = chatConfig.systemPrompt?.trim() ? systemPrompt + contextInfo : systemPrompt;
+    const finalPrompt = chatConfig.systemPrompt?.trim() ? systemPrompt + contextInfo + (hasKBMatch ? '\nIMPORTANT: Answer ONLY using the knowledge base above. Do not make up information.' : '') : systemPrompt;
 
     const effectiveKey = getEffectiveApiKey(chatConfig);
     if (!effectiveKey) {
@@ -126,13 +127,86 @@ ${contextInfo}`;
       };
     }
 
-    const response = await chatWithRetry(
-      [
-        { role: 'system', content: finalPrompt },
+    // Prepare tools based on authentication and role
+    const tools: any[] = [];
+    let role = 'guest';
+    let userName = '';
+
+    if (userId && workspaceId) {
+      const [membership, user] = await Promise.all([
+        prisma.workspaceMember.findUnique({
+          where: { userId_workspaceId: { userId, workspaceId } }
+        }),
+        prisma.user.findUnique({ where: { id: userId }, select: { name: true } })
+      ]);
+      if (membership) {
+        role = membership.role;
+        userName = user?.name || '';
+        Object.values(userTools).forEach(t => tools.push(t.definition));
+        if (role === 'admin' || role === 'owner') {
+          Object.values(adminTools).forEach(t => tools.push(t.definition));
+        }
+      }
+    }
+
+    const toolExecutor = async (name: string, args: any) => {
+      if (!userId || !workspaceId) return 'User not authenticated.';
+      
+      let handler;
+      if (userTools[name]) handler = userTools[name].handler;
+      if ((role === 'admin' || role === 'owner') && adminTools[name]) handler = adminTools[name].handler;
+      
+      if (!handler) return `Tool ${name} not found or you don't have permission to use it.`;
+      return handler(args, { userId, workspaceId, role });
+    };
+
+    // Use larger token budget and role-aware prompt when agent tools are active
+    const isAgentMode = tools.length > 0;
+    const agentRoleContext = isAgentMode
+      ? `\n\nAGENT CONTEXT:
+- You are operating as a full AI agent with real-time access to the SmmtAI database.
+- Authenticated user: ${userName || 'Unknown'} (role: ${role}, workspaceId: ${workspaceId})
+- You CAN and SHOULD use your tools to answer data-related questions.
+- For destructive actions (delete_post, ban_user) you MUST confirm with the user before executing (set confirm=false first to get their consent).
+- Do NOT make up data. Always use tools to retrieve live information.
+- Format lists and data clearly for the user.`
+      : '';
+
+    const agentSystemPrompt = isAgentMode
+      ? `ROLE: You are an omniscient AI assistant for SmmtAI. You have real-time access to the platform's data through tools.
+
+PERSONA:
+You are highly capable, concise, and action-oriented. You proactively use your tools to answer questions with real data.
+
+RULES:
+- CRITICAL: If you have a tool that can answer the user's question, YOU MUST CALL IT. Live tools ALWAYS take precedence over the Knowledge Base!
+- Be concise but thorough — do not truncate lists the user asked for.
+- For destructive actions, ALWAYS confirm with the user first.
+- You can handle multiple steps: look up data then act on it.
+${agentRoleContext}
+${contextInfo}`
+      : null;
+
+    const finalSystemPrompt = agentSystemPrompt || finalPrompt;
+    const effectiveMaxTokens = isAgentMode ? 1500 : chatConfig.maxTokens;
+    const openaiOptions = {
+      model: chatConfig.model,
+      temperature: isAgentMode ? 0.4 : 0.7,
+      maxTokens: effectiveMaxTokens,
+      apiKey: effectiveKey,
+      timeoutMs: isAgentMode ? 30000 : 15000
+    };
+    const conversationMessages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
+        { role: 'system', content: finalSystemPrompt },
         { role: 'user', content: message },
-      ],
-      { model: chatConfig.model, temperature: 0.7, maxTokens: chatConfig.maxTokens, apiKey: effectiveKey, timeoutMs: 15000 },
-    );
+    ];
+
+    let response: string;
+    if (tools.length > 0) {
+      response = await chatWithTools(conversationMessages, tools, toolExecutor, openaiOptions);
+    } else {
+      response = await chatWithRetry(conversationMessages as any, openaiOptions);
+    }
 
     if (sessionId && response) {
       await conversationService.addMessage(sessionId, { role: 'bot', content: response, timestamp: new Date() });

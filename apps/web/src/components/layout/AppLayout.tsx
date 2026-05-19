@@ -104,7 +104,7 @@ export function AppLayout() {
             )}
             {!collapsed && (
               <span className="font-heading font-bold text-lg text-neutral-900">
-                {siteSettings.site_title || 'EE PostMind'}
+                {siteSettings.site_title || 'SmmtAI'}
               </span>
             )}
           </div>

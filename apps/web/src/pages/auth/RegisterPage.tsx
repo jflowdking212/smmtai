@@ -67,7 +67,7 @@ export function RegisterPage() {
             <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
               <Sparkles className="w-6 h-6 text-white" />
             </div>
-            <span className="font-heading font-bold text-2xl">EE PostMind</span>
+            <span className="font-heading font-bold text-2xl">SmmtAI</span>
           </div>
           <h2 className="text-3xl font-heading font-bold leading-tight mb-4">
             Start managing your social media like a pro
@@ -96,7 +96,7 @@ export function RegisterPage() {
             <div className="w-10 h-10 bg-brand-500 rounded-xl flex items-center justify-center">
               <Sparkles className="w-5 h-5 text-white" />
             </div>
-            <span className="font-heading font-bold text-xl text-neutral-900">EE PostMind</span>
+            <span className="font-heading font-bold text-xl text-neutral-900">SmmtAI</span>
           </div>
 
           <h1 className="text-2xl font-heading font-bold text-neutral-900 mb-2">

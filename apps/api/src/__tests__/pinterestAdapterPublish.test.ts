@@ -108,7 +108,7 @@ describe('PinterestAdapter publishing', () => {
     expect(fetchMock.mock.calls[1]?.[0]).toBe('https://api.pinterest.com/v5/boards');
     expect(fetchMock.mock.calls[2]?.[0]).toBe('https://api.pinterest.com/v5/pins');
     const boardPayload = JSON.parse((fetchMock.mock.calls[1]?.[1] as { body?: string })?.body || '{}');
-    expect(boardPayload.name).toBe('EE PostMind');
+    expect(boardPayload.name).toBe('SmmtAI');
     const pinPayload = JSON.parse((fetchMock.mock.calls[2]?.[1] as { body?: string })?.body || '{}');
     expect(pinPayload.board_id).toBe('board_created');
   });

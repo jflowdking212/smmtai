@@ -88,8 +88,8 @@ function formatVideoLimit(limit?: VideoPlatformLimit): string {
   if (limit.note) parts.push(limit.note);
   return parts.join(' • ') || 'Video supported';
 }
-const PLATFORM_CAPTION_MAP_KEY = '__postmindPlatformCaptions';
-const PUBLISH_PAYLOAD_MAP_KEY = '__postmindPublishPayload';
+const PLATFORM_CAPTION_MAP_KEY = '__smmtaiPlatformCaptions';
+const PUBLISH_PAYLOAD_MAP_KEY = '__smmtaiPublishPayload';
 
 function buildPlatformUrl(platform: string, postId: string): string | null {
   const id = postId.trim();

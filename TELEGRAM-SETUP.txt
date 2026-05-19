@@ -1,15 +1,15 @@
-Telegram Setup for EE PostMind (Step by Step)
+Telegram Setup for SmmtAI (Step by Step)
 
 1) Create bot with BotFather
 - Open Telegram and search for @BotFather.
 - Send: /newbot
-- Enter bot name (example: EE PostMind Bot).
-- Enter bot username ending with "bot" (example: eepostmind_publish_bot).
+- Enter bot name (example: SmmtAI Bot).
+- Enter bot username ending with "bot" (example: eesmmtai_publish_bot).
 - Copy the Bot Token returned (format like 123456789:AA...).
 
 2) Prepare destination channel/group
 - Choose where posts should publish:
-  - Public channel (recommended): create channel and set username, e.g. @eepostmind_updates
+  - Public channel (recommended): create channel and set username, e.g. @eesmmtai_updates
   - Private channel/group: keep private and use numeric chat ID later
 
 3) Add bot and grant permissions
@@ -25,7 +25,7 @@ Telegram Setup for EE PostMind (Step by Step)
   - Find "chat": { "id": ... } in response.
   - Use that value as Chat ID (often starts with -100 for channels).
 
-5) Configure global Telegram credentials in EE PostMind
+5) Configure global Telegram credentials in SmmtAI
 - Go to: Admin Settings > Platform Credentials > Telegram
 - Fill:
   - Bot Token = token from BotFather
@@ -41,10 +41,10 @@ Telegram Setup for EE PostMind (Step by Step)
 - Send a text-only post first.
 - Then test image and video.
 
-If publish fails, capture and share the exact error message from EE PostMind.
+If publish fails, capture and share the exact error message from SmmtAI.
 
 ==================================================
-Pinterest Setup for EE PostMind (Step by Step)
+Pinterest Setup for SmmtAI (Step by Step)
 ==================================================
 
 1) Create a Pinterest developer app
@@ -69,7 +69,7 @@ Pinterest Setup for EE PostMind (Step by Step)
   - pins:read
   - pins:write
 
-5) Save in EE PostMind Admin
+5) Save in SmmtAI Admin
 - Go to: Admin Settings > Platform Credentials > Pinterest
 - Set:
   - Client ID / App ID = your App ID
@@ -83,7 +83,7 @@ Pinterest Setup for EE PostMind (Step by Step)
 
 7) Publish test pin
 - Use Compose with at least one image (or supported video) and optional link.
-- If no board is selected in metadata, EE PostMind will try your first available board.
+- If no board is selected in metadata, SmmtAI will try your first available board.
 
 8) Common errors
 - redirect_uri mismatch:

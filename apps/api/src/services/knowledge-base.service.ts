@@ -119,7 +119,7 @@ export async function searchKnowledge(query: string, limit = 5) {
         'tiktok': ['tik tok'],
         'youtube': ['yt', 'video'],
         'linkedin': ['linked in'],
-        'app': ['platform', 'tool', 'service', 'postmind', 'ee postmind', 'features', 'overview'],
+        'app': ['platform', 'tool', 'service', 'smmtai', 'ee smmtai', 'features', 'overview'],
         'use': ['using', 'usage', 'guide', 'tutorial', 'steps', 'instructions'],
         'create': ['compose', 'make', 'build', 'write', 'new'],
         'image': ['photo', 'picture', 'graphic', 'media', 'visual'],

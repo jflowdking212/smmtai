@@ -29,7 +29,7 @@ const footerLinks = {
 
 export function Footer() {
   const { settings } = useSiteSettings();
-  const siteName = settings.site_title || 'Postmind';
+  const siteName = settings.site_title || 'SmmtAI';
 
   return (
     <footer className="bg-neutral-900 text-neutral-300">

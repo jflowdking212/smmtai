@@ -37,7 +37,7 @@ const RELATED_PAGES = [
 
 export function LegalPageLayout({ title, subtitle, icon, lastUpdated, children }: LegalPageLayoutProps) {
   const { settings } = useSiteSettings();
-  const siteName = settings.site_title || 'EE PostMind';
+  const siteName = settings.site_title || 'SmmtAI';
   const Icon = ICONS[icon];
   const gradient = GRADIENTS[icon];
   const accent = ACCENTS[icon];
