@@ -1,10 +1,79 @@
 import { Link, useSearchParams } from 'react-router-dom';
 import { Button, Card } from '@/components/ui';
 import { Sparkles, CheckCircle2, Mail } from 'lucide-react';
+import { useSiteSettings } from '@/hooks/useSiteSettings';
+import { useEffect } from 'react';
+import { api } from '@/lib/api';
+
+declare global {
+  interface Window {
+    fbq: any;
+    _fbq: any;
+  }
+}
 
 export function CheckoutSuccessPage() {
   const [searchParams] = useSearchParams();
   const sessionId = searchParams.get('session_id');
+  const { settings } = useSiteSettings();
+
+  useEffect(() => {
+    if (!settings.fb_pixel_id) return;
+
+    const pixelId = settings.fb_pixel_id;
+
+    if (!window.fbq) {
+      (function (f: any, b, e, v, n?: any, t?: any, s?: any) {
+        if (f.fbq) return;
+        n = f.fbq = function () {
+          n.callMethod
+            ? n.callMethod.apply(n, arguments)
+            : n.queue.push(arguments);
+        };
+        if (!f._fbq) f._fbq = n;
+        n.push = n;
+        n.loaded = !0;
+        n.version = '2.0';
+        n.queue = [];
+        t = b.createElement(e);
+        t.async = !0;
+        t.src = v;
+        s = b.getElementsByTagName(e)[0];
+        s.parentNode.insertBefore(t, s);
+      })(
+        window,
+        document,
+        'script',
+        'https://connect.facebook.net/en_US/fbevents.js'
+      );
+    }
+
+    window.fbq('init', pixelId);
+    window.fbq('track', 'PageView');
+
+    if (sessionId) {
+      api.billing.getCheckoutSession(sessionId)
+        .then((res) => {
+          const { amount, currency } = res.data;
+          window.fbq('track', 'Purchase', {
+            value: amount,
+            currency: currency || 'USD',
+          });
+        })
+        .catch((err) => {
+          console.error('Failed to retrieve checkout details for FB Pixel tracking:', err);
+          window.fbq('track', 'Purchase', {
+            value: 0.00,
+            currency: 'USD',
+          });
+        });
+    } else {
+      window.fbq('track', 'Purchase', {
+        value: 0.00,
+        currency: 'USD',
+      });
+    }
+  }, [settings.fb_pixel_id, sessionId]);
 
   return (
     <div className="min-h-screen bg-neutral-50 flex items-center justify-center p-6">

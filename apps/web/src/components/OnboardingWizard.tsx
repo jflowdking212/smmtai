@@ -1,9 +1,8 @@
 import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, Button, Badge } from '@/components/ui';
-import { PLATFORMS, type PlatformType } from '@ee-postmind/shared';
+import { useTheme } from '@/components/ThemeProvider';
 import {
-  CheckCircle, Circle, ArrowRight, ArrowLeft,
+  CheckCircle, ArrowRight, ArrowLeft,
   Link2, FileText, Sparkles, BarChart3, X,
 } from 'lucide-react';
 
@@ -11,9 +10,11 @@ interface OnboardingStep {
   id: string;
   title: string;
   description: string;
-  icon: React.ReactNode;
+  icon: typeof Link2;
   actionLabel: string;
   route: string;
+  color: string;
+  bg: string;
 }
 
 const STEPS: OnboardingStep[] = [
@@ -21,33 +22,41 @@ const STEPS: OnboardingStep[] = [
     id: 'connect',
     title: 'Connect your first account',
     description: 'Link a social media platform to start managing your content from one place.',
-    icon: <Link2 className="w-6 h-6" />,
+    icon: Link2,
     actionLabel: 'Connect Account',
     route: '/connections',
+    color: 'text-blue-600',
+    bg: 'bg-blue-50',
   },
   {
     id: 'create',
     title: 'Create your first post',
     description: 'Write a post and select which platforms to publish to — all from one composer.',
-    icon: <FileText className="w-6 h-6" />,
+    icon: FileText,
     actionLabel: 'Create Post',
     route: '/compose',
+    color: 'text-purple-600',
+    bg: 'bg-purple-50',
   },
   {
     id: 'ai',
     title: 'Try AI content generation',
     description: 'Let AI help you write captions, generate hashtags, and suggest optimal posting times.',
-    icon: <Sparkles className="w-6 h-6" />,
+    icon: Sparkles,
     actionLabel: 'Open AI Assistant',
     route: '/ai',
+    color: 'text-amber-600',
+    bg: 'bg-amber-50',
   },
   {
     id: 'analytics',
-    title: 'Explore analytics',
+    title: 'Explore your analytics',
     description: 'Track engagement, reach, and performance across all your connected platforms.',
-    icon: <BarChart3 className="w-6 h-6" />,
+    icon: BarChart3,
     actionLabel: 'View Analytics',
     route: '/analytics',
+    color: 'text-green-600',
+    bg: 'bg-green-50',
   },
 ];
 
@@ -89,82 +98,167 @@ export function OnboardingWizard({ onDismiss }: { onDismiss: () => void }) {
     onDismiss();
   }, [onDismiss]);
 
-  const allDone = STEPS.every((s) => completed.has(s.id));
+  const handleNext = useCallback(() => {
+    markComplete(STEPS[currentStep].id);
+    setCurrentStep((p) => p + 1);
+  }, [currentStep, markComplete]);
 
+  const allDone = STEPS.every((s) => completed.has(s.id));
+  const completedCount = STEPS.filter((s) => completed.has(s.id)).length;
+  const progressPct = Math.round((completedCount / STEPS.length) * 100);
+
+  // All done state
   if (allDone) {
     return (
-      <Card className="p-6 border-brand-blue/30 bg-brand-blue/5">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-brand-blue/10 flex items-center justify-center">
-              <CheckCircle className="w-5 h-5 text-brand-blue" />
-            </div>
-            <div>
-              <h3 className="text-sm font-semibold text-neutral-800">You&apos;re all set!</h3>
-              <p className="text-xs text-neutral-500">You&apos;ve completed all onboarding steps. Happy posting!</p>
-            </div>
+      <div className="rounded-2xl border border-green-200 bg-gradient-to-br from-green-50 to-emerald-50 p-5 flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center shrink-0">
+            <CheckCircle className="w-5 h-5 text-green-600" />
           </div>
-          <Button variant="secondary" size="sm" onClick={handleDismiss}>Dismiss</Button>
+          <div>
+            <h3 className="text-sm font-semibold text-neutral-800">You&apos;re all set! 🎉</h3>
+            <p className="text-xs text-neutral-500 mt-0.5">All onboarding steps complete. Happy posting!</p>
+          </div>
         </div>
-      </Card>
+        <button
+          onClick={handleDismiss}
+          className="shrink-0 text-xs font-medium px-3 py-1.5 rounded-lg bg-white border border-neutral-200 text-neutral-600 hover:bg-neutral-50 transition-colors"
+        >
+          Dismiss
+        </button>
+      </div>
     );
   }
 
   const step = STEPS[currentStep];
+  const StepIcon = step.icon;
 
   return (
-    <Card className="p-6 border-brand-blue/30 bg-gradient-to-r from-brand-blue/5 to-transparent">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <Badge variant="brand">Getting Started</Badge>
-          <span className="text-xs text-neutral-400">Step {currentStep + 1} of {STEPS.length}</span>
+    <div className="rounded-2xl border border-blue-100 bg-white shadow-sm overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-neutral-100">
+        <div className="flex items-center gap-2.5">
+          <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-blue-600 text-white text-xs font-semibold tracking-wide">
+            Getting Started
+          </span>
+          <span className="text-xs text-neutral-400 font-medium">
+            {completedCount} of {STEPS.length} done
+          </span>
         </div>
-        <button onClick={handleDismiss} className="p-1 rounded hover:bg-neutral-100">
-          <X className="w-4 h-4 text-neutral-400" />
+        <button
+          onClick={handleDismiss}
+          aria-label="Dismiss onboarding"
+          className="w-7 h-7 flex items-center justify-center rounded-lg text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 transition-colors"
+        >
+          <X className="w-4 h-4" />
         </button>
       </div>
 
-      {/* Step indicators */}
-      <div className="flex gap-2 mb-4">
-        {STEPS.map((s, i) => (
-          <button
-            key={s.id}
-            onClick={() => setCurrentStep(i)}
-            className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium transition-all
-              ${i === currentStep ? 'bg-brand-blue text-white' : completed.has(s.id) ? 'bg-green-100 text-green-700' : 'bg-neutral-100 text-neutral-500'}`}
-          >
-            {completed.has(s.id) ? <CheckCircle className="w-3 h-3" /> : <Circle className="w-3 h-3" />}
-            {s.title.split(' ').slice(0, 2).join(' ')}
-          </button>
-        ))}
+      {/* Progress bar */}
+      <div className="h-1 bg-neutral-100">
+        <div
+          className="h-1 bg-blue-500 transition-all duration-500 ease-out"
+          style={{ width: `${progressPct}%` }}
+        />
+      </div>
+
+      {/* Step dot indicators */}
+      <div className="flex items-center gap-0 px-4 pt-4 pb-1">
+        {STEPS.map((s, i) => {
+          const isDone = completed.has(s.id);
+          const isActive = i === currentStep;
+          return (
+            <div key={s.id} className="flex items-center flex-1">
+              <button
+                onClick={() => setCurrentStep(i)}
+                className="flex items-center gap-1.5 group"
+                aria-label={`Go to step ${i + 1}: ${s.title}`}
+              >
+                <div
+                  className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-200 ${
+                    isDone
+                      ? 'bg-green-500 text-white'
+                      : isActive
+                        ? 'bg-blue-600 text-white ring-4 ring-blue-100'
+                        : 'bg-neutral-100 text-neutral-400 group-hover:bg-neutral-200'
+                  }`}
+                >
+                  {isDone ? <CheckCircle className="w-4 h-4" /> : <span>{i + 1}</span>}
+                </div>
+              </button>
+              {/* Connector line between dots */}
+              {i < STEPS.length - 1 && (
+                <div className={`flex-1 h-0.5 mx-1 rounded transition-colors duration-300 ${
+                  completed.has(s.id) ? 'bg-green-400' : 'bg-neutral-200'
+                }`} />
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Step label row — hidden on very small, shown on sm+ */}
+      <div className="hidden sm:flex items-center gap-0 px-4 pb-3">
+        {STEPS.map((s, i) => {
+          const isDone = completed.has(s.id);
+          const isActive = i === currentStep;
+          return (
+            <div key={s.id} className="flex-1 pr-2">
+              <p className={`text-[10px] font-medium leading-tight transition-colors ${
+                isActive ? 'text-blue-600' : isDone ? 'text-green-600' : 'text-neutral-400'
+              }`}>
+                {s.title.split(' ').slice(0, 3).join(' ')}
+              </p>
+            </div>
+          );
+        })}
       </div>
 
       {/* Current step content */}
-      <div className="flex items-start gap-4">
-        <div className="w-12 h-12 rounded-xl bg-brand-blue/10 flex items-center justify-center shrink-0 text-brand-blue">
-          {step.icon}
-        </div>
-        <div className="flex-1">
-          <h3 className="text-base font-semibold text-neutral-800">{step.title}</h3>
-          <p className="text-sm text-neutral-500 mt-1">{step.description}</p>
-          <div className="flex items-center gap-2 mt-3">
-            <Button size="sm" onClick={() => handleAction(step)}>
-              {step.actionLabel} <ArrowRight className="w-3.5 h-3.5" />
-            </Button>
-            {currentStep > 0 && (
-              <Button variant="secondary" size="sm" onClick={() => setCurrentStep((p) => p - 1)}>
-                <ArrowLeft className="w-3.5 h-3.5" /> Back
-              </Button>
-            )}
-            {currentStep < STEPS.length - 1 && (
-              <Button variant="secondary" size="sm" onClick={() => { markComplete(step.id); setCurrentStep((p) => p + 1); }}>
-                Skip
-              </Button>
-            )}
+      <div className="px-4 pb-4 pt-2">
+        <div className="flex flex-col sm:flex-row items-start gap-4 p-4 rounded-xl bg-neutral-50 border border-neutral-100">
+          {/* Icon */}
+          <div className={`w-12 h-12 rounded-xl ${step.bg} flex items-center justify-center shrink-0 ${step.color}`}>
+            <StepIcon className="w-6 h-6" />
+          </div>
+
+          {/* Text + Actions */}
+          <div className="flex-1 min-w-0 w-full">
+            <h3 className="text-sm font-semibold text-neutral-800 leading-snug">{step.title}</h3>
+            <p className="text-xs text-neutral-500 mt-1 leading-relaxed">{step.description}</p>
+
+            {/* Action buttons — stacked on mobile, row on sm+ */}
+            <div className="flex flex-col sm:flex-row gap-2 mt-3">
+              <button
+                onClick={() => handleAction(step)}
+                className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition-all active:scale-95 shadow-sm shadow-blue-600/20"
+              >
+                {step.actionLabel} <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+
+              <div className="flex gap-2">
+                {currentStep > 0 && (
+                  <button
+                    onClick={() => setCurrentStep((p) => p - 1)}
+                    className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-white border border-neutral-200 hover:bg-neutral-50 text-neutral-600 text-xs font-medium transition-colors"
+                  >
+                    <ArrowLeft className="w-3.5 h-3.5" /> Back
+                  </button>
+                )}
+                {currentStep < STEPS.length - 1 && (
+                  <button
+                    onClick={handleNext}
+                    className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-white border border-neutral-200 hover:bg-neutral-50 text-neutral-500 text-xs font-medium transition-colors"
+                  >
+                    Skip
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       </div>
-    </Card>
+    </div>
   );
 }
 

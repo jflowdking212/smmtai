@@ -3,21 +3,39 @@ import { authenticate, AuthRequest } from '../middleware/auth.js';
 import { checkUsage } from '../middleware/usage.js';
 import { connectionService } from '../services/connection.service.js';
 import { config } from '../config/index.js';
-import { getGlobalCredentialsForPlatform, getPlatformCredentials } from '../services/admin-settings.service.js';
+import { getGlobalCredentialsForPlatform, getPlatformCredentials, getEffectiveLimits } from '../services/admin-settings.service.js';
 import { AppError } from '../middleware/errorHandler.js';
+import { prisma } from '../config/database.js';
 import { getPlatformAdapter } from '../services/platforms/index.js';
 import {
   MANUAL_CONNECTION_PLATFORMS,
   OAUTH_PLATFORMS,
   GLOBAL_CREDENTIAL_PLATFORMS,
+  TIER_PLATFORMS,
   isPlatformType,
   type PlatformType,
+  type SubscriptionTier,
 } from '@ee-postmind/shared';
 
 export const connectionRouter = Router();
 const oauthPlatforms = new Set<PlatformType>(OAUTH_PLATFORMS);
 const manualPlatforms = new Set<PlatformType>(MANUAL_CONNECTION_PLATFORMS);
 const globalCredPlatforms = new Set<PlatformType>(GLOBAL_CREDENTIAL_PLATFORMS);
+
+async function checkPlatformTierAccess(workspaceId: string, platform: PlatformType): Promise<void> {
+  const sub = await prisma.subscription.findUnique({ where: { workspaceId } });
+  const tier = (sub?.tier || 'basic') as SubscriptionTier;
+  const allowed = TIER_PLATFORMS[tier] || [];
+  if (!allowed.includes(platform)) {
+    throw new AppError(
+      `Your ${tier} plan does not include ${platform}. Upgrade to connect this platform.`,
+      403,
+      'PLATFORM_TIER_RESTRICTED',
+    );
+  }
+}
+
+
 
 function normalizeString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
@@ -650,6 +668,7 @@ connectionRouter.post(
       }
 
       const mode = req.body?.mode as string | undefined;
+      await checkPlatformTierAccess(req.workspaceId, platform);
       const authUrl = await connectionService.initiateConnection(req.workspaceId, platform, mode);
       res.json({ success: true, data: { authUrl } });
     } catch (err) {
@@ -778,6 +797,7 @@ connectionRouter.post(
 
       const enrichedCredentials = await enrichSngineManualCredentials(platform, credentials);
       const normalizedCredentials = normalizeManualCredentials(platform, enrichedCredentials);
+      await checkPlatformTierAccess(req.workspaceId, platform);
       const connection = await connectionService.manualConnect(req.workspaceId, platform, normalizedCredentials);
       res.status(201).json({ success: true, data: connection });
     } catch (err) {

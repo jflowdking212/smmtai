@@ -4,6 +4,7 @@ import { prisma } from '../config/database.js';
 import { AppError } from '../middleware/errorHandler.js';
 import { emailService } from './email.service.js';
 import { couponService } from './coupon.service.js';
+import { getPlanConfig } from './admin-settings.service.js';
 
 let _stripe: Stripe | null = null;
 
@@ -19,12 +20,30 @@ function getStripe(): Stripe {
 
 // Price IDs — set these in .env after creating products in Stripe Dashboard
 const PRICE_IDS: Record<string, string> = {
+  basic_monthly: process.env.STRIPE_PRICE_BASIC_MONTHLY || '',
+  basic_quarterly: process.env.STRIPE_PRICE_BASIC_QUARTERLY || '',
+  basic_6month: process.env.STRIPE_PRICE_BASIC_6MONTH || '',
+  basic_yearly: process.env.STRIPE_PRICE_BASIC_YEARLY || '',
   pro_monthly: process.env.STRIPE_PRICE_PRO_MONTHLY || '',
+  pro_quarterly: process.env.STRIPE_PRICE_PRO_QUARTERLY || '',
+  pro_6month: process.env.STRIPE_PRICE_PRO_6MONTH || '',
   pro_yearly: process.env.STRIPE_PRICE_PRO_YEARLY || '',
   business_monthly: process.env.STRIPE_PRICE_BUSINESS_MONTHLY || '',
+  business_quarterly: process.env.STRIPE_PRICE_BUSINESS_QUARTERLY || '',
+  business_6month: process.env.STRIPE_PRICE_BUSINESS_6MONTH || '',
   business_yearly: process.env.STRIPE_PRICE_BUSINESS_YEARLY || '',
   enterprise_monthly: process.env.STRIPE_PRICE_ENTERPRISE_MONTHLY || '',
+  enterprise_quarterly: process.env.STRIPE_PRICE_ENTERPRISE_QUARTERLY || '',
+  enterprise_6month: process.env.STRIPE_PRICE_ENTERPRISE_6MONTH || '',
   enterprise_yearly: process.env.STRIPE_PRICE_ENTERPRISE_YEARLY || '',
+};
+
+// Billing period config for dynamic pricing fallback
+const PERIOD_CONFIG: Record<string, { months: number; discount: number; interval: 'month' | 'year'; intervalCount: number }> = {
+  monthly:   { months: 1,  discount: 0,  interval: 'month', intervalCount: 1 },
+  quarterly: { months: 3,  discount: 5,  interval: 'month', intervalCount: 3 },
+  '6month':  { months: 6,  discount: 15, interval: 'month', intervalCount: 6 },
+  yearly:    { months: 12, discount: 30, interval: 'year',  intervalCount: 1 },
 };
 
 const TIER_FROM_PRICE: Record<string, string> = {};
@@ -37,6 +56,46 @@ Object.entries(PRICE_IDS).forEach(([key, priceId]) => {
 });
 
 export class StripeService {
+  // Build Stripe line item: uses pre-created price IDs if configured,
+  // otherwise falls back to price_data using plan_config pricing.
+  private async buildLineItem(priceKey: string): Promise<import('stripe').Stripe.Checkout.SessionCreateParams.LineItem> {
+    const staticPriceId = PRICE_IDS[priceKey];
+    if (staticPriceId) return { price: staticPriceId, quantity: 1 };
+
+    // Dynamic fallback: parse {tier}_{period}
+    const parts = priceKey.split('_');
+    const period = parts.length >= 2 ? parts[parts.length - 1] : 'monthly';
+    const tier = parts.slice(0, parts.length >= 2 ? -1 : undefined).join('_');
+
+    const periodCfg = PERIOD_CONFIG[period];
+    if (!periodCfg) throw new AppError(`Invalid billing period: ${period}`, 400, 'INVALID_PRICE');
+
+    const planConfig = await getPlanConfig();
+    const monthlyPrice: number = planConfig?.pricing?.[tier]?.monthlyPrice ?? 0;
+    if (!monthlyPrice || monthlyPrice <= 0) {
+      throw new AppError(`No pricing configured for plan: ${tier}`, 400, 'INVALID_PRICE');
+    }
+
+    const discountedMonthly = monthlyPrice * (1 - periodCfg.discount / 100);
+    const totalCents = Math.round(discountedMonthly * periodCfg.months * 100);
+    const tierLabel = tier.charAt(0).toUpperCase() + tier.slice(1);
+    const periodLabel = period === '6month' ? '6-Month' : period.charAt(0).toUpperCase() + period.slice(1);
+
+    return {
+      quantity: 1,
+      price_data: {
+        currency: 'usd',
+        unit_amount: totalCents,
+        recurring: { interval: periodCfg.interval, interval_count: periodCfg.intervalCount },
+        product_data: {
+          name: `SmmtAI ${tierLabel} Plan — ${periodLabel} Billing`,
+          description: `${tierLabel} plan with ${periodCfg.discount > 0 ? `${periodCfg.discount}% discount` : 'no discount'} on ${periodLabel.toLowerCase()} billing`,
+        },
+      },
+    };
+  }
+
+
   // Create or retrieve Stripe customer for a workspace
   async getOrCreateCustomer(workspaceId: string): Promise<string> {
     const subscription = await prisma.subscription.findUnique({ where: { workspaceId } });
@@ -76,16 +135,16 @@ export class StripeService {
       couponCode?: string;
     },
   ): Promise<string> {
-    const priceId = PRICE_IDS[priceKey];
-    if (!priceId) throw new AppError('Invalid price plan', 400, 'INVALID_PRICE');
-
     const customerId = await this.getOrCreateCustomer(workspaceId);
+    const lineItem = await this.buildLineItem(priceKey);
+    // Derive tier from priceKey for metadata (e.g. 'pro_monthly' -> 'pro')
+    const derivedTier = priceKey.split('_')[0] || 'basic';
     let couponRedemptionId: string | undefined;
     let couponCode: string | undefined;
     let discountPercent: number | null = null;
     let discountDurationMonths: number | null = null;
     let requireCardForFreeCheckout = true;
-    let trialPeriodDays = 14;
+    let trialPeriodDays = derivedTier === 'pro' ? 14 : 0;
 
     if (options?.couponCode) {
       if (!options.userId) {
@@ -132,7 +191,7 @@ export class StripeService {
         mode: 'subscription',
         payment_method_collection: paymentMethodCollection,
         payment_method_types: ['card'],
-        line_items: [{ price: priceId, quantity: 1 }],
+        line_items: [lineItem],
         success_url: successUrl,
         cancel_url: cancelUrl,
         discounts: stripeCouponId ? [{ coupon: stripeCouponId }] : undefined,
@@ -140,12 +199,16 @@ export class StripeService {
           trial_period_days: trialPeriodDays > 0 ? trialPeriodDays : undefined,
           metadata: {
             workspaceId,
+            tier: derivedTier,
+            priceKey,
             ...(couponRedemptionId ? { couponRedemptionId } : {}),
             ...(couponCode ? { couponCode } : {}),
           },
         },
         metadata: {
           workspaceId,
+          tier: derivedTier,
+          priceKey,
           ...(couponRedemptionId ? { couponRedemptionId } : {}),
           ...(couponCode ? { couponCode } : {}),
         },
@@ -174,23 +237,9 @@ export class StripeService {
     const subscription = await prisma.subscription.findUnique({ where: { workspaceId } });
     if (!subscription) throw new AppError('Subscription not found', 404, 'SUB_NOT_FOUND');
 
-    const targetTier = input.tier?.toLowerCase().trim();
-    if (targetTier === 'basic') {
-      if (subscription.stripeSubscriptionId) {
-        const sub = await getStripe().subscriptions.cancel(subscription.stripeSubscriptionId);
-        await this.handleSubscriptionDeleted(sub);
-      } else {
-        await prisma.subscription.update({
-          where: { workspaceId },
-          data: { tier: 'basic', status: 'active', stripeSubscriptionId: null, stripePriceId: null, cancelAtPeriodEnd: false },
-        });
-      }
-      return { action: 'updated', ...(await this.getSubscriptionStatus(workspaceId)) };
-    }
-
     const priceKey = (input.priceKey || '').trim();
     if (!priceKey) {
-      throw new AppError('priceKey is required for paid plan changes', 400, 'MISSING_PRICE');
+      throw new AppError('priceKey is required for plan changes', 400, 'MISSING_PRICE');
     }
 
     // If workspace has no active Stripe subscription yet, start checkout
@@ -216,8 +265,7 @@ export class StripeService {
       );
     }
 
-    const priceId = PRICE_IDS[priceKey];
-    if (!priceId) throw new AppError('Invalid price plan', 400, 'INVALID_PRICE');
+    const lineItem = await this.buildLineItem(priceKey);
 
     const currentTier = (subscription.tier || 'basic').toLowerCase();
     const nextTier = priceKey.split('_')[0]?.toLowerCase() || currentTier;
@@ -229,14 +277,28 @@ export class StripeService {
     if (!itemId) throw new AppError('Stripe subscription has no items to update', 400, 'SUBSCRIPTION_INVALID');
 
     const updated = await getStripe().subscriptions.update(subscription.stripeSubscriptionId, {
-      items: [{ id: itemId, price: priceId }],
+      items: [
+        lineItem.price_data
+          ? { id: itemId, price_data: lineItem.price_data as any }
+          : { id: itemId, price: lineItem.price as string }
+      ],
       proration_behavior: isUpgrade ? 'always_invoice' : 'create_prorations',
       cancel_at_period_end: false,
-      metadata: { ...(currentSub.metadata || {}), workspaceId },
+      metadata: { ...(currentSub.metadata || {}), workspaceId, tier: nextTier, priceKey },
     });
 
     await this.handleSubscriptionUpdated(updated);
     return { action: 'updated', ...(await this.getSubscriptionStatus(workspaceId)) };
+  }
+
+  // Retrieve checkout session details for frontend conversion tracking
+  async getCheckoutSession(sessionId: string) {
+    const session = await getStripe().checkout.sessions.retrieve(sessionId);
+    return {
+      amount: session.amount_total ? session.amount_total / 100 : 0,
+      currency: (session.currency || 'usd').toUpperCase(),
+      status: session.payment_status,
+    };
   }
 
   // Create customer portal session for billing management

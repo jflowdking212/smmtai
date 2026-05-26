@@ -1,13 +1,6 @@
 @import 'tailwindcss';
 
 /* ============================================================
-   Dark mode: use .dark class (set by ThemeProvider) NOT media query
-   This ensures dark: utilities only apply when ThemeProvider
-   explicitly adds the .dark class to <html>, not based on OS.
-   ============================================================ */
-@variant dark (&:where(.dark, .dark *));
-
-/* ============================================================
    SmmtAI — Design Tokens
    ============================================================ */
 
@@ -90,7 +83,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* ============================================================
-   Dark Mode — dashboard overrides (class-based, for app interior)
+   Dark Mode
    ============================================================ */
 
 .dark body {

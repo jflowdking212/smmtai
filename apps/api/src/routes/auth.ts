@@ -19,7 +19,7 @@ export const authRouter = Router();
 const COOKIE_OPTIONS = {
   httpOnly: true,
   secure: !config.isDev,
-  sameSite: config.isDev ? 'lax' as const : 'strict' as const,
+  sameSite: 'lax' as const, // 'lax' allows cookie on top-level navigations and refreshes
   maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
   path: '/',
 };
@@ -171,6 +171,34 @@ authRouter.post('/logout', async (req: AuthRequest, res: Response, next: NextFun
   }
 });
 
+
+// Switch workspace
+authRouter.post(
+  '/switch-workspace',
+  authenticate,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const targetWorkspaceId = req.body.workspaceId;
+      if (!targetWorkspaceId) {
+         return res.status(400).json({ success: false, error: { message: 'workspaceId required' }});
+      }
+      const result = await authService.switchWorkspace(req.userId!, targetWorkspaceId);
+      res.cookie('refreshToken', result.refreshToken, COOKIE_OPTIONS);
+      res.json({
+        success: true,
+        data: {
+          workspaceId: result.workspaceId,
+          accessToken: result.accessToken,
+          role: result.role,
+          tier: result.tier,
+        },
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
 // Get current user
 authRouter.get(
   '/me',
@@ -187,6 +215,9 @@ authRouter.get(
           avatar: true,
           bio: true,
           timezone: true,
+          phone: true,
+          country: true,
+          profileComplete: true,
           emailVerified: true,
           createdAt: true,
         },
@@ -300,6 +331,21 @@ authRouter.get(
       return res.redirect(`${config.frontend.url}/auth/login?verified=1`);
     } catch {
       return res.redirect(`${config.frontend.url}/auth/login?verified=0`);
+    }
+  },
+);
+
+// Resend verification email
+authRouter.post(
+  '/resend-verification',
+  authLimiter,
+  authenticate,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      await authService.resendVerificationEmail(req.userId!);
+      res.json({ success: true, data: { message: 'Verification email sent.' } });
+    } catch (err) {
+      next(err);
     }
   },
 );

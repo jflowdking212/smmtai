@@ -19,6 +19,140 @@ interface CustomerInfo {
 const API_BASE = '/api/v1';
 const CSRF_COOKIE = 'csrfToken';
 
+// ─── Enhanced Markdown renderer ───────────────────────────────────────────
+// Converts bot response markdown to clean, wrapping JSX with link and list support.
+function renderMessageContent(content: string) {
+  const lines = content.split('\n');
+
+  // Parse inline styles: **bold**, *italic*, `code`, [link](url)
+  const parseInline = (text: string, keyPfx: string) => {
+    const result: React.ReactNode[] = [];
+    let idx = 0; let buf = ''; let k = 0;
+    const flush = () => { if (buf) { result.push(<span key={`${keyPfx}-t${k++}`}>{buf}</span>); buf = ''; } };
+    while (idx < text.length) {
+      // Bold **text**
+      if (text[idx] === '*' && text[idx + 1] === '*') {
+        const end = text.indexOf('**', idx + 2);
+        if (end !== -1) {
+          flush();
+          const innerText = text.slice(idx + 2, end);
+          result.push(
+            <strong key={`${keyPfx}-b${k++}`} className="font-bold text-neutral-900 dark:text-white">
+              {parseInline(innerText, `${keyPfx}-b${k}`)}
+            </strong>
+          );
+          idx = end + 2;
+          continue;
+        }
+      }
+      // Italic *text*
+      if (text[idx] === '*' && text[idx + 1] !== '*') {
+        const end = text.indexOf('*', idx + 1);
+        if (end !== -1) {
+          flush();
+          const innerText = text.slice(idx + 1, end);
+          result.push(
+            <em key={`${keyPfx}-i${k++}`} className="italic">
+              {parseInline(innerText, `${keyPfx}-i${k}`)}
+            </em>
+          );
+          idx = end + 1;
+          continue;
+        }
+      }
+      // Code `code`
+      if (text[idx] === '`') {
+        const end = text.indexOf('`', idx + 1);
+        if (end !== -1) {
+          flush();
+          result.push(
+            <code key={`${keyPfx}-c${k++}`} className="bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 rounded text-[11px] font-mono border border-neutral-200/50 dark:border-neutral-700/50 text-neutral-800 dark:text-neutral-200">
+              {text.slice(idx + 1, end)}
+            </code>
+          );
+          idx = end + 1;
+          continue;
+        }
+      }
+      // Markdown Link [text](url)
+      if (text[idx] === '[') {
+        const endText = text.indexOf(']', idx + 1);
+        if (endText !== -1 && text[endText + 1] === '(') {
+          const endUrl = text.indexOf(')', endText + 2);
+          if (endUrl !== -1) {
+            flush();
+            const linkText = text.slice(idx + 1, endText);
+            const linkUrl = text.slice(endText + 2, endUrl);
+            result.push(
+              <a
+                key={`${keyPfx}-l${k++}`}
+                href={linkUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 dark:text-blue-400 hover:underline font-semibold break-all inline"
+              >
+                {linkText}
+              </a>
+            );
+            idx = endUrl + 1;
+            continue;
+          }
+        }
+      }
+      buf += text[idx]; idx++;
+    }
+    flush();
+    return result;
+  };
+
+  return (
+    <div className="space-y-1.5 break-words whitespace-pre-wrap overflow-hidden" style={{ overflowWrap: 'break-word', wordBreak: 'break-word' }}>
+      {lines.map((line, i) => {
+        if (!line.trim()) return <div key={i} className="h-2.5" />;
+        
+        // Headers (e.g. # Header, ## Header)
+        const headerMatch = line.match(/^(#{1,6})\s+(.+)/);
+        if (headerMatch) {
+          const level = headerMatch[1].length;
+          const txt = headerMatch[2];
+          const className = level === 1 
+            ? 'text-lg font-bold my-2 text-neutral-900 dark:text-white' 
+            : level === 2 
+              ? 'text-base font-bold my-1.5 text-neutral-900 dark:text-white' 
+              : 'text-sm font-semibold my-1 text-neutral-900 dark:text-white';
+          return <div key={i} className={className}>{parseInline(txt, `${i}`)}</div>;
+        }
+
+        // Bullet item
+        if (/^[\u2022\-\*]\s/.test(line)) {
+          const txt = line.replace(/^[\u2022\-\*]\s+/, '');
+          return (
+            <div key={i} className="flex gap-2 items-start pl-1">
+              <span className="opacity-50 shrink-0 leading-5 select-none">•</span>
+              <span className="leading-5 flex-1">{parseInline(txt, `${i}`)}</span>
+            </div>
+          );
+        }
+
+        // Numbered list item
+        const numMatch = line.match(/^(\d+)\.\s+(.+)/);
+        if (numMatch) {
+          return (
+            <div key={i} className="flex gap-2 items-start pl-1">
+              <span className="opacity-70 shrink-0 font-medium leading-5 min-w-[1rem] select-none text-right">{numMatch[1]}.</span>
+              <span className="leading-5 flex-1">{parseInline(numMatch[2], `${i}`)}</span>
+            </div>
+          );
+        }
+
+        return <div key={i} className="leading-5">{parseInline(line, `${i}`)}</div>;
+      })}
+    </div>
+  );
+}
+// ───────────────────────────────────────────────────────────────────────────
+
+
 function getCookieValue(name: string): string | null {
   const cookies = typeof document !== 'undefined' && document.cookie ? document.cookie.split('; ') : [];
   for (const cookie of cookies) {
@@ -82,16 +216,31 @@ export function AIChatbot() {
   const audioChunksRef = useRef<Blob[]>([]);
   const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const stopRecording = useCallback(() => {
+  // ---- Paid OpenAI Text-to-Speech Ref & State ----
+  const [isPlayingAudio, setIsPlayingAudio] = useState(false);
+  const activeAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  const stopAudio = useCallback(() => {
+    if (activeAudioRef.current) {
+      activeAudioRef.current.pause();
+      activeAudioRef.current = null;
+    }
+    setIsPlayingAudio(false);
+  }, []);
+
+  // Cancel speech on unmount
+  useEffect(() => () => stopAudio(), [stopAudio]);
+
+  const stopRecording = () => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.stop();
     }
     if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
     setIsRecording(false);
     setRecordingSeconds(0);
-  }, []);
+  };
 
-  const startRecording = useCallback(async () => {
+  const startRecording = async () => {
     if (isRecording) { stopRecording(); return; }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -172,42 +321,64 @@ export function AIChatbot() {
         },
       ]);
     }
-  }, [isRecording, stopRecording]);
+  };
 
-  // Cleanup on unmount
+  // Cleanup recording on unmount
   useEffect(() => () => {
     stopRecording();
     if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
-  }, [stopRecording]);
+  }, []);
 
   useEffect(() => {
     const init = async () => {
-      const existing = localStorage.getItem('pmChatSessionId');
-      if (existing) {
-        setSessionId(existing);
-        const saved = localStorage.getItem('pmChatCustomerInfo');
-        if (saved) {
-          try { setCustomerInfo(JSON.parse(saved)); setIsContactSubmitted(true); } catch {}
-        }
-        try {
-          const res = await fetch(`${API_BASE}/chat/conversations/history/${existing}`);
-          if (res.ok) {
-            const data = await res.json();
-            if (data.success && Array.isArray(data.messages) && data.messages.length > 0) {
-              const loaded = data.messages.map((msg: any, idx: number) => ({
-                id: `loaded-${idx}`, content: msg.content, sender: msg.role as 'user' | 'bot', timestamp: new Date(msg.timestamp), sources: msg.sources,
-              }));
-              setMessages([
-                { id: '1', content: "Hi! I'm your SmmtAI assistant. I can help you with questions about social media management, scheduling, analytics, and more. How can I help?", sender: 'bot', timestamp: new Date() },
-                ...loaded,
-              ]);
-            }
-          }
-        } catch {}
+      let activeSessionId = '';
+      if (isLoggedIn && authUser && authWorkspaceId) {
+        // Tie session ID directly to user and workspace for complete security and isolation
+        activeSessionId = `session_${authUser.id}_${authWorkspaceId}`;
       } else {
-        const newId = `session_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
-        setSessionId(newId);
-        localStorage.setItem('pmChatSessionId', newId);
+        // Anonymous sessions use a persistent random guest ID
+        const existing = localStorage.getItem('pmChatSessionId');
+        if (existing && !existing.startsWith('session_usr_') && !existing.startsWith('session_')) {
+          activeSessionId = existing;
+        } else {
+          activeSessionId = `guest_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+          localStorage.setItem('pmChatSessionId', activeSessionId);
+        }
+      }
+
+      setSessionId(activeSessionId);
+
+      // Reset messages to base greeting first to prevent flash of previous history
+      const currentGreeting = isLoggedIn && authUser
+        ? `Hi ${authUser.name}! 👋 I'm your SmmtAI assistant. I have full visibility into your workspace — ask me about your posts, analytics, drafts, or just tell me to do something!`
+        : "Hi! I'm your SmmtAI assistant. I can help you with questions about social media management, scheduling, analytics, and more. How can I help?";
+
+      setMessages([
+        { id: '1', content: currentGreeting, sender: 'bot', timestamp: new Date() },
+      ]);
+      setNeedsTransfer(false);
+      setContactStage('none');
+
+      try {
+        const res = await fetch(`${API_BASE}/chat/conversations/history/${activeSessionId}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && Array.isArray(data.messages) && data.messages.length > 0) {
+            const loaded = data.messages.map((msg: any, idx: number) => ({
+              id: `loaded-${idx}`,
+              content: msg.content,
+              sender: msg.role as 'user' | 'bot',
+              timestamp: new Date(msg.timestamp),
+              sources: msg.sources,
+            }));
+            setMessages([
+              { id: '1', content: currentGreeting, sender: 'bot', timestamp: new Date() },
+              ...loaded,
+            ]);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load chat history:', err);
       }
     };
     init();
@@ -264,16 +435,52 @@ export function AIChatbot() {
 
   const playTTS = async (text: string) => {
     try {
+      stopAudio(); // Stop currently playing audio first
+
+      // Get a clean, concise version of the text to read aloud
+      // This reduces OpenAI generation latency to near-instant (under 500ms)
+      // and prevents reading out long lists, IDs, or links.
+      let speakText = text
+        .replace(/```[\s\S]*?```/g, '') // remove code blocks
+        .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '$1') // replace markdown links with text
+        .trim();
+
+      // Split into sentences and take the first 2
+      const sentences = speakText.split(/(?<=[.!?])\s+/);
+      let shortText = sentences.slice(0, 2).join(' ').trim();
+      
+      // If we ended up with nothing or very short, fallback to first 120 chars
+      if (shortText.length < 10) {
+        shortText = speakText.slice(0, 120).trim();
+      }
+
+      // Add a polite indicator if the response was truncated
+      if (shortText.length < speakText.length) {
+        shortText += "... Please see the details in the chat window.";
+      }
+
+      if (!shortText.trim()) return;
+
       const res = await fetch(`${API_BASE}/chat/tts`, {
         method: 'POST',
         headers: getJsonHeaders(),
         credentials: 'include',
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ text: shortText }),
       });
       if (res.ok) {
         const blob = await res.blob();
         const url = URL.createObjectURL(blob);
         const audio = new Audio(url);
+        activeAudioRef.current = audio;
+        setIsPlayingAudio(true);
+        audio.onended = () => {
+          setIsPlayingAudio(false);
+          activeAudioRef.current = null;
+        };
+        audio.onerror = () => {
+          setIsPlayingAudio(false);
+          activeAudioRef.current = null;
+        };
         audio.play().catch(console.error);
       }
     } catch (e) {
@@ -389,7 +596,7 @@ export function AIChatbot() {
                   </div>
                 )}
                 <div className={`max-w-[85%] sm:max-w-[70%] rounded-2xl px-4 py-2 ${message.sender === 'user' ? 'bg-brand-blue text-white' : 'bg-white dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200'}`}>
-                  <p className="text-sm leading-relaxed">{message.content}</p>
+                  <div className="text-sm leading-relaxed">{renderMessageContent(message.content)}</div>
                   <p className={`text-[10px] sm:text-xs mt-1 ${message.sender === 'user' ? 'text-blue-100' : 'text-neutral-500'}`}>
                     {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </p>
@@ -506,6 +713,21 @@ export function AIChatbot() {
                 {isRecording ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
               </button>
 
+              {/* Stop-speaking button — only shown while bot is reading aloud */}
+              {isPlayingAudio && (
+                <button
+                  type="button"
+                  onClick={stopAudio}
+                  className="w-10 h-10 rounded-full flex items-center justify-center bg-orange-500 text-white shadow-lg shadow-orange-500/40 hover:bg-orange-600 transition-all shrink-0 animate-pulse"
+                  aria-label="Stop speaking"
+                  title="Stop speaking"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                    <rect x="6" y="6" width="12" height="12" rx="2" />
+                  </svg>
+                </button>
+              )}
+
               {/* Send button */}
               <button type="submit" disabled={!inputMessage.trim() || isTyping || contactStage !== 'none' || isRecording}
                 className="w-10 h-10 bg-brand-blue text-white rounded-full hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center transition-all shrink-0"
@@ -513,7 +735,7 @@ export function AIChatbot() {
                 <Send className="w-4 h-4" />
               </button>
             </form>
-            <p className="text-[10px] sm:text-xs text-neutral-500 mt-2 text-center">Powered by SmmtAI AI · Voice by Whisper</p>
+            <p className="text-[10px] sm:text-xs text-neutral-500 mt-2 text-center">Powered by SmmtAI AI</p>
           </div>
         </div>
       )}

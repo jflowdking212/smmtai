@@ -3,6 +3,14 @@ import { chatWithRetry, chatWithTools } from './openai.service.js';
 import * as knowledgeBaseService from './knowledge-base.service.js';
 import * as conversationService from './conversation.service.js';
 import { adminTools, userTools } from './chat-tools.service.js';
+import { tryRouteLocally, logSuccessfulRoute, logRoutingOutcome } from './nlp-router.service.js';
+
+// ─── 🧪 TEST MODE ─────────────────────────────────────────────────────────────
+// Set to true to disable the OpenAI fallback and test ONLY the local NLP router.
+// When a query cannot be matched locally, a diagnostic message is returned instead
+// of calling OpenAI. Flip back to false when testing is complete.
+const LOCAL_ONLY_MODE = false; // ← Testing complete. OpenAI fallback re-enabled.
+// ──────────────────────────────────────────────────────────────────────────────
 
 // In-memory cache
 const cache = new Map<string, { value: any; expires: number }>();
@@ -117,17 +125,8 @@ ${contextInfo}`;
     const systemPrompt = chatConfig.systemPrompt?.trim() || defaultSystemPrompt;
     const finalPrompt = chatConfig.systemPrompt?.trim() ? systemPrompt + contextInfo + (hasKBMatch ? '\nIMPORTANT: Answer ONLY using the knowledge base above. Do not make up information.' : '') : systemPrompt;
 
-    const effectiveKey = getEffectiveApiKey(chatConfig);
-    if (!effectiveKey) {
-      return {
-        success: true,
-        response: 'Chatbot is not configured yet. Please add a valid OpenAI API key in Admin settings or set OPENAI_API_KEY environment variable.',
-        usedKnowledgeBase: knowledgeResults.length > 0,
-        sources: knowledgeResults.map((kb: any) => ({ title: kb.title, category: kb.category })),
-      };
-    }
-
-    // Prepare tools based on authentication and role
+    // Prepare tools based on authentication and role.
+    // This MUST run before the local router so `role` is correctly set.
     const tools: any[] = [];
     let role = 'guest';
     let userName = '';
@@ -148,6 +147,69 @@ ${contextInfo}`;
         }
       }
     }
+
+    // ── LOCAL ROUTER ────────────────────────────────────────────
+    // Runs BEFORE API key check so zero-token queries work even with no OpenAI key.
+    // Role is correctly set above, so admin tools can be properly accessed here.
+    if (userId && workspaceId && role !== 'guest') {
+      const startLocal = Date.now();
+      const localResponse = await tryRouteLocally(message, { userId, workspaceId, role });
+      if (localResponse) {
+        if (sessionId) {
+          await conversationService.addMessage(sessionId, { role: 'bot', content: localResponse, timestamp: new Date() });
+        }
+        return {
+          success: true,
+          response: localResponse,
+          usedKnowledgeBase: false,
+          sources: [],
+          routedLocally: true,
+        };
+      } else {
+        const latency = Date.now() - startLocal;
+        logRoutingOutcome('openai_fallback', latency).catch(console.error);
+      }
+    }
+
+    // ── OPENAI FALLBACK ───────────────────────────────────────
+    // Only reached when local routing returns null.
+
+    // 🧪 LOCAL_ONLY_MODE: short-circuit before calling OpenAI.
+    // Remove or set to false once local router testing is complete.
+    if (LOCAL_ONLY_MODE) {
+      const testMsg = [
+        `⚙️ **[Test Mode — Local Router Only]**`,
+        ``,
+        `Your message was **not matched** by the local NLP router.`,
+        ``,
+        `**What you said:** "${message}"`,
+        `**Your role:** ${role}`,
+        ``,
+        `**Try one of these to test local routing:**`,
+        `• _"show my dashboard stats"_`,
+        `• _"list my draft posts"_`,
+        `• _"show my 5 scheduled posts"_`,
+        `• _"how many active users are there"_` + (role === 'admin' || role === 'owner' ? `\n• _"show platform analytics"_\n• _"how many users are online now"_` : ''),
+        ``,
+        `_OpenAI fallback is temporarily disabled for testing._`,
+      ].join('\n');
+
+      if (sessionId) {
+        await conversationService.addMessage(sessionId, { role: 'bot', content: testMsg, timestamp: new Date() });
+      }
+      return { success: true, response: testMsg, usedKnowledgeBase: false, sources: [], routedLocally: false };
+    }
+
+    const effectiveKey = getEffectiveApiKey(chatConfig);
+    if (!effectiveKey) {
+      return {
+        success: true,
+        response: 'Chatbot is not configured yet. Please add a valid OpenAI API key in Admin settings or set OPENAI_API_KEY environment variable.',
+        usedKnowledgeBase: knowledgeResults.length > 0,
+        sources: knowledgeResults.map((kb: any) => ({ title: kb.title, category: kb.category })),
+      };
+    }
+
 
     const toolExecutor = async (name: string, args: any) => {
       if (!userId || !workspaceId) return 'User not authenticated.';
@@ -197,25 +259,58 @@ ${contextInfo}`
       timeoutMs: isAgentMode ? 30000 : 15000
     };
     const conversationMessages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
-        { role: 'system', content: finalSystemPrompt },
-        { role: 'user', content: message },
+      { role: 'system', content: finalSystemPrompt },
     ];
 
-    let response: string;
+    if (sessionId) {
+      try {
+        const conversation = await conversationService.getConversation(sessionId);
+        if (conversation?.messages && Array.isArray(conversation.messages)) {
+          // Load up to the last 12 messages of conversation history to keep prompt compact but highly contextual
+          const history = conversation.messages.slice(-12) as Array<{ role: 'user' | 'bot'; content: string }>;
+          history.forEach((msg) => {
+            const role = msg.role === 'bot' ? 'assistant' : 'user';
+            conversationMessages.push({ role, content: msg.content });
+          });
+        }
+      } catch (err) {
+        console.error('Failed to load conversation history for OpenAI fallback:', err);
+      }
+    }
+
+    // Fallback: if sessionId was not provided or history was empty, manually push the user's latest query
+    if (conversationMessages.length === 1) {
+      conversationMessages.push({ role: 'user', content: message });
+    }
+
+    let response: string = "";
+
     if (tools.length > 0) {
-      response = await chatWithTools(conversationMessages, tools, toolExecutor, openaiOptions);
+      // BUG FIX: Log the successful route AFTER the tool executes and returns a
+      // result — not before. Logging before meant a failed tool execution would
+      // be saved as a 'successful' training example, poisoning future routing.
+      const interceptingExecutor = async (name: string, args: any) => {
+        const result = await toolExecutor(name, args);
+        // Only log after we know the tool succeeded (did not throw)
+        await logSuccessfulRoute(message, name);
+        return result;
+      };
+      response = await chatWithTools(conversationMessages, tools, interceptingExecutor, openaiOptions);
     } else {
       response = await chatWithRetry(conversationMessages as any, openaiOptions);
     }
+    
+    if (!response) response = "I couldn't process that request.";
+    const finalResponse: string = response;
 
-    if (sessionId && response) {
-      await conversationService.addMessage(sessionId, { role: 'bot', content: response, timestamp: new Date() });
+    if (sessionId && finalResponse) {
+      await conversationService.addMessage(sessionId, { role: 'bot', content: finalResponse, timestamp: new Date() });
     }
 
-    if (response) {
+    if (finalResponse) {
       return {
         success: true,
-        response,
+        response: finalResponse,
         usedKnowledgeBase: knowledgeResults.length > 0,
         sources: knowledgeResults.map((kb: any) => ({ title: kb.title, category: kb.category })),
       };

@@ -47,10 +47,17 @@ export function RegisterPage() {
       setAuth(res.data.user, res.data.accessToken, res.data.workspaceId, res.data.role || 'owner', res.data.tier || 'basic');
 
       if (inviteToken && inviteAction !== 'decline') {
-        await api.workspaces.acceptInvite(inviteToken);
+        try {
+          const inviteRes = await api.workspaces.acceptInvite(inviteToken);
+          const workspaceName = inviteRes?.data?.workspace?.name;
+          setInviteNotice(`You've joined${workspaceName ? ' ' + workspaceName : ' the workspace'}! Welcome to the team.`);
+        } catch (invErr) {
+          const msg = invErr instanceof ApiError ? invErr.message : 'Could not process invitation';
+          setInviteNotice(`Note: ${msg}`);
+        }
       }
 
-      navigate('/');
+      navigate('/profile/complete');
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Something went wrong');
     } finally {

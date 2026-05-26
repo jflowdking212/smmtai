@@ -14,16 +14,19 @@ datasource db {
 // ============================================================
 
 model User {
-  id            String    @id @default(cuid())
-  email         String    @unique
-  name          String
-  passwordHash  String?
-  avatar        String?
-  bio           String?
-  timezone      String    @default("UTC")
-  emailVerified Boolean   @default(false)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id              String    @id @default(cuid())
+  email           String    @unique
+  name            String
+  passwordHash    String?
+  avatar          String?
+  bio             String?
+  timezone        String    @default("UTC")
+  phone           String?
+  country         String?
+  profileComplete Boolean   @default(false) @map("profilecomplete")
+  emailVerified   Boolean   @default(false)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   refreshTokens  RefreshToken[]
   workspaces     WorkspaceMember[]
@@ -115,12 +118,16 @@ model Workspace {
 }
 
 model WorkspaceMember {
-  id          String @id @default(cuid())
-  userId      String
+  id          String  @id @default(cuid())
+  userId      String?
   workspaceId String
-  role        String @default("editor") // owner, admin, editor, viewer
+  role        String  @default("creator") // owner, manager, creator, viewer
+  status      String  @default("active")  // active, pending
+  inviteEmail String?                       // email used for pending invites
+  invitedBy   String?                       // userId of who sent the invite
+  inviteToken String?                       // JWT token for the invite
 
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@unique([userId, workspaceId])
@@ -286,6 +293,7 @@ model Media {
 
   post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
 
+  @@index([postId])
   @@map("media")
 }
 

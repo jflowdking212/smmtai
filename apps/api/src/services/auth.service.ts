@@ -22,6 +22,27 @@ function slugify(text: string): string {
 }
 
 export class AuthService {
+  async switchWorkspace(userId: string, targetWorkspaceId: string) {
+    const membership = await prisma.workspaceMember.findUnique({
+      where: { userId_workspaceId: { userId, workspaceId: targetWorkspaceId } },
+    });
+    if (!membership || membership.status !== 'active') {
+      throw new AppError('You are not an active member of this workspace', 403, 'FORBIDDEN');
+    }
+
+    const tokens = this.generateTokenPair(userId, targetWorkspaceId);
+    await this.storeRefreshToken(userId, tokens.refreshToken);
+
+    const { role, tier } = await this.getWorkspaceContext(userId, targetWorkspaceId);
+
+    return {
+      workspaceId: targetWorkspaceId,
+      role,
+      tier,
+      ...tokens,
+    };
+  }
+
   async register(data: { name: string; email: string; password: string }) {
     const existing = await prisma.user.findUnique({ where: { email: data.email } });
     if (existing) {
@@ -54,7 +75,7 @@ export class AuthService {
     return {
       user: this.sanitizeUser(user),
       workspaceId: user.workspaceId,
-      role: 'editor' as const,
+      role: 'owner' as const,
       tier: 'basic' as const,
       ...tokens,
     };
@@ -335,7 +356,7 @@ export class AuthService {
       data: {
         userId,
         workspaceId: workspace.id,
-        role: 'editor',
+        role: 'owner',
       },
     });
 
@@ -430,6 +451,22 @@ export class AuthService {
       createdAt: user.createdAt,
     };
   }
+
+  async resendVerificationEmail(userId: string) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true, name: true, emailVerified: true },
+    });
+    if (!user) throw new AppError('User not found', 404, 'USER_NOT_FOUND');
+    if (user.emailVerified) throw new AppError('Email is already verified', 400, 'ALREADY_VERIFIED');
+
+    // Delete any existing token and create a fresh one
+    await prisma.emailVerificationToken.deleteMany({ where: { userId } });
+    const token = await this.createEmailVerificationToken(userId);
+    const link = `${config.frontend.url}/auth/verify-email?token=${token}`;
+    await emailService.sendVerificationEmail(user.email, user.name, link);
+  }
+
 }
 
 export const authService = new AuthService();

@@ -40,7 +40,7 @@ export function useSubscription() {
   }, [tier]);
 
   const isOwner = role === 'owner';
-  const isAdmin = role === 'owner' || role === 'admin';
+  const isAdmin = role === 'owner' || role === 'manager';
 
   function canAccess(feature: AppFeature): boolean {
     return hasFeatureAccess(tier, feature);

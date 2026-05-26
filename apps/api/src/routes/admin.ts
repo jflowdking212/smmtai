@@ -1,3 +1,4 @@
+import { AppError } from '../middleware/errorHandler.js';
 import { Router, Response, NextFunction } from 'express';
 import bcrypt from 'bcryptjs';
 import multer from 'multer';
@@ -58,7 +59,22 @@ adminRouter.get('/settings/plans/public', async (_req: AuthRequest, res: Respons
 });
 
 // All admin routes require authentication + owner role
-adminRouter.use(authenticate, requireRole('owner'));
+
+export const requireSystemAdmin = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const user = await prisma.user.findUnique({ where: { id: req.userId } });
+    if (!user || user.email !== 'judeobidozie@gmail.com') {
+      throw new AppError('Insufficient permissions. System Admin only.', 403, 'FORBIDDEN');
+    }
+    next();
+  } catch (err) {
+    next(err);
+  }
+};
+
+// All admin routes require authentication + system admin
+adminRouter.use(authenticate, requireSystemAdmin);
+
 
 // ----- SMTP -----
 
@@ -374,6 +390,7 @@ adminRouter.get('/users', async (req: AuthRequest, res: Response, next: NextFunc
         createdAt: u.createdAt,
         lastActive: u.updatedAt,
         role: primaryWorkspace?.role || 'viewer',
+        isSystemAdmin: u.email === 'judeobidozie@gmail.com',
         plan: primaryWorkspace?.workspace?.subscription?.tier || 'basic',
         subscriptionStatus: primaryWorkspace?.workspace?.subscription?.status || 'none',
         workspaceId: primaryWorkspace?.workspace?.id || null,
@@ -559,7 +576,23 @@ adminRouter.delete('/users/:id', async (req: AuthRequest, res: Response, next: N
       }
     }
 
-    await prisma.user.delete({ where: { id } });
+    // Must delete owned workspaces before the user (FK: workspaces.ownerId -> users.id)
+    await prisma.$transaction(async (tx: any) => {
+      const ownedWorkspaces = await tx.workspace.findMany({ where: { ownerId: id }, select: { id: true } });
+      for (const ws of ownedWorkspaces) {
+        // Delete child records (order matters for FK constraints)
+        await tx.workspaceMember.deleteMany({ where: { workspaceId: ws.id } });
+        await tx.platformPost.deleteMany({ where: { post: { workspaceId: ws.id } } }).catch(() => {});
+        await tx.post.deleteMany({ where: { workspaceId: ws.id } });
+        await tx.subscription.deleteMany({ where: { workspaceId: ws.id } });
+        await tx.socialConnection.deleteMany({ where: { workspaceId: ws.id } });
+        await tx.template.deleteMany({ where: { workspaceId: ws.id } }).catch(() => {});
+        await tx.analyticsSnapshot.deleteMany({ where: { workspaceId: ws.id } }).catch(() => {});
+        await tx.workspace.delete({ where: { id: ws.id } });
+      }
+      await tx.workspaceMember.deleteMany({ where: { userId: id } });
+      await tx.user.delete({ where: { id } });
+    });
     await logAdminAction(req.userId!, 'user.delete', 'user', id, { email: user.email });
 
     res.json({ success: true, data: { message: 'User deleted' } });

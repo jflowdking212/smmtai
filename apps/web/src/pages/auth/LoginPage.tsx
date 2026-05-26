@@ -71,7 +71,17 @@ export function LoginPage() {
       setAuth(res.data.user, res.data.accessToken, res.data.workspaceId, res.data.role || 'viewer', res.data.tier || 'basic');
 
       if (inviteToken && inviteAction !== 'decline') {
-        await api.workspaces.acceptInvite(inviteToken);
+        try {
+          const inviteRes = await api.workspaces.acceptInvite(inviteToken);
+          const workspaceName = inviteRes?.data?.workspace?.name;
+          setInviteNotice(`You've successfully joined${workspaceName ? ' ' + workspaceName : ' the workspace'}! Welcome to the team.`);
+          // Give the user a moment to see the success message before redirecting
+          await new Promise(r => setTimeout(r, 1800));
+        } catch (invErr) {
+          const msg = invErr instanceof ApiError ? invErr.message : 'Could not process invitation';
+          setInviteNotice(`Note: ${msg}`);
+          await new Promise(r => setTimeout(r, 2000));
+        }
       }
 
       navigate(nextPath, { replace: true });

@@ -57,7 +57,7 @@ workspaceRouter.get(
 workspaceRouter.post(
   '/:workspaceId/members',
   authenticate,
-  requireRole('owner', 'admin'),
+  requireRole('owner', 'manager'),
   validate(inviteMemberSchema),
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
@@ -107,7 +107,7 @@ workspaceRouter.post(
 workspaceRouter.delete(
   '/:workspaceId/members/:userId',
   authenticate,
-  requireRole('owner', 'admin'),
+  requireRole('owner', 'manager'),
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       await workspaceService.removeMember(

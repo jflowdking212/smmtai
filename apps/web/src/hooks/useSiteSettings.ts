@@ -8,6 +8,7 @@ export interface SiteSettings {
   site_logo: string;
   seo_meta_title: string;
   seo_meta_description: string;
+  fb_pixel_id?: string;
 }
 
 const DEFAULTS: SiteSettings = {
@@ -17,6 +18,7 @@ const DEFAULTS: SiteSettings = {
   site_logo: '',
   seo_meta_title: '',
   seo_meta_description: '',
+  fb_pixel_id: '',
 };
 
 let cached: SiteSettings | null = null;

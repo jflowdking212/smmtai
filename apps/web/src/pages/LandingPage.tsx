@@ -1,27 +1,30 @@
 import { Link } from 'react-router-dom';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Footer } from '@/components/Footer';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
+import { useTheme } from '@/components/ThemeProvider';
 import { api } from '@/lib/api';
+import { useEffect } from 'react';
 import {
   Sparkles, ArrowRight, Check, Zap, CreditCard, Building2, Crown,
   PenSquare, Calendar, BarChart3, Palette, Link2, Bot, Shield, Globe, Users,
+  Sun, Moon,
 } from 'lucide-react';
 
-const DEFAULT_PRICES: Record<string, number> = { Basic: 0, Pro: 19, Business: 49, Enterprise: 0 };
+const DEFAULT_PRICES: Record<string, number> = { Basic: 5, Pro: 19, Business: 49, Enterprise: 0 };
 const DEFAULT_YEARLY_DISCOUNT = 30;
 const TIER_MAP: Record<string, string> = { Basic: 'basic', Pro: 'pro', Business: 'business', Enterprise: 'enterprise' };
 
 const plans = [
   {
-    name: 'Basic', monthlyPrice: 0, description: 'Get started with the basics', icon: Zap, popular: false,
+    name: 'Basic', monthlyPrice: 5, description: 'Get started with the basics', icon: Zap, popular: false,
     platforms: ['Entreprenrs', 'Chrxstians', 'Iohah', 'Facebook'],
     features: ['4 social accounts', '30 posts/month', '5 AI generations', '10 templates/month', '1 team member', '7-day analytics'],
   },
   {
     name: 'Pro', monthlyPrice: 19, description: 'For growing creators & teams', icon: CreditCard, popular: true,
     platforms: ['Everything in Basic', 'Instagram', 'X (Twitter)', 'YouTube', 'Pinterest'],
-    features: ['8 social accounts', '200 posts/month', '100 AI generations', '50 templates/month', '3 team members', '30-day analytics'],
+    features: ['8 social accounts', '200 posts/month', '100 AI generations', '50 templates/month', '5 team members', '30-day analytics'],
   },
   {
     name: 'Business', monthlyPrice: 49, description: 'For agencies & larger teams', icon: Building2, popular: false,
@@ -31,7 +34,7 @@ const plans = [
   {
     name: 'Enterprise', monthlyPrice: 0, description: 'Dedicated support & custom limits', icon: Crown, popular: false, custom: true,
     platforms: ['All 13 platforms'],
-    features: ['Unlimited accounts', 'Unlimited posts', 'Unlimited AI', 'Unlimited templates', 'Unlimited team', 'Full analytics history', 'Dedicated support', 'Custom integrations'],
+    features: ['Unlimited accounts', 'Unlimited posts', 'Unlimited AI', 'Unlimited templates', '20 team members', 'Full analytics history', 'Dedicated support', 'Custom integrations'],
   },
 ];
 
@@ -47,9 +50,38 @@ const features = [
   { icon: Globe, title: 'Global Reach', description: 'Support for multiple languages, timezones, and international social platforms.' },
 ];
 
+function ThemeToggle() {
+  const { resolvedTheme, setTheme } = useTheme();
+  const isDark = resolvedTheme === 'dark';
+
+  return (
+    <button
+      type="button"
+      onClick={() => setTheme(isDark ? 'light' : 'dark')}
+      aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+      className="relative flex items-center justify-center w-9 h-9 rounded-xl border border-neutral-200 dark:border-white/10 bg-neutral-50 dark:bg-white/5 hover:bg-neutral-100 dark:hover:bg-white/10 text-neutral-600 dark:text-neutral-300 transition-all duration-200 hover:scale-105 active:scale-95"
+    >
+      {isDark ? (
+        <Sun className="w-4 h-4 text-amber-400" />
+      ) : (
+        <Moon className="w-4 h-4 text-blue-500" />
+      )}
+    </button>
+  );
+}
+
 function PricingSection() {
-  const [yearly, setYearly] = useState(false);
+  const [sliderIndex, setSliderIndex] = useState(0); // 0 = Monthly, 1 = Quarterly, 2 = 6 Months, 3 = Yearly
   const [planConfig, setPlanConfig] = useState<Record<string, any>>({});
+
+  const PERIODS_INFO = [
+    { id: 'monthly', label: 'Monthly', months: 1, discount: 0, saveText: '' },
+    { id: 'quarterly', label: 'Quarterly', months: 3, discount: 5, saveText: 'Save 5%' },
+    { id: '6month', label: '6 Months', months: 6, discount: 15, saveText: 'Save 15%' },
+    { id: 'yearly', label: 'Yearly', months: 12, discount: 30, saveText: 'Save 30%' },
+  ] as const;
+
+  const selectedPeriod = PERIODS_INFO[sliderIndex].id;
 
   useEffect(() => {
     let active = true;
@@ -64,130 +96,174 @@ function PricingSection() {
     return planConfig?.pricing?.[tier]?.monthlyPrice ?? DEFAULT_PRICES[planName];
   }
 
-  function getYearlyDiscount(): number {
-    return planConfig?.yearlyDiscount ?? DEFAULT_YEARLY_DISCOUNT;
-  }
-
-  function formatPrice(monthlyPrice: number, yearlyDiscountPct: number): { display: string; period: string; originalYearly?: string } {
-    if (monthlyPrice === 0) return { display: '$0', period: '/forever' };
-    if (yearly) {
-      const fullYearly = +(monthlyPrice * 12).toFixed(2);
-      const discountedYearly = +(fullYearly * (1 - yearlyDiscountPct / 100)).toFixed(2);
-      return {
-        display: `$${Number.isInteger(discountedYearly) ? discountedYearly : discountedYearly.toFixed(2)}`,
-        period: '/year',
-        originalYearly: `$${Number.isInteger(fullYearly) ? fullYearly : fullYearly.toFixed(2)}/year`,
-      };
+  function formatSliderPrice(baseMonthlyPrice: number, index: number) {
+    if (baseMonthlyPrice === 0) return { display: '$0', period: '/forever', billingText: 'Free forever' };
+    
+    const info = PERIODS_INFO[index];
+    const discountedMonthly = +(baseMonthlyPrice * (1 - info.discount / 100)).toFixed(2);
+    const totalBilled = +(discountedMonthly * info.months).toFixed(2);
+    
+    const fmt = (val: number) => Number.isInteger(val) ? val.toString() : val.toFixed(2);
+    
+    let billingText = 'Billed monthly';
+    if (info.months === 3) {
+      billingText = `Billed $${fmt(totalBilled)} every 3 months`;
+    } else if (info.months === 6) {
+      billingText = `Billed $${fmt(totalBilled)} every 6 months`;
+    } else if (info.months === 12) {
+      billingText = `Billed $${fmt(totalBilled)} yearly`;
     }
-    return { display: `$${monthlyPrice}`, period: '/month' };
+    
+    return {
+      display: `$${fmt(discountedMonthly)}`,
+      period: '/month',
+      billingText,
+      originalMonthly: info.discount > 0 ? `$${baseMonthlyPrice}/month` : undefined
+    };
   }
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div className="text-center mb-10">
-        <h2 className="text-3xl sm:text-4xl font-bold font-heading text-neutral-900">Simple, transparent pricing</h2>
-        <p className="mt-4 text-lg text-neutral-600">Start free and scale as you grow. No hidden fees.</p>
+        <h2 className="text-3xl sm:text-4xl font-bold font-heading text-neutral-900 dark:text-white">Simple, transparent pricing</h2>
+        <p className="mt-4 text-lg text-neutral-600 dark:text-neutral-400">Choose the perfect plan with flexible billing intervals.</p>
       </div>
 
-      {/* Monthly / Yearly Toggle */}
-      <div className="flex items-center justify-center gap-3 mb-10">
-        <span className={`text-sm font-medium ${!yearly ? 'text-neutral-900' : 'text-neutral-400'}`}>Monthly</span>
-        <button
-          type="button"
-          role="switch"
-          aria-checked={yearly}
-          onClick={() => setYearly(!yearly)}
-          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${yearly ? 'bg-blue-600' : 'bg-neutral-300'}`}
-        >
-          <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${yearly ? 'translate-x-6' : 'translate-x-1'}`} />
-        </button>
-        <span className={`text-sm font-medium ${yearly ? 'text-neutral-900' : 'text-neutral-400'}`}>
-          Yearly <span className="text-green-600 font-semibold">(Save {getYearlyDiscount()}%)</span>
-        </span>
+      {/* Dynamic Range Slider Control */}
+      <div className="max-w-xl mx-auto mb-16 bg-neutral-50 dark:bg-white/5 rounded-2xl p-6 border border-neutral-200/50 dark:border-white/10 shadow-sm">
+        <div className="flex justify-between mb-4 text-xs font-semibold tracking-wider uppercase text-neutral-500 dark:text-neutral-400">
+          <span>Choose billing period</span>
+          <span className="text-blue-600 dark:text-blue-400 font-bold">
+            {PERIODS_INFO[sliderIndex].discount > 0 ? `${PERIODS_INFO[sliderIndex].saveText} Activated` : 'Standard Rate'}
+          </span>
+        </div>
+        
+        <div className="relative mt-4">
+          <input
+            type="range"
+            min="0"
+            max="3"
+            step="1"
+            value={sliderIndex}
+            onChange={(e) => setSliderIndex(parseInt(e.target.value))}
+            className="w-full h-2 bg-neutral-200 dark:bg-neutral-800 rounded-lg appearance-none cursor-pointer accent-blue-600 focus:outline-none"
+          />
+          
+          <div className="flex justify-between mt-5">
+            {PERIODS_INFO.map((item, idx) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setSliderIndex(idx)}
+                className={`flex flex-col items-center transition-all ${
+                  sliderIndex === idx 
+                    ? 'text-blue-600 dark:text-blue-400 font-bold scale-105' 
+                    : 'text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 text-xs font-medium'
+                }`}
+              >
+                <span className="text-sm">{item.label}</span>
+                {item.discount > 0 && (
+                  <span className="text-[10px] mt-0.5 px-1.5 py-0.5 rounded-full bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400 font-semibold">
+                    -{item.discount}%
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8">
         {plans.map((plan) => {
           const monthlyPrice = getMonthlyPrice(plan.name);
-          const yearlyDiscount = getYearlyDiscount();
+          const price = formatSliderPrice(monthlyPrice, sliderIndex);
+          const tier = TIER_MAP[plan.name] || '';
+
+          const selectedPriceKey = tier && tier !== 'enterprise'
+            ? `${tier}_${selectedPeriod}`
+            : '';
+
+          const href = plan.custom 
+            ? '#contact' 
+            : `/checkout?priceKey=${encodeURIComponent(selectedPriceKey)}`;
+
+          const label = plan.custom 
+            ? 'Contact Sales' 
+            : tier === 'basic' 
+              ? 'Start Basic Plan' 
+              : tier === 'pro' 
+                ? 'Start 14-Day Free Trial' 
+                : 'Continue';
+
+          const className = `block w-full text-center py-2.5 rounded-lg font-medium text-sm transition-all ${
+            plan.popular
+              ? 'bg-blue-600 hover:bg-blue-500 text-white shadow-sm shadow-blue-600/20'
+              : 'bg-neutral-100 dark:bg-white/8 hover:bg-neutral-200 dark:hover:bg-white/12 text-neutral-800 dark:text-neutral-200'
+          }`;
 
           return (
-          <div key={plan.name}
-            className={`relative bg-white rounded-2xl p-6 sm:p-8 border-2 transition-all hover:shadow-lg ${
-              plan.popular ? 'border-blue-600 shadow-lg shadow-blue-600/10' : 'border-neutral-100'
-            }`}
-          >
-            {plan.popular && (
-              <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-3 py-1 bg-blue-600 text-white text-xs font-medium rounded-full">
-                Most Popular
-              </div>
-            )}
-            <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center mb-4">
-              <plan.icon className="w-5 h-5 text-blue-600" />
-            </div>
-            <h3 className="text-lg font-semibold text-neutral-900">{plan.name}</h3>
-            <p className="text-sm text-neutral-500 mt-1">{plan.description}</p>
-            <div className="mt-4 mb-2">
-              {plan.custom ? (
-                <span className="text-4xl font-bold text-neutral-900">Custom</span>
-              ) : (() => {
-                const price = formatPrice(monthlyPrice, yearlyDiscount);
-                return (
-                  <>
-                    <span className="text-4xl font-bold text-neutral-900">{price.display}</span>
-                    <span className="text-sm text-neutral-500">{price.period}</span>
-                    {price.originalYearly && (
-                      <span className="block text-xs text-neutral-400 line-through">{price.originalYearly}</span>
-                    )}
-                  </>
-                );
-              })()}
-            </div>
-
-            {/* Platform badges */}
-            <div className="flex flex-wrap gap-1 mb-4">
-              {plan.platforms.map((p) => (
-                <span key={p} className="px-2 py-0.5 rounded-full text-xs font-medium bg-neutral-100 text-neutral-600">
-                  {p}
-                </span>
-              ))}
-            </div>
-
-            <ul className="space-y-3 mb-8">
-              {plan.features.map((f) => (
-                <li key={f} className="flex items-center gap-2 text-sm text-neutral-700">
-                  <Check className="w-4 h-4 text-green-500 shrink-0" /> {f}
-                </li>
-              ))}
-            </ul>
-            {(() => {
-              const tier = TIER_MAP[plan.name] || '';
-              const selectedPriceKey = tier && tier !== 'basic'
-                ? `${tier}_${yearly ? 'yearly' : 'monthly'}`
-                : '';
-              const href = tier === 'basic'
-                ? '/auth/register'
-                : `/checkout?priceKey=${encodeURIComponent(selectedPriceKey)}`;
-              const label = plan.custom ? 'Contact Sales' : tier === 'basic' ? 'Get Started Free' : 'Continue';
-              const className = `block w-full text-center py-2.5 rounded-lg font-medium text-sm transition-all ${
+            <div key={plan.name}
+              className={`relative rounded-2xl p-6 sm:p-8 border-2 transition-all hover:shadow-xl ${
                 plan.popular
-                  ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-sm'
-                  : 'bg-neutral-100 hover:bg-neutral-200 text-neutral-800'
-              }`;
-              if (plan.custom) {
-                return (
-                  <a href="#contact" className={className}>
-                    {label}
-                  </a>
-                );
-              }
-              return (
+                  ? 'border-blue-600 shadow-lg shadow-blue-600/20 bg-white dark:bg-[#1a1f3c]'
+                  : 'border-neutral-100 dark:border-white/10 bg-white dark:bg-[#141420] hover:border-blue-200 dark:hover:border-blue-500/30'
+              }`}
+            >
+              {plan.popular && (
+                <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-3 py-1 bg-blue-600 text-white text-xs font-medium rounded-full shadow-lg shadow-blue-600/30">
+                  Most Popular
+                </div>
+              )}
+              <div className="w-10 h-10 bg-blue-50 dark:bg-blue-500/10 rounded-lg flex items-center justify-center mb-4">
+                <plan.icon className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+              </div>
+              <h3 className="text-lg font-semibold text-neutral-900 dark:text-white">{plan.name}</h3>
+              <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">{plan.description}</p>
+              
+              <div className="mt-4 mb-2">
+                {plan.custom ? (
+                  <span className="text-4xl font-bold text-neutral-900 dark:text-white">Custom</span>
+                ) : (
+                  <>
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-4xl font-bold text-neutral-900 dark:text-white">{price.display}</span>
+                      <span className="text-sm text-neutral-500 dark:text-neutral-400">{price.period}</span>
+                    </div>
+                    {price.originalMonthly && (
+                      <span className="block text-xs text-neutral-400 dark:text-neutral-500 line-through mt-0.5">{price.originalMonthly}</span>
+                    )}
+                    <span className="block text-xs text-neutral-400 dark:text-neutral-500 mt-1 font-medium">{price.billingText}</span>
+                  </>
+                )}
+              </div>
+
+              {/* Platform badges */}
+              <div className="flex flex-wrap gap-1 mb-4 mt-3">
+                {plan.platforms.map((p) => (
+                  <span key={p} className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-neutral-100 dark:bg-white/8 text-neutral-600 dark:text-neutral-300">
+                    {p}
+                  </span>
+                ))}
+              </div>
+
+              <ul className="space-y-3 mb-8 mt-4">
+                {plan.features.map((f) => (
+                  <li key={f} className="flex items-center gap-2 text-sm text-neutral-700 dark:text-neutral-300">
+                    <Check className="w-4 h-4 text-green-500 shrink-0" /> {f}
+                  </li>
+                ))}
+              </ul>
+              
+              {plan.custom ? (
+                <a href="#contact" className={className}>
+                  {label}
+                </a>
+              ) : (
                 <Link to={href} className={className}>
                   {label}
                 </Link>
-              );
-            })()}
-          </div>
+              )}
+            </div>
           );
         })}
       </div>
@@ -201,9 +277,10 @@ export function LandingPage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-white dark:bg-[#0d0d18] transition-colors duration-300">
+
       {/* Navigation */}
-      <nav className="sticky top-0 z-50 bg-white/90 backdrop-blur-lg border-b border-neutral-100">
+      <nav className="sticky top-0 z-50 bg-white/90 dark:bg-[#0d0d18]/90 backdrop-blur-xl border-b border-neutral-100 dark:border-white/8 transition-colors duration-300">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             {/* Logo */}
@@ -211,31 +288,36 @@ export function LandingPage() {
               {settings.site_logo ? (
                 <img src={settings.site_logo} alt={siteName} className="w-8 h-8 object-contain" />
               ) : (
-                <Sparkles className="w-7 h-7 text-blue-600" />
+                <Sparkles className="w-7 h-7 text-blue-500" />
               )}
-              <span className="text-xl font-bold font-heading text-neutral-900">{siteName}</span>
+              <span className="text-xl font-bold font-heading text-neutral-900 dark:text-white">{siteName}</span>
             </div>
+
             {/* Desktop nav */}
             <div className="hidden md:flex items-center gap-8">
-              <a href="#features" className="text-sm text-neutral-600 hover:text-neutral-900 transition-colors">Features</a>
-              <a href="#pricing" className="text-sm text-neutral-600 hover:text-neutral-900 transition-colors">Pricing</a>
-              <a href="#contact" className="text-sm text-neutral-600 hover:text-neutral-900 transition-colors">Contact</a>
+              <a href="#features" className="text-sm text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-colors">Features</a>
+              <a href="#pricing" className="text-sm text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-colors">Pricing</a>
+              <a href="#contact" className="text-sm text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-colors">Contact</a>
             </div>
-            {/* Desktop CTA */}
+
+            {/* Desktop CTA + Theme Toggle */}
             <div className="hidden md:flex items-center gap-3">
-              <Link to="/auth/login" className="text-sm font-medium text-neutral-700 hover:text-neutral-900 transition-colors px-4 py-2">Log In</Link>
-              <Link to="/auth/register" className="text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 px-5 py-2.5 rounded-lg transition-all shadow-sm">
-                Get Started Free
+              <ThemeToggle />
+              <Link to="/auth/login" className="text-sm font-medium text-neutral-700 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white transition-colors px-4 py-2">Log In</Link>
+              <Link to="/checkout?priceKey=pro_monthly" className="text-sm font-semibold text-white bg-blue-600 hover:bg-blue-500 px-5 py-2.5 rounded-lg transition-all shadow-sm shadow-blue-600/20">
+                Start 14-Day Free Trial
               </Link>
             </div>
-            {/* Mobile: Log In + Hamburger */}
+
+            {/* Mobile: Theme Toggle + Log In + Hamburger */}
             <div className="flex md:hidden items-center gap-1">
-              <Link to="/auth/login" className="text-sm font-medium text-neutral-600 hover:text-neutral-900 px-3 py-2 rounded-lg transition-colors">
+              <ThemeToggle />
+              <Link to="/auth/login" className="text-sm font-medium text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white px-3 py-2 rounded-lg transition-colors">
                 Log In
               </Link>
               <button
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className="p-2 rounded-lg text-neutral-600 hover:bg-neutral-100 transition-colors"
+                className="p-2 rounded-lg text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-white/8 transition-colors"
                 aria-label="Toggle menu"
               >
                 {mobileMenuOpen ? (
@@ -250,19 +332,20 @@ export function LandingPage() {
               </button>
             </div>
           </div>
+
           {/* Mobile dropdown */}
           {mobileMenuOpen && (
-            <div className="md:hidden border-t border-neutral-100 py-3 space-y-1">
-              <a href="#features" onClick={() => setMobileMenuOpen(false)} className="flex items-center px-3 py-2.5 text-sm font-medium text-neutral-700 hover:bg-neutral-50 rounded-lg transition-colors">Features</a>
-              <a href="#pricing" onClick={() => setMobileMenuOpen(false)} className="flex items-center px-3 py-2.5 text-sm font-medium text-neutral-700 hover:bg-neutral-50 rounded-lg transition-colors">Pricing</a>
-              <a href="#contact" onClick={() => setMobileMenuOpen(false)} className="flex items-center px-3 py-2.5 text-sm font-medium text-neutral-700 hover:bg-neutral-50 rounded-lg transition-colors">Contact</a>
+            <div className="md:hidden border-t border-neutral-100 dark:border-white/8 py-3 space-y-1">
+              <a href="#features" onClick={() => setMobileMenuOpen(false)} className="flex items-center px-3 py-2.5 text-sm font-medium text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-white/5 rounded-lg transition-colors">Features</a>
+              <a href="#pricing" onClick={() => setMobileMenuOpen(false)} className="flex items-center px-3 py-2.5 text-sm font-medium text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-white/5 rounded-lg transition-colors">Pricing</a>
+              <a href="#contact" onClick={() => setMobileMenuOpen(false)} className="flex items-center px-3 py-2.5 text-sm font-medium text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-white/5 rounded-lg transition-colors">Contact</a>
               <div className="pt-2 pb-1">
                 <Link
-                  to="/auth/register"
+                  to="/checkout?priceKey=pro_monthly"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="flex items-center justify-center gap-2 w-full py-3 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition-all shadow-md shadow-blue-600/20"
+                  className="flex items-center justify-center gap-2 w-full py-3 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-xl transition-all shadow-md shadow-blue-600/20"
                 >
-                  Get Started Free <ArrowRight className="w-4 h-4" />
+                  Start 14-Day Free Trial <ArrowRight className="w-4 h-4" />
                 </Link>
               </div>
             </div>
@@ -272,37 +355,47 @@ export function LandingPage() {
 
       {/* Hero */}
       <section className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-white to-purple-50" />
+        {/* Light mode bg */}
+        <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:hidden" />
+        {/* Dark mode bg — deep space with glows */}
+        <div className="absolute inset-0 hidden dark:block bg-[#0d0d18]">
+          <div className="absolute top-0 left-1/4 w-96 h-96 bg-blue-600/20 rounded-full blur-3xl" />
+          <div className="absolute top-0 right-1/4 w-80 h-80 bg-purple-600/15 rounded-full blur-3xl" />
+          <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[600px] h-40 bg-blue-500/10 rounded-full blur-2xl" />
+        </div>
+
         <div className="relative max-w-7xl mx-auto px-5 sm:px-6 lg:px-8 py-14 sm:py-24 lg:py-36">
           <div className="max-w-3xl mx-auto text-center">
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-50 border border-blue-100 text-blue-700 text-xs sm:text-sm font-medium mb-5">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-50 dark:bg-blue-500/10 border border-blue-100 dark:border-blue-500/30 text-blue-700 dark:text-blue-400 text-xs sm:text-sm font-medium mb-5 backdrop-blur-sm">
               <Sparkles className="w-3.5 h-3.5" /> AI-Powered Social Media Management
             </div>
-            <h1 className="text-3xl sm:text-5xl lg:text-6xl font-bold font-heading text-neutral-900 leading-tight tracking-tight">
-              Create, Schedule &amp; Publish <span className="text-blue-600">Everywhere</span>
+            <h1 className="text-3xl sm:text-5xl lg:text-6xl font-bold font-heading text-neutral-900 dark:text-white leading-tight tracking-tight">
+              Create, Schedule &amp; Publish <span className="text-blue-500 dark:text-blue-400">Everywhere</span>
             </h1>
-            <p className="mt-4 sm:mt-6 text-base sm:text-xl text-neutral-500 leading-relaxed max-w-2xl mx-auto">
+            <p className="mt-4 sm:mt-6 text-base sm:text-xl text-neutral-500 dark:text-neutral-400 leading-relaxed max-w-2xl mx-auto">
               {settings.site_tagline || 'SmmtAI helps you craft stunning content with AI, design eye-catching visuals, and publish to all your social platforms — all from one dashboard.'}
             </p>
+
             {/* CTA Buttons */}
             <div className="mt-8 sm:mt-10 flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3">
               <Link
-                to="/auth/register"
-                className="inline-flex items-center justify-center gap-2 px-7 py-3.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-semibold rounded-xl transition-all shadow-lg shadow-blue-600/25 text-sm sm:text-base"
+                to="/checkout?priceKey=pro_monthly"
+                className="inline-flex items-center justify-center gap-2 px-7 py-3.5 bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-semibold rounded-xl transition-all shadow-lg shadow-blue-600/25 text-sm sm:text-base"
               >
-                Start Free Today <ArrowRight className="w-4 h-4" />
+                Start 14-Day Free Trial <ArrowRight className="w-4 h-4" />
               </Link>
               <a
                 href="#features"
-                className="inline-flex items-center justify-center gap-2 px-7 py-3.5 bg-white hover:bg-neutral-50 active:scale-95 text-neutral-700 font-semibold rounded-xl transition-all border border-neutral-200 text-sm sm:text-base"
+                className="inline-flex items-center justify-center gap-2 px-7 py-3.5 bg-white dark:bg-white/8 hover:bg-neutral-50 dark:hover:bg-white/12 active:scale-95 text-neutral-700 dark:text-neutral-200 font-semibold rounded-xl transition-all border border-neutral-200 dark:border-white/10 text-sm sm:text-base backdrop-blur-sm"
               >
                 See Features
               </a>
             </div>
+
             {/* Trust badges */}
-            <div className="mt-5 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-xs text-neutral-400">
-              <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5 text-green-500" /> No credit card</span>
-              <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5 text-green-500" /> Free forever plan</span>
+            <div className="mt-5 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-xs text-neutral-400 dark:text-neutral-500">
+              <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5 text-green-500" /> No upfront payment</span>
+              <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5 text-green-500" /> 14-day Pro trial</span>
               <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5 text-green-500" /> Cancel anytime</span>
             </div>
           </div>
@@ -310,20 +403,66 @@ export function LandingPage() {
       </section>
 
       {/* Features */}
-      <section id="features" className="py-20 sm:py-28 bg-neutral-50">
+      <section id="features" className="py-20 sm:py-28 bg-neutral-50 dark:bg-[#0a0a14] transition-colors duration-300">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 className="text-3xl sm:text-4xl font-bold font-heading text-neutral-900">Everything you need to grow your social presence</h2>
-            <p className="mt-4 text-lg text-neutral-600 max-w-2xl mx-auto">Powerful tools that save you time and help you create better content across every platform.</p>
+            <h2 className="text-3xl sm:text-4xl font-bold font-heading text-neutral-900 dark:text-white">Everything you need to grow your social presence</h2>
+            <p className="mt-4 text-lg text-neutral-600 dark:text-neutral-400 max-w-2xl mx-auto">Powerful tools that save you time and help you create better content across every platform.</p>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
             {features.map((f) => (
-              <div key={f.title} className="bg-white rounded-2xl p-6 sm:p-8 border border-neutral-100 hover:border-blue-100 hover:shadow-lg transition-all group">
-                <div className="w-12 h-12 bg-blue-50 group-hover:bg-blue-100 rounded-xl flex items-center justify-center mb-5 transition-colors">
-                  <f.icon className="w-6 h-6 text-blue-600" />
+              <div key={f.title} className="bg-white dark:bg-[#14141f] rounded-2xl p-6 sm:p-8 border border-neutral-100 dark:border-white/8 hover:border-blue-200 dark:hover:border-blue-500/40 hover:shadow-lg dark:hover:shadow-blue-500/5 transition-all group">
+                <div className="w-12 h-12 bg-blue-50 dark:bg-blue-500/10 group-hover:bg-blue-100 dark:group-hover:bg-blue-500/20 rounded-xl flex items-center justify-center mb-5 transition-colors">
+                  <f.icon className="w-6 h-6 text-blue-600 dark:text-blue-400" />
                 </div>
-                <h3 className="text-lg font-semibold text-neutral-900 mb-2">{f.title}</h3>
-                <p className="text-sm text-neutral-600 leading-relaxed">{f.description}</p>
+                <h3 className="text-lg font-semibold text-neutral-900 dark:text-white mb-2">{f.title}</h3>
+                <p className="text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed">{f.description}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Powerhouse Features Showcase */}
+      <section className="py-20 sm:py-28 bg-white dark:bg-[#0d0d18] border-y border-neutral-100 dark:border-white/8 transition-colors duration-300">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <span className="inline-flex items-center px-3 py-1.5 rounded-full bg-blue-600/10 text-blue-600 dark:text-blue-400 text-xs font-semibold mb-3 border-none">Next-Gen Workspace</span>
+            <h2 className="text-3xl sm:text-4xl font-bold font-heading text-neutral-900 dark:text-white">Unleash the full power of SmmtAI</h2>
+            <p className="mt-4 text-lg text-neutral-600 dark:text-neutral-400 max-w-2xl mx-auto">Discover SmmtAI's newest advanced modules that turn social media management into a seamless, high-converting process.</p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 sm:gap-12">
+            {[
+              {
+                icon: Bot,
+                title: 'Interactive AI Chat Assistant',
+                description: 'Talk to your virtual AI marketing manager. Brainstorm campaign ideas, generate full captions, request compliance checks, and schedule your posts directly within our interactive chat workspace.'
+              },
+              {
+                icon: PenSquare,
+                title: 'AI Humanizer & Caption Rewriter',
+                description: 'Banish robotic tones forever. Our intelligent humanizer rewrites and refines your text to sound completely natural, friendly, and authentic, boosting algorithmic reach and authentic reader engagement.'
+              },
+              {
+                icon: Palette,
+                title: 'Canvas Visual Design Studio',
+                description: 'Craft beautiful graphics and visually engaging posts directly within SMMT. Enjoy full template layouts, drag-and-drop layers, visual filters, and a built-in instant background removal utility.'
+              },
+              {
+                icon: Users,
+                title: 'Workspace Collaboration & Approval Workflows',
+                description: 'Manage distinct brands or client accounts in dedicated multi-tenant workspaces. Set up structured workflows with specialized roles (Owner, Manager, Reviewer) and a secure approval queue.'
+              }
+            ].map((item, idx) => (
+              <div key={idx} className="flex gap-4 sm:gap-6 p-6 sm:p-8 rounded-2xl bg-neutral-50 dark:bg-[#141420] border border-neutral-100 dark:border-white/5 transition-all hover:border-blue-500/25">
+                <div className="w-12 h-12 bg-blue-600 text-white rounded-xl flex items-center justify-center shrink-0 shadow-md shadow-blue-600/20">
+                  <item.icon className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-lg sm:text-xl font-bold text-neutral-900 dark:text-white mb-2">{item.title}</h3>
+                  <p className="text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed">{item.description}</p>
+                </div>
               </div>
             ))}
           </div>
@@ -331,39 +470,172 @@ export function LandingPage() {
       </section>
 
       {/* Pricing */}
-      <section id="pricing" className="py-20 sm:py-28">
+      <section id="pricing" className="py-20 sm:py-28 bg-white dark:bg-[#0d0d18] transition-colors duration-300">
         <PricingSection />
       </section>
 
       {/* CTA */}
-      <section className="py-20 sm:py-28 bg-gradient-to-br from-blue-600 to-blue-800">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+      <section className="py-20 sm:py-28 bg-gradient-to-br from-blue-600 to-blue-800 dark:from-blue-700 dark:to-[#1a0a3a] relative overflow-hidden">
+        <div className="absolute inset-0 hidden dark:block">
+          <div className="absolute top-0 left-1/3 w-64 h-64 bg-blue-400/10 rounded-full blur-3xl" />
+          <div className="absolute bottom-0 right-1/3 w-64 h-64 bg-purple-500/15 rounded-full blur-3xl" />
+        </div>
+        <div className="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-3xl sm:text-4xl font-bold font-heading text-white">Ready to supercharge your social media?</h2>
           <p className="mt-4 text-lg text-blue-100 max-w-2xl mx-auto">Join thousands of creators and teams who use SmmtAI to save time, create better content, and grow their audience.</p>
           <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Link to="/auth/register" className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-3.5 bg-white hover:bg-neutral-50 text-blue-700 font-medium rounded-xl transition-all shadow-lg text-base">
-              Get Started Free <ArrowRight className="w-5 h-5" />
+            <Link to="/checkout?priceKey=pro_monthly" className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-3.5 bg-white hover:bg-blue-50 text-blue-700 font-medium rounded-xl transition-all shadow-lg text-base">
+              Start 14-Day Free Trial <ArrowRight className="w-5 h-5" />
             </Link>
-            <Link to="/auth/login" className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-3.5 border-2 border-white/30 hover:border-white/50 text-white font-medium rounded-xl transition-all text-base">
+            <Link to="/auth/login" className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-3.5 border-2 border-white/30 hover:border-white/60 text-white font-medium rounded-xl transition-all text-base hover:bg-white/5">
               Log In
             </Link>
           </div>
         </div>
       </section>
 
+      {/* Detailed Plan Comparison Table */}
+      <section className="py-20 sm:py-28 bg-white dark:bg-[#0d0d18] transition-colors duration-300">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl sm:text-4xl font-bold font-heading text-neutral-900 dark:text-white">Compare plans in detail</h2>
+            <p className="mt-4 text-lg text-neutral-600 dark:text-neutral-400">Everything you need to know to make the best decision for your social growth.</p>
+          </div>
+          
+          <div className="overflow-x-auto border border-neutral-100 dark:border-white/10 rounded-2xl shadow-sm bg-neutral-50/50 dark:bg-[#141420]/50 backdrop-blur-sm">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-neutral-100 dark:border-white/10 text-neutral-400 dark:text-neutral-400 text-xs sm:text-sm font-semibold">
+                  <th className="p-4 sm:p-6 w-1/3">Feature</th>
+                  <th className="p-4 sm:p-6 text-center">Basic ($5/mo)</th>
+                  <th className="p-4 sm:p-6 text-center text-blue-600 dark:text-blue-400 font-bold bg-blue-50/20 dark:bg-blue-500/5">Pro ($19/mo)</th>
+                  <th className="p-4 sm:p-6 text-center">Business ($49/mo)</th>
+                  <th className="p-4 sm:p-6 text-center">Enterprise</th>
+                </tr>
+              </thead>
+              <tbody className="text-neutral-700 dark:text-neutral-300 text-xs sm:text-sm">
+                {/* Group 1: Channels & Limits */}
+                <tr className="bg-neutral-100/50 dark:bg-white/5 font-semibold text-neutral-900 dark:text-white border-b border-neutral-100 dark:border-white/10">
+                  <td colSpan={5} className="p-3 sm:p-4 text-xs sm:text-sm uppercase tracking-wider">Channels &amp; Publishing</td>
+                </tr>
+                <tr className="border-b border-neutral-100 dark:border-white/8">
+                  <td className="p-4 sm:p-5 font-medium">Social Accounts</td>
+                  <td className="p-4 sm:p-5 text-center">4 Accounts</td>
+                  <td className="p-4 sm:p-5 text-center bg-blue-50/10 dark:bg-blue-500/5">8 Accounts</td>
+                  <td className="p-4 sm:p-5 text-center">25 Accounts</td>
+                  <td className="p-4 sm:p-5 text-center">Unlimited</td>
+                </tr>
+                <tr className="border-b border-neutral-100 dark:border-white/8">
+                  <td className="p-4 sm:p-5 font-medium">Posts Per Month</td>
+                  <td className="p-4 sm:p-5 text-center">30 Posts</td>
+                  <td className="p-4 sm:p-5 text-center bg-blue-50/10 dark:bg-blue-500/5">200 Posts</td>
+                  <td className="p-4 sm:p-5 text-center">Unlimited</td>
+                  <td className="p-4 sm:p-5 text-center">Unlimited</td>
+                </tr>
+                <tr className="border-b border-neutral-100 dark:border-white/8">
+                  <td className="p-4 sm:p-5 font-medium">Included Channels</td>
+                  <td className="p-4 sm:p-5 text-center text-xs text-neutral-500 dark:text-neutral-400">FB, Entr, Chrx, Iohah</td>
+                  <td className="p-4 sm:p-5 text-center bg-blue-50/10 dark:bg-blue-500/5 text-xs text-neutral-500 dark:text-neutral-400">FB, Entr, Chrx, Iohah, Insta, X/Twitter, YT, Pinterest</td>
+                  <td className="p-4 sm:p-5 text-center text-xs text-neutral-500 dark:text-neutral-400">Everything in Pro + TikTok, LinkedIn, Bluesky, Mastodon, Telegram</td>
+                  <td className="p-4 sm:p-5 text-center text-xs text-neutral-500 dark:text-neutral-400">All 13 Supported Platforms</td>
+                </tr>
+                
+                {/* Group 2: AI & Creative Suite */}
+                <tr className="bg-neutral-100/50 dark:bg-white/5 font-semibold text-neutral-900 dark:text-white border-b border-neutral-100 dark:border-white/10">
+                  <td colSpan={5} className="p-3 sm:p-4 text-xs sm:text-sm uppercase tracking-wider">AI &amp; Creative Suite</td>
+                </tr>
+                <tr className="border-b border-neutral-100 dark:border-white/8">
+                  <td className="p-4 sm:p-5 font-medium">AI Generations / mo</td>
+                  <td className="p-4 sm:p-5 text-center">5 generations</td>
+                  <td className="p-4 sm:p-5 text-center bg-blue-50/10 dark:bg-blue-500/5 font-semibold">100 generations</td>
+                  <td className="p-4 sm:p-5 text-center">500 generations</td>
+                  <td className="p-4 sm:p-5 text-center">Unlimited</td>
+                </tr>
+                <tr className="border-b border-neutral-100 dark:border-white/8">
+                  <td className="p-4 sm:p-5 font-medium">Visual Templates / mo</td>
+                  <td className="p-4 sm:p-5 text-center">10 templates</td>
+                  <td className="p-4 sm:p-5 text-center bg-blue-50/10 dark:bg-blue-500/5">50 templates</td>
+                  <td className="p-4 sm:p-5 text-center">Unlimited</td>
+                  <td className="p-4 sm:p-5 text-center">Unlimited</td>
+                </tr>
+                <tr className="border-b border-neutral-100 dark:border-white/8">
+                  <td className="p-4 sm:p-5 font-medium">Visual Design Studio</td>
+                  <td className="p-4 sm:p-5 text-center"><Check className="w-4 h-4 mx-auto text-green-500" /></td>
+                  <td className="p-4 sm:p-5 text-center bg-blue-50/10 dark:bg-blue-500/5"><Check className="w-4 h-4 mx-auto text-green-500" /></td>
+                  <td className="p-4 sm:p-5 text-center"><Check className="w-4 h-4 mx-auto text-green-500" /></td>
+                  <td className="p-4 sm:p-5 text-center"><Check className="w-4 h-4 mx-auto text-green-500" /></td>
+                </tr>
+                <tr className="border-b border-neutral-100 dark:border-white/8">
+                  <td className="p-4 sm:p-5 font-medium">AI Humanizer &amp; Rewriter</td>
+                  <td className="p-4 sm:p-5 text-center text-neutral-400">—</td>
+                  <td className="p-4 sm:p-5 text-center bg-blue-50/10 dark:bg-blue-500/5"><Check className="w-4 h-4 mx-auto text-green-500" /></td>
+                  <td className="p-4 sm:p-5 text-center"><Check className="w-4 h-4 mx-auto text-green-500" /></td>
+                  <td className="p-4 sm:p-5 text-center"><Check className="w-4 h-4 mx-auto text-green-500" /></td>
+                </tr>
+                
+                {/* Group 3: Collaboration & Workspace */}
+                <tr className="bg-neutral-100/50 dark:bg-white/5 font-semibold text-neutral-900 dark:text-white border-b border-neutral-100 dark:border-white/10">
+                  <td colSpan={5} className="p-3 sm:p-4 text-xs sm:text-sm uppercase tracking-wider">Collaboration &amp; Management</td>
+                </tr>
+                <tr className="border-b border-neutral-100 dark:border-white/8">
+                  <td className="p-4 sm:p-5 font-medium">Team Members</td>
+                  <td className="p-4 sm:p-5 text-center">1 member</td>
+                  <td className="p-4 sm:p-5 text-center bg-blue-50/10 dark:bg-blue-500/5">5 members</td>
+                  <td className="p-4 sm:p-5 text-center">10 members</td>
+                  <td className="p-4 sm:p-5 text-center">20 members</td>
+                </tr>
+                <tr className="border-b border-neutral-100 dark:border-white/8">
+                  <td className="p-4 sm:p-5 font-medium">Structured Workspace Roles</td>
+                  <td className="p-4 sm:p-5 text-center text-neutral-400">—</td>
+                  <td className="p-4 sm:p-5 text-center bg-blue-50/10 dark:bg-blue-500/5"><Check className="w-4 h-4 mx-auto text-green-500" /></td>
+                  <td className="p-4 sm:p-5 text-center"><Check className="w-4 h-4 mx-auto text-green-500" /></td>
+                  <td className="p-4 sm:p-5 text-center"><Check className="w-4 h-4 mx-auto text-green-500" /></td>
+                </tr>
+                <tr className="border-b border-neutral-100 dark:border-white/8">
+                  <td className="p-4 sm:p-5 font-medium">Structured Approval Flows</td>
+                  <td className="p-4 sm:p-5 text-center text-neutral-400">—</td>
+                  <td className="p-4 sm:p-5 text-center bg-blue-50/10 dark:bg-blue-500/5"><Check className="w-4 h-4 mx-auto text-green-500" /></td>
+                  <td className="p-4 sm:p-5 text-center"><Check className="w-4 h-4 mx-auto text-green-500" /></td>
+                  <td className="p-4 sm:p-5 text-center"><Check className="w-4 h-4 mx-auto text-green-500" /></td>
+                </tr>
+                
+                {/* Group 4: Analytics & Support */}
+                <tr className="bg-neutral-100/50 dark:bg-white/5 font-semibold text-neutral-900 dark:text-white border-b border-neutral-100 dark:border-white/10">
+                  <td colSpan={5} className="p-3 sm:p-4 text-xs sm:text-sm uppercase tracking-wider">Analytics &amp; Support</td>
+                </tr>
+                <tr className="border-b border-neutral-100 dark:border-white/8">
+                  <td className="p-4 sm:p-5 font-medium">Analytics History</td>
+                  <td className="p-4 sm:p-5 text-center">7 days</td>
+                  <td className="p-4 sm:p-5 text-center bg-blue-50/10 dark:bg-blue-500/5">30 days</td>
+                  <td className="p-4 sm:p-5 text-center">90 days</td>
+                  <td className="p-4 sm:p-5 text-center">Full history</td>
+                </tr>
+                <tr className="border-b border-neutral-100 dark:border-white/8">
+                  <td className="p-4 sm:p-5 font-medium">Dedicated Support Manager</td>
+                  <td className="p-4 sm:p-5 text-center text-neutral-400">—</td>
+                  <td className="p-4 sm:p-5 text-center bg-blue-50/10 dark:bg-blue-500/5 text-neutral-400">—</td>
+                  <td className="p-4 sm:p-5 text-center text-neutral-400">—</td>
+                  <td className="p-4 sm:p-5 text-center"><Check className="w-4 h-4 mx-auto text-green-500" /></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
       {/* Contact */}
-      <section id="contact" className="py-20 sm:py-28 bg-neutral-50">
+      <section id="contact" className="py-20 sm:py-28 bg-neutral-50 dark:bg-[#0a0a14] transition-colors duration-300">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-3xl sm:text-4xl font-bold font-heading text-neutral-900">Get in touch</h2>
-          <p className="mt-4 text-lg text-neutral-600">Have questions? We'd love to hear from you.</p>
+          <h2 className="text-3xl sm:text-4xl font-bold font-heading text-neutral-900 dark:text-white">Get in touch</h2>
+          <p className="mt-4 text-lg text-neutral-600 dark:text-neutral-400">Have questions? We'd love to hear from you.</p>
           <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-6">
-            <div className="bg-white rounded-2xl p-6 border border-neutral-100">
-              <h3 className="font-semibold text-neutral-900 mb-2">Email Support</h3>
-              <p className="text-sm text-neutral-500">support@smmtai.app</p>
+            <div className="bg-white dark:bg-[#14141f] rounded-2xl p-6 border border-neutral-100 dark:border-white/8 hover:border-blue-200 dark:hover:border-blue-500/30 transition-all">
+              <h3 className="font-semibold text-neutral-900 dark:text-white mb-2">Email Support</h3>
+              <p className="text-sm text-neutral-500 dark:text-neutral-400">support@smmtai.com</p>
             </div>
-            <div className="bg-white rounded-2xl p-6 border border-neutral-100">
-              <h3 className="font-semibold text-neutral-900 mb-2">Sales</h3>
-              <p className="text-sm text-neutral-500">sales@smmtai.app</p>
+            <div className="bg-white dark:bg-[#14141f] rounded-2xl p-6 border border-neutral-100 dark:border-white/8 hover:border-blue-200 dark:hover:border-blue-500/30 transition-all">
+              <h3 className="font-semibold text-neutral-900 dark:text-white mb-2">Sales</h3>
+              <p className="text-sm text-neutral-500 dark:text-neutral-400">sales@smmtai.com</p>
             </div>
           </div>
         </div>

@@ -26,7 +26,7 @@ export function AdminSettingsPage() {
   // State
   const [smtpConfig, setSmtpConfig] = useState({ smtp_host: '', smtp_port: '587', smtp_user: '', smtp_pass: '', smtp_from: '', smtp_secure: 'true' });
   const [storageConfig, setStorageConfig] = useState({ storage_provider: '', storage_endpoint: '', storage_region: '', storage_bucket: '', storage_access_key: '', storage_secret_key: '' });
-  const [siteConfig, setSiteConfig] = useState({ site_title: '', site_tagline: '', site_favicon: '', site_logo: '', seo_meta_title: '', seo_meta_description: '' });
+  const [siteConfig, setSiteConfig] = useState({ site_title: '', site_tagline: '', site_favicon: '', site_logo: '', seo_meta_title: '', seo_meta_description: '', fb_pixel_id: '' });
   const [platformCreds, setPlatformCreds] = useState<Record<string, { access_token: string; server_key: string; client_id: string; client_secret: string }>>({});
   const [saving, setSaving] = useState<string | null>(null);
 
@@ -167,6 +167,7 @@ export function AdminSettingsPage() {
                   { key: 'site_tagline', label: 'Tagline' },
                   { key: 'seo_meta_title', label: 'SEO Title' },
                   { key: 'seo_meta_description', label: 'SEO Description' },
+                  { key: 'fb_pixel_id', label: 'Facebook Pixel ID' },
                 ].map(({ key, label }) => (
                   <div key={key}>
                     <label className="block text-xs text-neutral-400 mb-1">{label}</label>

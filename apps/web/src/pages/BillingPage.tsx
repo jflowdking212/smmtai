@@ -15,14 +15,18 @@ import {
   Loader2,
 } from 'lucide-react';
 
-const DEFAULT_PRICES: Record<SubscriptionTier, number> = { basic: 0, pro: 19, business: 49, enterprise: 0 };
-const DEFAULT_YEARLY_DISCOUNT = 30;
+const DEFAULT_PRICES: Record<SubscriptionTier, number> = { basic: 5, pro: 25, business: 50, enterprise: 0 };
+type BillingPeriodKey = 'monthly' | 'quarterly' | '6month' | 'yearly';
+const BILLING_PERIODS: { key: BillingPeriodKey; label: string; months: number; discount: number }[] = [
+  { key: 'monthly', label: 'Monthly', months: 1, discount: 0 },
+  { key: 'quarterly', label: 'Quarterly', months: 3, discount: 5 },
+  { key: '6month', label: '6 Months', months: 6, discount: 15 },
+  { key: 'yearly', label: 'Yearly', months: 12, discount: 30 },
+];
 
 const plans: {
   tier: SubscriptionTier;
   name: string;
-  priceKeyMonthly: string;
-  priceKeyYearly: string;
   description: string;
   icon: typeof Zap;
   popular?: boolean;
@@ -31,16 +35,12 @@ const plans: {
   {
     tier: 'basic',
     name: 'Basic',
-    priceKeyMonthly: '',
-    priceKeyYearly: '',
     description: 'Get started with the basics',
     icon: Zap,
   },
   {
     tier: 'pro',
     name: 'Pro',
-    priceKeyMonthly: 'pro_monthly',
-    priceKeyYearly: 'pro_yearly',
     description: 'For growing creators & teams',
     icon: CreditCard,
     popular: true,
@@ -48,16 +48,12 @@ const plans: {
   {
     tier: 'business',
     name: 'Business',
-    priceKeyMonthly: 'business_monthly',
-    priceKeyYearly: 'business_yearly',
     description: 'For agencies & larger teams',
     icon: Building2,
   },
   {
     tier: 'enterprise',
     name: 'Enterprise',
-    priceKeyMonthly: '',
-    priceKeyYearly: '',
     description: 'Dedicated support & custom limits',
     icon: Crown,
     custom: true,
@@ -79,25 +75,26 @@ function formatLimit(value: number, isDays = false): string {
   return value.toLocaleString();
 }
 
-function formatPrice(monthlyPrice: number, yearly: boolean, yearlyDiscountPct: number): { display: string; period: string; originalYearly?: string } {
-  if (monthlyPrice === 0) return { display: '$0', period: '' };
-  if (yearly) {
-    const fullYearly = +(monthlyPrice * 12).toFixed(2);
-    const discountedYearly = +(fullYearly * (1 - yearlyDiscountPct / 100)).toFixed(2);
-    return {
-      display: `$${Number.isInteger(discountedYearly) ? discountedYearly : discountedYearly.toFixed(2)}`,
-      period: '/year',
-      originalYearly: `$${Number.isInteger(fullYearly) ? fullYearly : fullYearly.toFixed(2)}/year`,
-    };
-  }
-  return { display: `$${monthlyPrice}`, period: '/month' };
+function computePrice(monthlyPrice: number, period: BillingPeriodKey): { display: string; period: string; badge?: string } {
+  if (monthlyPrice === 0) return { display: 'Custom', period: '' };
+  const p = BILLING_PERIODS.find((b) => b.key === period)!;
+  const discountedMonthly = +(monthlyPrice * (1 - p.discount / 100)).toFixed(2);
+  const total = +(discountedMonthly * p.months).toFixed(2);
+  const dm = Number.isInteger(discountedMonthly) ? discountedMonthly : +discountedMonthly.toFixed(2);
+  const totalStr = Number.isInteger(total) ? `$${total}` : `$${total.toFixed(2)}`;
+  if (period === 'monthly') return { display: `$${dm}`, period: '/month' };
+  return {
+    display: `$${dm}`,
+    period: '/month',
+    badge: `${totalStr} billed ${p.label.toLowerCase()} · Save ${p.discount}%`,
+  };
 }
 
 export function BillingPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const couponFromQuery = searchParams.get('coupon') || '';
   const [loading, setLoading] = useState<string | null>(null);
-  const [yearly, setYearly] = useState(false);
+  const [billingPeriod, setBillingPeriod] = useState<BillingPeriodKey>('monthly');
   const [planConfig, setPlanConfig] = useState<Record<string, any>>({});
   const [billingStatus, setBillingStatus] = useState<any>(null);
   const [couponCode, setCouponCode] = useState(couponFromQuery);
@@ -134,10 +131,6 @@ export function BillingPage() {
 
   function getMonthlyPrice(tier: SubscriptionTier): number {
     return planConfig?.pricing?.[tier]?.monthlyPrice ?? DEFAULT_PRICES[tier];
-  }
-
-  function getYearlyDiscount(): number {
-    return planConfig?.yearlyDiscount ?? DEFAULT_YEARLY_DISCOUNT;
   }
 
   const currentTier = (billingStatus?.tier || storeTier || 'basic') as SubscriptionTier;
@@ -215,21 +208,39 @@ export function BillingPage() {
         </Button>
       </div>
 
-      {/* Monthly / Yearly Toggle */}
-      <div className="flex items-center justify-center gap-3">
-        <span className={`text-sm font-medium ${!yearly ? 'text-neutral-900' : 'text-neutral-400'}`}>Monthly</span>
-        <button
-          type="button"
-          role="switch"
-          aria-checked={yearly}
-          onClick={() => setYearly(!yearly)}
-          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${yearly ? 'bg-brand-500' : 'bg-neutral-300'}`}
-        >
-          <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${yearly ? 'translate-x-6' : 'translate-x-1'}`} />
-        </button>
-        <span className={`text-sm font-medium ${yearly ? 'text-neutral-900' : 'text-neutral-400'}`}>
-          Yearly <span className="text-success-600 font-semibold">(Save {getYearlyDiscount()}%)</span>
-        </span>
+      {/* Billing Period Slider */}
+      <div className="flex flex-col items-center gap-2 w-full max-w-lg mx-auto px-4">
+        <div className="relative w-full">
+          <input
+            type="range"
+            min={0}
+            max={BILLING_PERIODS.length - 1}
+            step={1}
+            value={BILLING_PERIODS.findIndex((p) => p.key === billingPeriod)}
+            onChange={(e) => setBillingPeriod(BILLING_PERIODS[Number(e.target.value)].key)}
+            className="w-full h-2 rounded-full appearance-none cursor-pointer"
+            style={{ accentColor: 'var(--color-brand-500, #6366f1)' }}
+          />
+          <div className="flex justify-between mt-3">
+            {BILLING_PERIODS.map((p) => (
+              <button
+                key={p.key}
+                type="button"
+                onClick={() => setBillingPeriod(p.key)}
+                className={`flex flex-col items-center gap-1 text-center transition-all ${billingPeriod === p.key ? 'text-brand-600' : 'text-neutral-400 hover:text-neutral-600'}`}
+              >
+                <span className={`text-sm font-semibold ${billingPeriod === p.key ? 'text-neutral-900' : ''}`}>{p.label}</span>
+                {p.discount > 0 ? (
+                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full transition-colors ${billingPeriod === p.key ? 'bg-success-100 text-success-700' : 'bg-neutral-100 text-neutral-400'}`}>
+                    Save {p.discount}%
+                  </span>
+                ) : (
+                  <span className="text-xs text-neutral-300">—</span>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
       {couponCode && (
@@ -251,9 +262,9 @@ export function BillingPage() {
         {plans.map((plan) => {
           const limits = SUBSCRIPTION_LIMITS[plan.tier];
           const platforms = TIER_PLATFORMS[plan.tier];
-          const priceKey = yearly ? plan.priceKeyYearly : plan.priceKeyMonthly;
+          const priceKey = plan.custom ? '' : `${plan.tier}_${billingPeriod}`;
           const monthlyPrice = getMonthlyPrice(plan.tier);
-          const yearlyDiscount = getYearlyDiscount();
+
           const isCurrent = plan.tier === currentTier;
           const isDowngrade = (tierOrder[plan.tier] ?? 0) < (tierOrder[currentTier] ?? 0);
 
@@ -286,14 +297,14 @@ export function BillingPage() {
                 {plan.custom ? (
                   <span className="text-3xl font-bold text-neutral-900">Custom</span>
                 ) : (() => {
-                  const price = formatPrice(monthlyPrice, yearly, yearlyDiscount);
+                  const price = computePrice(monthlyPrice, billingPeriod);
                   return (
                     <>
                       <span className="text-3xl font-bold text-neutral-900">{price.display}</span>
                       {price.period && <span className="text-sm text-neutral-400">{price.period}</span>}
-                      {price.originalYearly && (
-                        <span className="block text-xs text-neutral-400 line-through mt-0.5">
-                          {price.originalYearly}
+                      {price.badge && (
+                        <span className="block text-xs text-success-600 font-medium mt-1">
+                          {price.badge}
                         </span>
                       )}
                     </>
@@ -347,14 +358,10 @@ export function BillingPage() {
                 <Button
                   variant={isDowngrade ? 'secondary' : plan.popular ? 'primary' : 'secondary'}
                   className="w-full"
-                  loading={loading === (plan.tier === 'basic' ? 'basic' : priceKey)}
-                  onClick={() => void handlePlanChange(
-                    plan.tier === 'basic'
-                      ? { tier: 'basic' }
-                      : { tier: plan.tier, priceKey, couponCode: couponCode || undefined },
-                  )}
+                  loading={loading === priceKey}
+                  onClick={() => void handlePlanChange({ tier: plan.tier, priceKey, couponCode: couponCode || undefined })}
                 >
-                  {isDowngrade ? 'Downgrade' : plan.popular && currentTier === 'basic' ? 'Start 14-Day Trial' : 'Upgrade'}
+                  {isDowngrade ? 'Downgrade' : plan.popular ? 'Get Pro' : 'Select Plan'}
                 </Button>
               )}
             </Card>
@@ -390,7 +397,7 @@ export function BillingPage() {
           <div>
             <h4 className="font-medium text-neutral-800 mb-1">Do you offer annual discounts?</h4>
             <p className="text-neutral-500">
-              Yes — yearly plans save 30%. Toggle to yearly billing above to see discounted prices.
+              Yes — quarterly billing saves 5%, 6-month billing saves 15%, and yearly billing saves 30%. Use the slider above to switch billing periods.
             </p>
           </div>
         </div>

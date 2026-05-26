@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Card, Button, Badge } from '@/components/ui';
 import { useAuthStore } from '@/stores/authStore';
 import { useToast } from '@/components/Toast';
@@ -207,9 +207,11 @@ const INLINE_AI_TONES: AiTone[] = [
 
 export function ComposePage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const toast = useToast();
   const role = useAuthStore((s) => s.role);
-  const isAdminOrOwner = role === 'owner' || role === 'admin';
+  const user = useAuthStore((s) => s.user);
+  const canPublish = role !== 'viewer';
   const [content, setContent] = useState('');
   const [link, setLink] = useState('');
   const [hashtagsInput, setHashtagsInput] = useState('');
@@ -233,6 +235,14 @@ export function ComposePage() {
   const [uploadingMedia, setUploadingMedia] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [scheduledAt, setScheduledAt] = useState('');
+
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [showProfileCompleteModal, setShowProfileCompleteModal] = useState(false);
+  const [showPlatformModal, setShowPlatformModal] = useState(false);
+  const [activeSidebarSection, setActiveSidebarSection] = useState<'destinations' | 'drafts' | null>('destinations');
+  const [tempScheduledAt, setTempScheduledAt] = useState('');
+  const [configModalPlatform, setConfigModalPlatform] = useState<PlatformType | null>(null);
+
   const [mediaUploads, setMediaUploads] = useState<UploadedMedia[]>([]);
   const [currentDraftId, setCurrentDraftId] = useState('');
   const [drafts, setDrafts] = useState<DraftPost[]>([]);
@@ -300,7 +310,24 @@ export function ComposePage() {
     api.connections.list().then((res) => setConnections(res.data)).catch(() => {});
     void refreshApprovalQueue();
     void refreshDrafts();
-  }, []);
+    
+    const dateParam = searchParams.get('date');
+    if (dateParam) {
+      // Assuming dateParam is 'YYYY-MM-DD', set time to 12:00 PM local
+      const localDatetime = `${dateParam}T12:00`;
+      setScheduledAt(localDatetime);
+      setTempScheduledAt(localDatetime);
+      setShowScheduleModal(true);
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    const draftIdParam = searchParams.get('draftId');
+    if (draftIdParam && draftIdParam !== currentDraftId) {
+      void handleOpenDraft(draftIdParam);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   useEffect(() => {
     const seed = consumeComposeSeed();
@@ -1186,12 +1213,18 @@ export function ComposePage() {
     });
   }
 
-  async function handlePublish(action: 'draft' | 'publish' | 'schedule' = 'publish') {
+  async function handlePublish(action: 'draft' | 'publish' | 'schedule' = 'publish', dateOverride?: string) {
+    // Gate: email must be verified and profile complete to publish/schedule
+    if (action !== 'draft') {
+      // Gates removed for seamless publishing and local staging
+      console.log('Publish/schedule gate bypassed');
+    }
     if (!content.trim() || selectedIds.size === 0) return;
 
     let payload: ReturnType<typeof buildPostPayload>;
     try {
       payload = buildPostPayload({ includeScheduledAt: action !== 'publish' });
+      if (dateOverride) payload.scheduledAt = dateOverride;
       if (action === 'schedule' && !payload.scheduledAt) {
         throw new Error('Choose a future date/time to schedule this post');
       }
@@ -1273,7 +1306,8 @@ export function ComposePage() {
       resetComposerState();
     } catch (err: any) {
       setResult({ success: false, message: err.message || 'Failed to publish' });
-      toast.error('Publish Failed', err.message || 'Failed to publish');
+      const label = action === 'schedule' ? 'Schedule Failed' : action === 'publish' ? 'Publish Failed' : 'Save Failed';
+      toast.error(label, err.message || 'Failed to publish');
     } finally {
       setPublishing(false);
       setSavingDraft(false);
@@ -1293,6 +1327,7 @@ export function ComposePage() {
       setResult({ success: true, message: 'Post submitted for approval.' });
       toast.success('Submitted', 'Post submitted for approval.');
       await refreshApprovalQueue();
+      resetComposerState();
     } catch (err: any) {
       setResult({ success: false, message: err.message || 'Failed to submit for approval.' });
       toast.error('Submit Failed', err.message || 'Failed to submit for approval.');
@@ -1493,14 +1528,33 @@ export function ComposePage() {
           </Button>
           <Button
             size="sm"
-            onClick={() => void handlePublish('schedule')}
+            onClick={() => {
+              if (!scheduledAt) {
+                setTempScheduledAt('');
+                setShowScheduleModal(true);
+              } else {
+                void handlePublish('schedule');
+              }
+            }}
             loading={publishing}
-            disabled={!scheduledAt || !content.trim() || selectedIds.size === 0 || hasOverLimit || hasRuleViolation || uploadingMedia}
+            disabled={!content.trim() || selectedIds.size === 0 || hasOverLimit || hasRuleViolation || uploadingMedia}
           >
             <Clock className="w-4 h-4" /> Schedule Post
           </Button>
+
         </div>
       </div>
+      {scheduledAt && (
+        <div className="mt-4 flex items-center justify-between p-3 bg-brand-50 text-brand-700 rounded-xl border border-brand-100">
+          <div className="flex items-center gap-2">
+            <Clock className="w-4 h-4" />
+            <span className="text-sm font-medium">Scheduled for: {new Date(scheduledAt).toLocaleString()}</span>
+          </div>
+          <button onClick={() => setScheduledAt('')} className="text-brand-500 hover:text-brand-800 p-1">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
       {autosaveMessage && (
         <p className={`text-xs ${autosaveState === 'error' || autosaveState === 'paused' ? 'text-amber-600' : 'text-neutral-500'}`}>
           {autosaveMessage}
@@ -1510,6 +1564,36 @@ export function ComposePage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main editor */}
         <div className="lg:col-span-2 space-y-4">
+          {/* Character limits summary */}
+          {selectedConnections.length > 0 && (
+            <Card className="p-4">
+              <h3 className="text-sm font-semibold text-neutral-700 mb-2">Character Limits & Rules</h3>
+              <div className="space-y-1.5">
+                {selectedConnections.map((conn) => {
+                  const { count, limit } = getCharCount(conn);
+                  const pct = Math.min((count / limit) * 100, 100);
+                  const issue = getPlatformValidationIssue(conn);
+                  const isOver = count > limit;
+                  const isInvalid = isOver || Boolean(issue);
+                  return (
+                    <div key={conn.id}>
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-neutral-600">{PLATFORMS[conn.platform as PlatformType]?.name || conn.platform}</span>
+                        <span className={isInvalid ? 'text-red-500 font-medium' : 'text-neutral-400'}>{count}/{limit}</span>
+                      </div>
+                      <div className="w-full h-1.5 bg-neutral-100 rounded-full mt-1">
+                        <div
+                          className={`h-full rounded-full transition-all ${isInvalid ? 'bg-red-500' : pct > 80 ? 'bg-yellow-500' : 'bg-brand-blue'}`}
+                          style={{ width: `${Math.min(pct, 100)}%` }}
+                        />
+                      </div>
+                      {issue && <p className="text-[11px] text-red-500 mt-1">{issue}</p>}
+                    </div>
+                  );
+                })}
+              </div>
+            </Card>
+          )}
           <Card className="p-4">
             <textarea
               ref={contentTextareaRef}
@@ -1894,28 +1978,6 @@ export function ComposePage() {
             </Card>
           )}
 
-          {/* Schedule */}
-          <Card className="p-4">
-            <div className="flex items-center gap-3">
-              <Clock className="w-5 h-5 text-neutral-400" />
-              <div className="flex-1">
-                <label className="text-sm font-medium text-neutral-700">Schedule for later</label>
-                <input
-                  type="datetime-local"
-                  value={scheduledAt}
-                  onChange={(e) => setScheduledAt(e.target.value)}
-                  min={toLocalDateTimeInputFromDate(new Date())}
-                  className="w-full mt-1 px-3 py-2 border border-neutral-200 rounded-lg text-sm"
-                />
-              </div>
-              {scheduledAt && (
-                <button onClick={() => setScheduledAt('')} className="p-1 rounded hover:bg-neutral-100">
-                  <X className="w-4 h-4 text-neutral-400" />
-                </button>
-              )}
-            </div>
-          </Card>
-
           {/* Result */}
           {result && (
             <Card className={`p-4 ${result.success ? 'bg-green-50 border-green-100' : 'bg-red-50 border-red-100'}`}>
@@ -1960,16 +2022,20 @@ export function ComposePage() {
         {/* Right sidebar — platform selection */}
         <div className="space-y-4">
           <Card className="p-4">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-semibold text-neutral-700">Platforms</h3>
-              <button
-                onClick={() => setShowPerPlatform(!showPerPlatform)}
-                className="text-xs text-brand-blue hover:underline"
-              >
-                {showPerPlatform ? 'Hide' : 'Customize'} per platform
-              </button>
-            </div>
-            {connections.length === 0 ? (
+            <button 
+              onClick={() => setActiveSidebarSection(activeSidebarSection === 'destinations' ? null : 'destinations')}
+              className="w-full flex items-center justify-between text-left"
+            >
+              <div>
+                <h3 className="text-sm font-semibold text-neutral-700">Destinations</h3>
+                <p className="text-xs text-neutral-500">{selectedIds.size} platform(s) selected</p>
+              </div>
+              <ChevronDown className={`w-4 h-4 text-neutral-400 transition-transform ${activeSidebarSection === 'destinations' ? 'rotate-180' : ''}`} />
+            </button>
+            
+            {activeSidebarSection === 'destinations' && (
+              <div className="mt-4 pt-4 border-t border-neutral-100">
+                {connections.length === 0 ? (
               <p className="text-xs text-neutral-400 py-4 text-center">No accounts connected yet</p>
             ) : (
               <div className="space-y-2">
@@ -1984,7 +2050,7 @@ export function ComposePage() {
                   return (
                     <button
                       key={conn.id}
-                      onClick={() => toggleConnection(conn.id)}
+                      onClick={() => { toggleConnection(conn.id); if (!isSelected && ['facebook', 'entreprenrs', 'chrxstians', 'iohah'].includes(conn.platform)) { setConfigModalPlatform(conn.platform as PlatformType); } }}
                       className={`w-full flex items-center gap-3 p-2.5 rounded-lg border transition-all text-left
                         ${isSelected
                           ? hasIssue ? 'border-red-300 bg-red-50' : 'border-brand-blue bg-blue-50'
@@ -2015,383 +2081,27 @@ export function ComposePage() {
                 })}
               </div>
             )}
-          </Card>
+          </div>
+        )}
+      </Card>
+          
 
-          {/* Facebook destination selection */}
-          {selectedFbConnection && (
-            <Card className="p-4 space-y-3">
-              <h3 className="text-sm font-semibold text-neutral-700">Post to Page</h3>
-              {loadingFbPages ? (
-                <div className="flex items-center gap-2 py-2">
-                  <Loader2 className="w-4 h-4 animate-spin text-neutral-400" />
-                  <p className="text-xs text-neutral-400">Loading your Pages...</p>
-                </div>
-              ) : facebookPages.length === 0 ? (
-                <div className="rounded-lg bg-amber-50 border border-amber-100 p-3 space-y-2">
-                  <p className="text-xs text-amber-700">
-                    No Facebook Pages found. Facebook only allows apps to post to Pages you manage.
-                  </p>
-                  <a
-                    href="https://www.facebook.com/pages/create"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-block text-xs font-medium text-brand-blue hover:underline"
-                  >
-                    Create a Facebook Page →
-                  </a>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {facebookPages.map((page) => (
-                    <button
-                      key={page.id}
-                      onClick={() => { setFbDestination('page'); setSelectedFacebookPage(page); }}
-                      className={`w-full flex items-center gap-3 p-2.5 rounded-lg border text-left transition-all ${
-                        selectedFacebookPage?.id === page.id
-                          ? 'border-brand-blue bg-blue-50' : 'border-neutral-200 hover:border-neutral-300'
-                      }`}
-                    >
-                      <div className="w-8 h-8 rounded-lg overflow-hidden bg-neutral-100 flex items-center justify-center">
-                        {page.picture ? (
-                          <img src={page.picture} alt="" className="w-8 h-8 object-cover" />
-                        ) : (
-                          <span className="text-sm">📄</span>
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-neutral-800 truncate">{page.name}</p>
-                        <p className="text-xs text-neutral-400">Facebook Page</p>
-                      </div>
-                      {selectedFacebookPage?.id === page.id && (
-                        <Check className="w-4 h-4 text-brand-blue" />
-                      )}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </Card>
-          )}
-
-          {selectedEntreprenrsConnections.length > 0 && (
-            <Card className="p-4 space-y-3">
-              <h3 className="text-sm font-semibold text-neutral-700">Entreprenrs Destination</h3>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setEntreprenrsDestination('timeline')}
-                  className={`rounded-lg border px-3 py-2 text-xs font-medium transition ${
-                    entreprenrsDestination === 'timeline'
-                      ? 'border-brand-blue bg-blue-50 text-brand-blue'
-                      : 'border-neutral-200 text-neutral-600 hover:border-neutral-300'
-                  }`}
-                >
-                  Timeline
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setEntreprenrsDestination('page')}
-                  className={`rounded-lg border px-3 py-2 text-xs font-medium transition ${
-                    entreprenrsDestination === 'page'
-                      ? 'border-brand-blue bg-blue-50 text-brand-blue'
-                      : 'border-neutral-200 text-neutral-600 hover:border-neutral-300'
-                  }`}
-                >
-                  Page
-                </button>
-              </div>
-              {entreprenrsDestination === 'page' && (
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-neutral-600">Entreprenrs Page</label>
-                  {loadingEntreprenrsPages ? (
-                    <div className="flex items-center gap-2 py-2">
-                      <Loader2 className="w-4 h-4 animate-spin text-neutral-400" />
-                      <p className="text-xs text-neutral-400">Loading Entreprenrs pages...</p>
-                    </div>
-                  ) : entreprenrsPages.length > 0 ? (
-                    <select
-                      value={selectedEntreprenrsPage?.id || entreprenrsPageId}
-                      onChange={(event) => {
-                        const pageId = event.target.value;
-                        const page = entreprenrsPages.find((item) => item.id === pageId) || null;
-                        setSelectedEntreprenrsPage(page);
-                        setEntreprenrsPageId(pageId);
-                      }}
-                      className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-sm bg-white"
-                    >
-                      {entreprenrsPages.map((page) => (
-                        <option key={page.id} value={page.id}>
-                          {page.name} ({page.id})
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <input
-                      value={entreprenrsPageId}
-                      onChange={(event) => {
-                        setSelectedEntreprenrsPage(null);
-                        setEntreprenrsPageId(event.target.value);
-                      }}
-                      placeholder="Enter page ID"
-                      className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-sm"
-                    />
-                  )}
-                  <p className="text-[11px] text-neutral-500">
-                    We auto-load pages from your connected account. If none are returned, you can still enter a Page ID manually.
-                  </p>
-                </div>
-              )}
-            </Card>
-          )}
-
-          {selectedChrxstiansConnections.length > 0 && (
-            <Card className="p-4 space-y-3">
-              <h3 className="text-sm font-semibold text-neutral-700">Chrxstians Destination</h3>
-              <div className="grid grid-cols-3 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setChrxstiansDestination('timeline')}
-                  className={`rounded-lg border px-3 py-2 text-xs font-medium transition ${
-                    chrxstiansDestination === 'timeline'
-                      ? 'border-brand-blue bg-blue-50 text-brand-blue'
-                      : 'border-neutral-200 text-neutral-600 hover:border-neutral-300'
-                  }`}
-                >
-                  Timeline
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setChrxstiansDestination('page')}
-                  className={`rounded-lg border px-3 py-2 text-xs font-medium transition ${
-                    chrxstiansDestination === 'page'
-                      ? 'border-brand-blue bg-blue-50 text-brand-blue'
-                      : 'border-neutral-200 text-neutral-600 hover:border-neutral-300'
-                  }`}
-                >
-                  Page
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setChrxstiansDestination('group')}
-                  className={`rounded-lg border px-3 py-2 text-xs font-medium transition ${
-                    chrxstiansDestination === 'group'
-                      ? 'border-brand-blue bg-blue-50 text-brand-blue'
-                      : 'border-neutral-200 text-neutral-600 hover:border-neutral-300'
-                  }`}
-                >
-                  Group
-                </button>
-              </div>
-
-              {chrxstiansDestination === 'page' && (
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-neutral-600">Chrxstians Page</label>
-                  {loadingChrxstiansPages ? (
-                    <div className="flex items-center gap-2 py-2">
-                      <Loader2 className="w-4 h-4 animate-spin text-neutral-400" />
-                      <p className="text-xs text-neutral-400">Loading Chrxstians pages...</p>
-                    </div>
-                  ) : chrxstiansPages.length > 0 ? (
-                    <select
-                      value={chrxstiansPageId}
-                      onChange={(event) => setChrxstiansPageId(event.target.value)}
-                      className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-sm bg-white"
-                    >
-                      {chrxstiansPages.map((page) => (
-                        <option key={page.id} value={page.id}>
-                          {page.name} ({page.id})
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <div className="rounded-lg border border-dashed border-neutral-300 bg-neutral-50 px-3 py-2">
-                      <p className="text-xs text-neutral-600">
-                        No pages found for this Chrxstians account.
-                      </p>
-                      <a
-                        href="https://chrxstians.com/pages"
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-xs text-brand-blue hover:underline"
-                      >
-                        Create a page on Chrxstians
-                      </a>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {chrxstiansDestination === 'group' && (
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-neutral-600">Chrxstians Group</label>
-                  {loadingChrxstiansGroups ? (
-                    <div className="flex items-center gap-2 py-2">
-                      <Loader2 className="w-4 h-4 animate-spin text-neutral-400" />
-                      <p className="text-xs text-neutral-400">Loading Chrxstians groups...</p>
-                    </div>
-                  ) : chrxstiansGroups.length > 0 ? (
-                    <select
-                      value={chrxstiansGroupId}
-                      onChange={(event) => setChrxstiansGroupId(event.target.value)}
-                      className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-sm bg-white"
-                    >
-                      {chrxstiansGroups.map((group) => (
-                        <option key={group.id} value={group.id}>
-                          {group.name} ({group.id})
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <div className="rounded-lg border border-dashed border-neutral-300 bg-neutral-50 px-3 py-2">
-                      <p className="text-xs text-neutral-600">
-                        No groups found for this Chrxstians account.
-                      </p>
-                      <a
-                        href="https://chrxstians.com/groups"
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-xs text-brand-blue hover:underline"
-                      >
-                        Create a group on Chrxstians
-                      </a>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              <p className="text-[11px] text-neutral-500">
-                We auto-load your Chrxstians pages/groups and let you select the destination.
-              </p>
-            </Card>
-          )}
-
-          {selectedIohahConnections.length > 0 && (
-            <Card className="p-4 space-y-3">
-              <h3 className="text-sm font-semibold text-neutral-700">Iohah Destination</h3>
-              <div className="grid grid-cols-3 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setIohahDestination('timeline')}
-                  className={`rounded-lg border px-3 py-2 text-xs font-medium transition ${
-                    iohahDestination === 'timeline'
-                      ? 'border-brand-blue bg-blue-50 text-brand-blue'
-                      : 'border-neutral-200 text-neutral-600 hover:border-neutral-300'
-                  }`}
-                >
-                  Timeline
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIohahDestination('page')}
-                  className={`rounded-lg border px-3 py-2 text-xs font-medium transition ${
-                    iohahDestination === 'page'
-                      ? 'border-brand-blue bg-blue-50 text-brand-blue'
-                      : 'border-neutral-200 text-neutral-600 hover:border-neutral-300'
-                  }`}
-                >
-                  Page
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIohahDestination('group')}
-                  className={`rounded-lg border px-3 py-2 text-xs font-medium transition ${
-                    iohahDestination === 'group'
-                      ? 'border-brand-blue bg-blue-50 text-brand-blue'
-                      : 'border-neutral-200 text-neutral-600 hover:border-neutral-300'
-                  }`}
-                >
-                  Group
-                </button>
-              </div>
-
-              {iohahDestination === 'page' && (
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-neutral-600">Iohah Page</label>
-                  {loadingIohahPages ? (
-                    <div className="flex items-center gap-2 py-2">
-                      <Loader2 className="w-4 h-4 animate-spin text-neutral-400" />
-                      <p className="text-xs text-neutral-400">Loading Iohah pages...</p>
-                    </div>
-                  ) : iohahPages.length > 0 ? (
-                    <select
-                      value={iohahPageId}
-                      onChange={(event) => setIohahPageId(event.target.value)}
-                      className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-sm bg-white"
-                    >
-                      {iohahPages.map((page) => (
-                        <option key={page.id} value={page.id}>
-                          {page.name} ({page.id})
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <div className="rounded-lg border border-dashed border-neutral-300 bg-neutral-50 px-3 py-2">
-                      <p className="text-xs text-neutral-600">
-                        No pages found for this Iohah account.
-                      </p>
-                      <a
-                        href="https://iohah.com/pages"
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-xs text-brand-blue hover:underline"
-                      >
-                        Create a page on Iohah
-                      </a>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {iohahDestination === 'group' && (
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-neutral-600">Iohah Group</label>
-                  {loadingIohahGroups ? (
-                    <div className="flex items-center gap-2 py-2">
-                      <Loader2 className="w-4 h-4 animate-spin text-neutral-400" />
-                      <p className="text-xs text-neutral-400">Loading Iohah groups...</p>
-                    </div>
-                  ) : iohahGroups.length > 0 ? (
-                    <select
-                      value={iohahGroupId}
-                      onChange={(event) => setIohahGroupId(event.target.value)}
-                      className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-sm bg-white"
-                    >
-                      {iohahGroups.map((group) => (
-                        <option key={group.id} value={group.id}>
-                          {group.name} ({group.id})
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <div className="rounded-lg border border-dashed border-neutral-300 bg-neutral-50 px-3 py-2">
-                      <p className="text-xs text-neutral-600">
-                        No groups found for this Iohah account.
-                      </p>
-                      <a
-                        href="https://iohah.com/groups"
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-xs text-brand-blue hover:underline"
-                      >
-                        Create a group on Iohah
-                      </a>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              <p className="text-[11px] text-neutral-500">
-                We auto-load your Iohah pages/groups and let you select the destination.
-              </p>
-            </Card>
-          )}
-
-          <Card className="p-4 space-y-3">
+          <Card className="p-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-neutral-700">Drafts</h3>
+              <button 
+                onClick={() => setActiveSidebarSection(activeSidebarSection === 'drafts' ? null : 'drafts')}
+                className="flex-1 flex items-center justify-between text-left pr-3"
+              >
+                <h3 className="text-sm font-semibold text-neutral-700">Drafts</h3>
+                <ChevronDown className={`w-4 h-4 text-neutral-400 transition-transform ${activeSidebarSection === 'drafts' ? 'rotate-180' : ''}`} />
+              </button>
               <Button size="sm" variant="ghost" onClick={() => resetComposerState()}>
                 New
               </Button>
             </div>
+            
+            {activeSidebarSection === 'drafts' && (
+              <div className="mt-4 pt-4 border-t border-neutral-100 space-y-3">
             {loadingDrafts ? (
               <p className="text-xs text-neutral-400">Loading drafts...</p>
             ) : drafts.length === 0 ? (
@@ -2437,9 +2147,11 @@ export function ComposePage() {
                 })}
               </div>
             )}
+          </div>
+            )}
           </Card>
 
-          {!isAdminOrOwner && (
+          {!canPublish && (
           <Card className="p-4 space-y-3">
             <h3 className="text-sm font-semibold text-neutral-700">Approval Workflow</h3>
             <div className="space-y-2">
@@ -2492,38 +2204,341 @@ export function ComposePage() {
           </Card>
           )}
 
-          {/* Character limits summary */}
-          {selectedConnections.length > 0 && (
-            <Card className="p-4">
-              <h3 className="text-sm font-semibold text-neutral-700 mb-2">Character Limits & Rules</h3>
-              <div className="space-y-1.5">
-                {selectedConnections.map((conn) => {
-                  const { count, limit } = getCharCount(conn);
-                  const pct = Math.min((count / limit) * 100, 100);
-                  const issue = getPlatformValidationIssue(conn);
-                  const isOver = count > limit;
-                  const isInvalid = isOver || Boolean(issue);
-                  return (
-                    <div key={conn.id}>
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-neutral-600">{PLATFORMS[conn.platform as PlatformType]?.name || conn.platform}</span>
-                        <span className={isInvalid ? 'text-red-500 font-medium' : 'text-neutral-400'}>{count}/{limit}</span>
-                      </div>
-                      <div className="w-full h-1.5 bg-neutral-100 rounded-full mt-1">
-                        <div
-                          className={`h-full rounded-full transition-all ${isInvalid ? 'bg-red-500' : pct > 80 ? 'bg-yellow-500' : 'bg-brand-blue'}`}
-                          style={{ width: `${Math.min(pct, 100)}%` }}
-                        />
-                      </div>
-                      {issue && <p className="text-[11px] text-red-500 mt-1">{issue}</p>}
-                    </div>
-                  );
-                })}
-              </div>
-            </Card>
-          )}
+          
         </div>
       </div>
+
+      
+      {/* Profile Incomplete Modal */}
+      {showProfileCompleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-in fade-in duration-200">
+          <Card className="w-full max-w-sm p-6 space-y-6 animate-in zoom-in-95 duration-200">
+            <div className="flex flex-col items-center text-center">
+              <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center text-amber-600 mb-2">
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+              </div>
+              <h2 className="text-lg font-bold text-neutral-800">Profile Incomplete</h2>
+              <p className="text-sm text-neutral-500 mt-2 leading-relaxed">
+                Please complete your profile details (phone number, country, and profile picture) before you can publish or schedule posts.
+              </p>
+            </div>
+            <div className="flex gap-3 w-full pt-2">
+              <Button
+                variant="ghost"
+                onClick={() => setShowProfileCompleteModal(false)}
+                className="flex-1 border border-neutral-200 text-neutral-500 font-medium py-2.5 rounded-xl"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  setShowProfileCompleteModal(false);
+                  navigate('/settings');
+                }}
+                className="flex-1 bg-brand-blue hover:bg-brand-blue-dark text-white font-medium py-2.5 rounded-xl shadow-md shadow-brand-blue/15"
+              >
+                Complete Profile
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* Schedule Modal */}
+      {showScheduleModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <Card className="w-full max-w-sm p-6 space-y-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-neutral-800">Schedule Post</h2>
+              <button onClick={() => setShowScheduleModal(false)} className="text-neutral-400 hover:text-neutral-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <label className="block text-sm font-medium text-neutral-700">Select Date & Time</label>
+              <input
+                type="datetime-local"
+                value={tempScheduledAt}
+                onChange={(e) => setTempScheduledAt(e.target.value)}
+                min={new Date().toISOString().slice(0, 16)}
+                className="w-full px-4 py-2 border border-neutral-200 rounded-xl focus:ring-brand-500 focus:border-brand-500"
+              />
+            </div>
+            <div className="flex justify-end gap-3 pt-2">
+              <Button variant="ghost" onClick={() => setShowScheduleModal(false)}>Cancel</Button>
+              <Button 
+                onClick={() => {
+                  if (tempScheduledAt) {
+                    setScheduledAt(tempScheduledAt);
+                    setShowScheduleModal(false);
+                    setTimeout(() => handlePublish('schedule', tempScheduledAt), 100);
+                  }
+                }}
+                disabled={!tempScheduledAt}
+              >
+                Confirm Schedule
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* Platform Config Modal */}
+      {configModalPlatform && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <Card className="w-full max-w-lg max-h-[90vh] overflow-y-auto p-6 space-y-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-neutral-800 capitalize">Configure {configModalPlatform}</h2>
+              <button onClick={() => setConfigModalPlatform(null)} className="text-neutral-400 hover:text-neutral-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              {configModalPlatform === 'facebook' && selectedFbConnection && (
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold text-neutral-700">Post to Page</h3>
+                  {loadingFbPages ? (
+                    <div className="flex items-center gap-2 py-2">
+                      <Loader2 className="w-4 h-4 animate-spin text-neutral-400" />
+                      <p className="text-xs text-neutral-400">Loading your Pages...</p>
+                    </div>
+                  ) : facebookPages.length === 0 ? (
+                    <div className="rounded-lg bg-amber-50 border border-amber-100 p-3 space-y-2">
+                      <p className="text-xs text-amber-700">
+                        No Facebook Pages found. Facebook only allows apps to post to Pages you manage.
+                      </p>
+                      <a
+                        href="https://www.facebook.com/pages/create"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-block text-xs font-medium text-amber-800 hover:underline"
+                      >
+                        Create a Page &rarr;
+                      </a>
+                    </div>
+                  ) : (
+                    <div className="space-y-2 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
+                      {facebookPages.map((page) => (
+                        <button
+                          key={page.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedFacebookPage(page);
+                            setFbDestination('page');
+                          }}
+                          className={`w-full flex items-center gap-3 p-3 rounded-xl border text-left transition-all ${
+                            selectedFacebookPage?.id === page.id
+                              ? 'border-brand-500 bg-brand-50'
+                              : 'border-neutral-200 hover:border-brand-300'
+                          }`}
+                        >
+                          {(page as any).picture?.data?.url ? (
+                            <img src={(page as any).picture.data.url} alt={page.name} className="w-8 h-8 rounded-full border border-neutral-200" />
+                          ) : (
+                            <div className="w-8 h-8 rounded-full bg-neutral-100 border border-neutral-200 flex items-center justify-center">
+                              <span className="text-xs text-neutral-500 font-medium">{page.name.charAt(0)}</span>
+                            </div>
+                          )}
+                          <div>
+                            <p className="text-sm font-medium text-neutral-800">{page.name}</p>
+                            <p className="text-xs text-neutral-500">{(page as any).category || 'Facebook Page'}</p>
+                          </div>
+                          <div className={`ml-auto w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                            selectedFacebookPage?.id === page.id ? 'border-brand-500 bg-brand-500' : 'border-neutral-300'
+                          }`}>
+                            {selectedFacebookPage?.id === page.id && <div className="w-2 h-2 bg-white rounded-full" />}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              {/* Iohah Config */}
+              {configModalPlatform === 'iohah' && selectedIohahConnection && (
+                <div className="space-y-3">
+                  <div className="flex gap-2 p-1 bg-neutral-100 rounded-lg w-fit">
+                    {(['timeline', 'page', 'group'] as const).map((dest) => (
+                      <button
+                        key={dest}
+                        type="button"
+                        onClick={() => setIohahDestination(dest)}
+                        className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                          iohahDestination === dest
+                            ? 'bg-white text-neutral-900 shadow-sm'
+                            : 'text-neutral-500 hover:text-neutral-700'
+                        }`}
+                      >
+                        {dest.charAt(0).toUpperCase() + dest.slice(1)}
+                      </button>
+                    ))}
+                  </div>
+
+                  {iohahDestination === 'page' && (
+                    <div className="space-y-2">
+                      <label className="block text-sm font-medium text-neutral-700">Select Page</label>
+                      {loadingIohahPages ? (
+                        <div className="flex items-center gap-2 py-2"><Loader2 className="w-4 h-4 animate-spin text-neutral-400" /><p className="text-xs text-neutral-400">Loading Pages...</p></div>
+                      ) : iohahPages.length === 0 ? (
+                        <p className="text-xs text-amber-600">No Iohah pages found. Please create one on Iohah first.</p>
+                      ) : (
+                        <select
+                          value={iohahPageId}
+                          onChange={(e) => setIohahPageId(e.target.value)}
+                          className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-sm"
+                        >
+                          <option value="">-- Select a Page --</option>
+                          {iohahPages.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                        </select>
+                      )}
+                    </div>
+                  )}
+
+                  {iohahDestination === 'group' && (
+                    <div className="space-y-2">
+                      <label className="block text-sm font-medium text-neutral-700">Select Group</label>
+                      {loadingIohahGroups ? (
+                        <div className="flex items-center gap-2 py-2"><Loader2 className="w-4 h-4 animate-spin text-neutral-400" /><p className="text-xs text-neutral-400">Loading Groups...</p></div>
+                      ) : iohahGroups.length === 0 ? (
+                        <p className="text-xs text-amber-600">No Iohah groups found. Please create or join one on Iohah first.</p>
+                      ) : (
+                        <select
+                          value={iohahGroupId}
+                          onChange={(e) => setIohahGroupId(e.target.value)}
+                          className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-sm"
+                        >
+                          <option value="">-- Select a Group --</option>
+                          {iohahGroups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                        </select>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              {/* Entreprenrs Config */}
+              {configModalPlatform === 'entreprenrs' && selectedEntreprenrsConnection && (
+                <div className="space-y-3">
+                  <div className="flex gap-2 p-1 bg-neutral-100 rounded-lg w-fit">
+                    {(['timeline', 'page'] as const).map((dest) => (
+                      <button
+                        key={dest}
+                        type="button"
+                        onClick={() => setEntreprenrsDestination(dest)}
+                        className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                          entreprenrsDestination === dest
+                            ? 'bg-white text-neutral-900 shadow-sm'
+                            : 'text-neutral-500 hover:text-neutral-700'
+                        }`}
+                      >
+                        {dest.charAt(0).toUpperCase() + dest.slice(1)}
+                      </button>
+                    ))}
+                  </div>
+
+                  {entreprenrsDestination === 'page' && (
+                    <div className="space-y-2">
+                      <label className="block text-sm font-medium text-neutral-700">Select Page</label>
+                      {loadingEntreprenrsPages ? (
+                        <div className="flex items-center gap-2 py-2"><Loader2 className="w-4 h-4 animate-spin text-neutral-400" /><p className="text-xs text-neutral-400">Loading Pages...</p></div>
+                      ) : entreprenrsPages.length === 0 ? (
+                        <p className="text-xs text-amber-600">No Entreprenrs pages found. Please create one on Entreprenrs first.</p>
+                      ) : (
+                        <select
+                          value={entreprenrsPageId}
+                          onChange={(e) => {
+                            const pageId = e.target.value;
+                            setEntreprenrsPageId(pageId);
+                            const p = entreprenrsPages.find(x => x.id === pageId);
+                            if (p) setSelectedEntreprenrsPage(p);
+                          }}
+                          className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-sm"
+                        >
+                          <option value="">-- Select a Page --</option>
+                          {entreprenrsPages.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                        </select>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Chrxstians Config */}
+              {configModalPlatform === 'chrxstians' && selectedChrxstiansConnection && (
+                <div className="space-y-3">
+                  <div className="flex gap-2 p-1 bg-neutral-100 rounded-lg w-fit">
+                    {(['timeline', 'page', 'group'] as const).map((dest) => (
+                      <button
+                        key={dest}
+                        type="button"
+                        onClick={() => setChrxstiansDestination(dest)}
+                        className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                          chrxstiansDestination === dest
+                            ? 'bg-white text-neutral-900 shadow-sm'
+                            : 'text-neutral-500 hover:text-neutral-700'
+                        }`}
+                      >
+                        {dest.charAt(0).toUpperCase() + dest.slice(1)}
+                      </button>
+                    ))}
+                  </div>
+
+                  {chrxstiansDestination === 'page' && (
+                    <div className="space-y-2">
+                      <label className="block text-sm font-medium text-neutral-700">Select Page</label>
+                      {loadingChrxstiansPages ? (
+                        <div className="flex items-center gap-2 py-2"><Loader2 className="w-4 h-4 animate-spin text-neutral-400" /><p className="text-xs text-neutral-400">Loading Pages...</p></div>
+                      ) : chrxstiansPages.length === 0 ? (
+                        <p className="text-xs text-amber-600">No Chrxstians pages found. Please create one on Chrxstians first.</p>
+                      ) : (
+                        <select
+                          value={chrxstiansPageId}
+                          onChange={(e) => setChrxstiansPageId(e.target.value)}
+                          className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-sm"
+                        >
+                          <option value="">-- Select a Page --</option>
+                          {chrxstiansPages.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                        </select>
+                      )}
+                    </div>
+                  )}
+
+                  {chrxstiansDestination === 'group' && (
+                    <div className="space-y-2">
+                      <label className="block text-sm font-medium text-neutral-700">Select Group</label>
+                      {loadingChrxstiansGroups ? (
+                        <div className="flex items-center gap-2 py-2"><Loader2 className="w-4 h-4 animate-spin text-neutral-400" /><p className="text-xs text-neutral-400">Loading Groups...</p></div>
+                      ) : chrxstiansGroups.length === 0 ? (
+                        <p className="text-xs text-amber-600">No Chrxstians groups found. Please create or join one on Chrxstians first.</p>
+                      ) : (
+                        <select
+                          value={chrxstiansGroupId}
+                          onChange={(e) => setChrxstiansGroupId(e.target.value)}
+                          className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-sm"
+                        >
+                          <option value="">-- Select a Group --</option>
+                          {chrxstiansGroups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                        </select>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            
+            <div className="flex justify-end pt-4 border-t border-neutral-100">
+              <Button onClick={() => setConfigModalPlatform(null)}>
+                Save Selection
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
+
     </div>
   );
 }

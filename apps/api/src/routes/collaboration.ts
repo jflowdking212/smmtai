@@ -135,9 +135,9 @@ async function resolveCollaborator(req: Request): Promise<CollaboratorContext> {
   }
 
   return {
-    userId: member.user.id,
+    userId: member.user!.id,
     workspaceId: payload.workspaceId,
-    name: member.user.name,
+    name: member.user!.name,
     tier,
   };
 }

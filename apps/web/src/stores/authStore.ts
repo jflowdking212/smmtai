@@ -53,12 +53,24 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'ee-postmind-auth',
-      partialize: (state) => ({
+      storage: {
+        getItem: (name) => {
+          try { const item = localStorage.getItem(name); return item ? JSON.parse(item) : null; } catch { return null; }
+        },
+        setItem: (name, value) => {
+          try { localStorage.setItem(name, JSON.stringify(value)); } catch {}
+        },
+        removeItem: (name) => {
+          try { localStorage.removeItem(name); } catch {}
+        },
+      },
+      partialize: (state): any => ({
         user: state.user,
+        accessToken: state.accessToken,
         workspaceId: state.workspaceId,
+        isAuthenticated: state.isAuthenticated,
         role: state.role,
         tier: state.tier,
-        // Don't persist accessToken — use refresh cookie instead
       }),
     },
   ),

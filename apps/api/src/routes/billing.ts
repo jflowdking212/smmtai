@@ -64,6 +64,21 @@ billingRouter.post(
   },
 );
 
+// Get checkout session details (amount and currency for tracking/analytics)
+billingRouter.get(
+  '/checkout/session/:sessionId',
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const rawSessionId = req.params.sessionId;
+      const sessionId = (Array.isArray(rawSessionId) ? rawSessionId[0] : rawSessionId || '').trim();
+      const data = await stripeService.getCheckoutSession(sessionId);
+      res.json({ success: true, data });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
 // Get subscription status
 billingRouter.get(
   '/status',

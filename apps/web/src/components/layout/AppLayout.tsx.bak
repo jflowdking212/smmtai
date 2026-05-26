@@ -2,14 +2,11 @@ import { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { Avatar } from '@/components/ui';
-import { WorkspaceSwitcher } from './WorkspaceSwitcher';
 import { useAuthStore } from '@/stores/authStore';
 import { useSubscription } from '@/hooks/useSubscription';
-import { useTheme } from '@/components/ThemeProvider';
 import { api } from '@/lib/api';
 import { FeedbackWidget } from '@/components/FeedbackWidget';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
-import { useToast } from '@/components/Toast';
 import type { AppFeature } from '@ee-postmind/shared';
 import {
   LayoutDashboard,
@@ -35,11 +32,6 @@ import {
   HelpCircle,
   Lock,
   Monitor,
-  Sun,
-  Moon,
-  MailWarning,
-  CheckCircle2,
-  AlertCircle,
 } from 'lucide-react';
 
 const navigation: { name: string; href: string; icon: typeof LayoutDashboard; feature: AppFeature }[] = [
@@ -67,26 +59,10 @@ export function AppLayout() {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const navigate = useNavigate();
-  const toast = useToast();
-  const [resendingVerification, setResendingVerification] = useState(false);
-
-  async function handleResendVerification() {
-    setResendingVerification(true);
-    try {
-      await api.auth.resendVerification();
-      toast.success('Email sent!', 'Check your inbox to verify your email.');
-    } catch (err) {
-      toast.error('Error', err instanceof Error ? err.message : 'Failed to send verification email');
-    } finally {
-      setResendingVerification(false);
-    }
-  }
   const { user, role, logout: clearAuth } = useAuthStore();
   const { settings: siteSettings } = useSiteSettings();
   const { canAccess } = useSubscription();
-  const { resolvedTheme, setTheme } = useTheme();
-  const isSystemAdmin = user?.email === 'judeobidozie@gmail.com';
-  const isDark = resolvedTheme === 'dark';
+  const isOwner = role === 'owner';
 
   async function handleLogout() {
     try {
@@ -99,27 +75,7 @@ export function AppLayout() {
   }
 
   return (
-    <>
-      {/* Email verification banner */}
-      {user && !user.emailVerified && (
-        <div className="fixed top-0 left-0 right-0 z-[100] bg-amber-50 dark:bg-amber-900/30 border-b border-amber-200 dark:border-amber-700 px-4 py-2.5 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-2.5 text-sm">
-            <MailWarning className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
-            <span className="text-amber-800 dark:text-amber-200 font-medium">
-              Please verify your email address. Check your inbox for the verification link.
-            </span>
-          </div>
-          <button
-            onClick={handleResendVerification}
-            disabled={resendingVerification}
-            className="shrink-0 text-xs font-semibold text-amber-700 dark:text-amber-300 hover:underline disabled:opacity-50 whitespace-nowrap"
-          >
-            {resendingVerification ? 'Sending...' : 'Resend email'}
-          </button>
-        </div>
-      )}
-      {/* Add top padding when banner is showing */}
-      <div className={`min-h-screen bg-neutral-50 transition-all ${user && !user.emailVerified ? 'pt-10' : ''}`}>
+    <div className="min-h-screen bg-neutral-50">
       {/* Mobile overlay */}
       {mobileOpen && (
         <div
@@ -211,7 +167,7 @@ export function AppLayout() {
 
         {/* Collapse toggle */}
         <div className="px-3 mb-3 space-y-1">
-          {isSystemAdmin && (
+          {isOwner && (
             <button
               onClick={() => navigate('/admin/dashboard')}
               className={cn(
@@ -266,23 +222,7 @@ export function AppLayout() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <WorkspaceSwitcher />
-            {/* Theme Toggle */}
-            <button
-              type="button"
-              onClick={() => setTheme(isDark ? 'light' : 'dark')}
-              aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-              title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-              className="relative p-2 rounded-xl text-neutral-500 hover:bg-neutral-100 transition-all duration-200 hover:scale-105 active:scale-95"
-            >
-              {isDark ? (
-                <Sun className="w-5 h-5 text-amber-500" />
-              ) : (
-                <Moon className="w-5 h-5" />
-              )}
-            </button>
-
+          <div className="flex items-center gap-3">
             <button className="relative p-2 rounded-xl text-neutral-500 hover:bg-neutral-100 transition-colors">
               <Bell className="w-5 h-5" />
               <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-brand-500 rounded-full" />
@@ -299,7 +239,6 @@ export function AppLayout() {
 
       {/* Feedback widget */}
       {/* <FeedbackWidget /> */}
-      </div>
-    </>
+    </div>
   );
 }

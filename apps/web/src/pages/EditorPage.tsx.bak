@@ -321,7 +321,6 @@ export function EditorPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const initialTemplateId = searchParams.get('template');
-  const initialDraftId = searchParams.get('draftId');
   const [platform, setPlatform] = useState('instagram');
   const [postType, setPostType] = useState('post');
   const [showTemplates, setShowTemplates] = useState(false);
@@ -382,7 +381,6 @@ export function EditorPage() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const loadedQueryTemplateIdRef = useRef<string | null>(null);
-  const loadedDraftIdRef = useRef<string | null>(null);
   const canvasViewportRef = useRef<HTMLDivElement>(null);
   const canvasAreaRef = useRef<HTMLDivElement>(null);
   const collabClientIdRef = useRef(`client-${Math.random().toString(36).slice(2, 10)}`);
@@ -845,8 +843,7 @@ export function EditorPage() {
   async function pushDesignToCompose() {
     const dataUrl = exportImage('png');
     if (!dataUrl) {
-      if (initialDraftId) navigate(`/compose?draftId=${initialDraftId}`);
-      else navigate('/compose');
+      navigate('/compose');
       return;
     }
 
@@ -861,8 +858,7 @@ export function EditorPage() {
         source: 'editor',
         media: [upload.data],
       });
-      if (initialDraftId) navigate(`/compose?draftId=${initialDraftId}`);
-      else navigate('/compose');
+      navigate('/compose');
     } catch (err: any) {
       window.alert(err.message || 'Failed to send design to Compose');
     } finally {
@@ -892,34 +888,6 @@ export function EditorPage() {
     loadedQueryTemplateIdRef.current = initialTemplateId;
     handleLoadTemplate(template);
   }, [canvasReady, handleLoadTemplate, initialTemplateId]);
-
-  useEffect(() => {
-    if (!canvasReady || !initialDraftId) return;
-    if (loadedDraftIdRef.current === initialDraftId) return;
-    loadedDraftIdRef.current = initialDraftId;
-
-    api.posts.get(initialDraftId)
-      .then((res) => {
-        const draft = res.data;
-        if (draft && draft.designData) {
-          try {
-            let dataObj = typeof draft.designData === 'string' ? JSON.parse(draft.designData) : draft.designData;
-            if (dataObj.width && dataObj.height) {
-              resizeCanvas({ width: dataObj.width, height: dataObj.height, label: 'Custom AI Draft' });
-            }
-            const jsonStr = typeof draft.designData === 'string' 
-              ? draft.designData 
-              : JSON.stringify(draft.designData);
-            loadJSON(jsonStr);
-          } catch (err) {
-            console.error('Failed to parse draft design:', err);
-          }
-        }
-      })
-      .catch((err) => {
-        console.error('Failed to load draft design:', err);
-      });
-  }, [canvasReady, initialDraftId, loadJSON, resizeCanvas]);
 
   function handleBgChange(color: string) {
     setBgColor(color);
@@ -1116,7 +1084,7 @@ export function EditorPage() {
           <h1 className="text-2xl font-heading font-bold text-neutral-900">Design Editor</h1>
           <p className="text-sm text-neutral-500 mt-1">{size.label} — {size.width}×{size.height}px</p>
         </div>
-        <div className="flex gap-2 items-center overflow-x-auto whitespace-nowrap py-1 justify-start max-w-full lg:flex-wrap lg:justify-end lg:overflow-x-visible" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+        <div className="flex gap-2 items-center flex-wrap justify-end">
           {(collabEnabled || collabStatus === 'blocked' || collabStatus === 'error') && (
             <Badge variant={collabStatus === 'connected' ? 'success' : collabStatus === 'blocked' ? 'warning' : 'default'}>
               {collabStatus === 'connected'
@@ -1189,9 +1157,9 @@ export function EditorPage() {
         </div>
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-4 items-stretch lg:items-start h-auto lg:h-[calc(100vh-10rem)]">
+      <div className="flex gap-4 items-start h-[calc(100vh-12rem)]">
         {/* Left toolbar */}
-        <Card className="p-2 lg:p-3 space-y-2 w-full lg:w-14 h-14 lg:h-full overflow-x-auto lg:overflow-y-auto flex flex-row lg:flex-col items-center shrink-0 gap-2 lg:gap-0 bg-white/95 dark:bg-neutral-900/95 backdrop-blur-md border border-neutral-200 dark:border-neutral-800" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+        <Card className="p-3 space-y-2 w-14 h-full overflow-y-auto flex flex-col items-center shrink-0">
           <TBtn onClick={() => openPanelOnly('text')} title="Text Styles">
             <Type className={`w-5 h-5 ${openPanel === 'text' ? 'text-brand-blue' : 'text-neutral-600'}`} />
           </TBtn>
@@ -1212,27 +1180,23 @@ export function EditorPage() {
           </TBtn>
           <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
 
-          <div className="hidden lg:block w-8 h-px bg-neutral-200 dark:bg-neutral-800 shrink-0" />
-          <div className="block lg:hidden w-px h-6 bg-neutral-200 dark:bg-neutral-800 mx-1 shrink-0" />
+          <div className="w-8 h-px bg-neutral-200" />
           <TBtn onClick={copySelected} title="Copy (Ctrl+C)"><Copy className="w-5 h-5 text-neutral-600" /></TBtn>
           <TBtn onClick={pasteClipboard} title="Paste (Ctrl+V)"><ClipboardPaste className="w-5 h-5 text-neutral-600" /></TBtn>
           <TBtn onClick={groupSelected} title="Group (Ctrl+G)"><Group className="w-5 h-5 text-neutral-600" /></TBtn>
           <TBtn onClick={ungroupSelected} title="Ungroup (Ctrl+Shift+G)"><Ungroup className="w-5 h-5 text-neutral-600" /></TBtn>
 
-          <div className="hidden lg:block w-8 h-px bg-neutral-200 dark:bg-neutral-800 shrink-0" />
-          <div className="block lg:hidden w-px h-6 bg-neutral-200 dark:bg-neutral-800 mx-1 shrink-0" />
+          <div className="w-8 h-px bg-neutral-200" />
           <TBtn onClick={undo} title="Undo (Ctrl+Z)" disabled={!canUndo}><Undo2 className="w-5 h-5 text-neutral-600" /></TBtn>
           <TBtn onClick={redo} title="Redo (Ctrl+Shift+Z)" disabled={!canRedo}><Redo2 className="w-5 h-5 text-neutral-600" /></TBtn>
 
-          <div className="hidden lg:block w-8 h-px bg-neutral-200 dark:bg-neutral-800 shrink-0" />
-          <div className="block lg:hidden w-px h-6 bg-neutral-200 dark:bg-neutral-800 mx-1 shrink-0" />
+          <div className="w-8 h-px bg-neutral-200" />
           <TBtn onClick={bringToFront} title="Bring to Front"><ChevronsUp className="w-5 h-5 text-neutral-600" /></TBtn>
           <TBtn onClick={bringForward} title="Bring Forward"><ArrowUp className="w-5 h-5 text-neutral-600" /></TBtn>
           <TBtn onClick={sendBackward} title="Send Backward"><ArrowDown className="w-5 h-5 text-neutral-600" /></TBtn>
           <TBtn onClick={sendToBack} title="Send to Back"><ChevronsDown className="w-5 h-5 text-neutral-600" /></TBtn>
 
-          <div className="hidden lg:block w-8 h-px bg-neutral-200 dark:bg-neutral-800 shrink-0" />
-          <div className="block lg:hidden w-px h-6 bg-neutral-200 dark:bg-neutral-800 mx-1 shrink-0" />
+          <div className="w-8 h-px bg-neutral-200" />
           <TBtn onClick={() => togglePanel('layers')} title="Layers Panel">
             <Layers className={`w-5 h-5 ${openPanel === 'layers' ? 'text-brand-blue' : 'text-neutral-600'}`} />
           </TBtn>
@@ -1256,13 +1220,12 @@ export function EditorPage() {
             </>
           )}
 
-          <div className="hidden lg:block w-8 h-px bg-neutral-200 dark:bg-neutral-800 shrink-0" />
-          <div className="block lg:hidden w-px h-6 bg-neutral-200 dark:bg-neutral-800 mx-1 shrink-0" />
+          <div className="w-8 h-px bg-neutral-200" />
           <TBtn onClick={deleteSelected} title="Delete (Del)" danger><Trash2 className="w-5 h-5 text-red-500" /></TBtn>
         </Card>
 
         {/* Canvas with drag-and-drop */}
-        <div className="flex-1 min-w-0 h-[420px] sm:h-[500px] lg:h-full">
+        <div className="flex-1 min-w-0 h-full">
           <div ref={canvasViewportRef} className="w-full h-full rounded-2xl border border-neutral-200 bg-neutral-50/60 p-3 flex items-center justify-center overflow-auto">
             <div
               ref={canvasAreaRef}
@@ -1289,29 +1252,15 @@ export function EditorPage() {
         </div>
 
         {/* Right panel */}
-        <div className={`w-full lg:w-72 h-auto lg:h-full space-y-3 lg:space-y-3 overflow-y-auto pr-1 shrink-0 transition-all duration-300 ${openPanel ? 'block' : 'hidden lg:block'}`}>
+        <div className="w-72 h-full space-y-3 overflow-y-auto pr-1 shrink-0">
           {/* Platform & Size */}
-          <Card className={`overflow-hidden border border-neutral-200 dark:border-neutral-800 transition-all duration-200 ${openPanel === 'platform' ? 'block' : 'hidden lg:block'}`}>
+          <Card className="overflow-hidden">
             <button
               onClick={() => togglePanel('platform')}
               className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-neutral-50"
             >
               <span className="text-xs font-medium text-neutral-700">Platform & Size</span>
-              <div className="flex items-center gap-2">
-                <ChevronDown className={`w-4 h-4 text-neutral-500 transition-transform ${openPanel === 'platform' ? 'rotate-180' : ''}`} />
-                {openPanel === 'platform' && (
-                  <span
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      e.preventDefault();
-                      setOpenPanel(null);
-                    }}
-                    className="p-0.5 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-400 hover:text-neutral-600 block lg:hidden"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </span>
-                )}
-              </div>
+              <ChevronDown className={`w-4 h-4 text-neutral-500 transition-transform ${openPanel === 'platform' ? 'rotate-180' : ''}`} />
             </button>
             {openPanel === 'platform' && (
               <div className="p-4 pt-0 space-y-4 border-t border-neutral-100">
@@ -1361,27 +1310,13 @@ export function EditorPage() {
           </Card>
 
           {/* Background */}
-          <Card className={`overflow-hidden border border-neutral-200 dark:border-neutral-800 transition-all duration-200 ${openPanel === 'background' ? 'block' : 'hidden lg:block'}`}>
+          <Card className="overflow-hidden">
             <button
               onClick={() => togglePanel('background')}
               className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-neutral-50"
             >
               <span className="text-xs font-medium text-neutral-700">Background</span>
-              <div className="flex items-center gap-2">
-                <ChevronDown className={`w-4 h-4 text-neutral-500 transition-transform ${openPanel === 'background' ? 'rotate-180' : ''}`} />
-                {openPanel === 'background' && (
-                  <span
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      e.preventDefault();
-                      setOpenPanel(null);
-                    }}
-                    className="p-0.5 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-400 hover:text-neutral-600 block lg:hidden"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </span>
-                )}
-              </div>
+              <ChevronDown className={`w-4 h-4 text-neutral-500 transition-transform ${openPanel === 'background' ? 'rotate-180' : ''}`} />
             </button>
             {openPanel === 'background' && (
               <div className="p-4 pt-0 space-y-3 border-t border-neutral-100">
@@ -1468,27 +1403,13 @@ export function EditorPage() {
           </Card>
 
           {/* Assets */}
-          <Card className={`overflow-hidden border border-neutral-200 dark:border-neutral-800 transition-all duration-200 ${openPanel === 'assets' ? 'block' : 'hidden lg:block'}`}>
+          <Card className="overflow-hidden">
             <button
               onClick={() => togglePanel('assets')}
               className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-neutral-50"
             >
               <span className="text-xs font-medium text-neutral-700">Shapes & Frames</span>
-              <div className="flex items-center gap-2">
-                <ChevronDown className={`w-4 h-4 text-neutral-500 transition-transform ${openPanel === 'assets' ? 'rotate-180' : ''}`} />
-                {openPanel === 'assets' && (
-                  <span
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      e.preventDefault();
-                      setOpenPanel(null);
-                    }}
-                    className="p-0.5 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-400 hover:text-neutral-600 block lg:hidden"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </span>
-                )}
-              </div>
+              <ChevronDown className={`w-4 h-4 text-neutral-500 transition-transform ${openPanel === 'assets' ? 'rotate-180' : ''}`} />
             </button>
             {openPanel === 'assets' && (
               <div className="p-4 pt-0 space-y-3 border-t border-neutral-100">
@@ -1551,27 +1472,13 @@ export function EditorPage() {
           </Card>
 
           {/* Quick Add */}
-          <Card className={`overflow-hidden border border-neutral-200 dark:border-neutral-800 transition-all duration-200 ${openPanel === 'quick' ? 'block' : 'hidden lg:block'}`}>
+          <Card className="overflow-hidden">
             <button
               onClick={() => togglePanel('quick')}
               className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-neutral-50"
             >
               <span className="text-xs font-medium text-neutral-700">Quick Add</span>
-              <div className="flex items-center gap-2">
-                <ChevronDown className={`w-4 h-4 text-neutral-500 transition-transform ${openPanel === 'quick' ? 'rotate-180' : ''}`} />
-                {openPanel === 'quick' && (
-                  <span
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      e.preventDefault();
-                      setOpenPanel(null);
-                    }}
-                    className="p-0.5 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-400 hover:text-neutral-600 block lg:hidden"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </span>
-                )}
-              </div>
+              <ChevronDown className={`w-4 h-4 text-neutral-500 transition-transform ${openPanel === 'quick' ? 'rotate-180' : ''}`} />
             </button>
             {openPanel === 'quick' && (
               <div className="p-4 pt-0 space-y-2 border-t border-neutral-100">
@@ -1603,27 +1510,13 @@ export function EditorPage() {
           </Card>
 
           {/* Text styling */}
-          <Card className={`overflow-hidden border border-neutral-200 dark:border-neutral-800 transition-all duration-200 ${openPanel === 'text' ? 'block' : 'hidden lg:block'}`}>
+          <Card className="overflow-hidden">
             <button
               onClick={() => togglePanel('text')}
               className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-neutral-50"
             >
               <span className="text-xs font-medium text-neutral-700">Text Styles</span>
-              <div className="flex items-center gap-2">
-                <ChevronDown className={`w-4 h-4 text-neutral-500 transition-transform ${openPanel === 'text' ? 'rotate-180' : ''}`} />
-                {openPanel === 'text' && (
-                  <span
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      e.preventDefault();
-                      setOpenPanel(null);
-                    }}
-                    className="p-0.5 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-400 hover:text-neutral-600 block lg:hidden"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </span>
-                )}
-              </div>
+              <ChevronDown className={`w-4 h-4 text-neutral-500 transition-transform ${openPanel === 'text' ? 'rotate-180' : ''}`} />
             </button>
             {openPanel === 'text' && (
               <div className="p-4 pt-0 space-y-3 border-t border-neutral-100">
@@ -1730,27 +1623,13 @@ export function EditorPage() {
           </Card>
 
           {/* Shape styling */}
-          <Card className={`overflow-hidden border border-neutral-200 dark:border-neutral-800 transition-all duration-200 ${openPanel === 'shape' ? 'block' : 'hidden lg:block'}`}>
+          <Card className="overflow-hidden">
             <button
               onClick={() => togglePanel('shape')}
               className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-neutral-50"
             >
               <span className="text-xs font-medium text-neutral-700">Shape Styles</span>
-              <div className="flex items-center gap-2">
-                <ChevronDown className={`w-4 h-4 text-neutral-500 transition-transform ${openPanel === 'shape' ? 'rotate-180' : ''}`} />
-                {openPanel === 'shape' && (
-                  <span
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      e.preventDefault();
-                      setOpenPanel(null);
-                    }}
-                    className="p-0.5 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-400 hover:text-neutral-600 block lg:hidden"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </span>
-                )}
-              </div>
+              <ChevronDown className={`w-4 h-4 text-neutral-500 transition-transform ${openPanel === 'shape' ? 'rotate-180' : ''}`} />
             </button>
             {openPanel === 'shape' && (
               <div className="p-4 pt-0 space-y-3 border-t border-neutral-100">
@@ -1810,28 +1689,14 @@ export function EditorPage() {
           </Card>
 
           {/* Image Crop Tools */}
-          <Card className={`overflow-hidden border border-neutral-200 dark:border-neutral-800 transition-all duration-200 ${openPanel === 'crop' ? 'block' : 'hidden lg:block'}`}>
+          <Card className={`overflow-hidden ${activeObjType !== 'image' ? 'opacity-60' : ''}`}>
             <button
               onClick={() => activeObjType === 'image' && togglePanel('crop')}
               disabled={activeObjType !== 'image'}
               className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-neutral-50 disabled:cursor-not-allowed"
             >
               <span className="text-xs font-medium text-neutral-700">Crop & Rotate</span>
-              <div className="flex items-center gap-2">
-                <ChevronDown className={`w-4 h-4 text-neutral-500 transition-transform ${openPanel === 'crop' ? 'rotate-180' : ''}`} />
-                {openPanel === 'crop' && (
-                  <span
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      e.preventDefault();
-                      setOpenPanel(null);
-                    }}
-                    className="p-0.5 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-400 hover:text-neutral-600 block lg:hidden"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </span>
-                )}
-              </div>
+              <ChevronDown className={`w-4 h-4 text-neutral-500 transition-transform ${openPanel === 'crop' ? 'rotate-180' : ''}`} />
             </button>
             {openPanel === 'crop' && activeObjType === 'image' && (
               <div className="p-4 pt-0 space-y-3 border-t border-neutral-100">
@@ -1874,28 +1739,14 @@ export function EditorPage() {
           </Card>
 
           {/* Image Fine-Tuning */}
-          <Card className={`overflow-hidden border border-neutral-200 dark:border-neutral-800 transition-all duration-200 ${openPanel === 'tune' ? 'block' : 'hidden lg:block'}`}>
+          <Card className={`overflow-hidden ${activeObjType !== 'image' ? 'opacity-60' : ''}`}>
             <button
               onClick={() => activeObjType === 'image' && togglePanel('tune')}
               disabled={activeObjType !== 'image'}
               className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-neutral-50 disabled:cursor-not-allowed"
             >
               <span className="text-xs font-medium text-neutral-700">Image Tuning</span>
-              <div className="flex items-center gap-2">
-                <ChevronDown className={`w-4 h-4 text-neutral-500 transition-transform ${openPanel === 'tune' ? 'rotate-180' : ''}`} />
-                {openPanel === 'tune' && (
-                  <span
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      e.preventDefault();
-                      setOpenPanel(null);
-                    }}
-                    className="p-0.5 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-400 hover:text-neutral-600 block lg:hidden"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </span>
-                )}
-              </div>
+              <ChevronDown className={`w-4 h-4 text-neutral-500 transition-transform ${openPanel === 'tune' ? 'rotate-180' : ''}`} />
             </button>
             {openPanel === 'tune' && activeObjType === 'image' && (
               <div className="p-4 pt-0 space-y-3 border-t border-neutral-100">
@@ -1956,27 +1807,13 @@ export function EditorPage() {
           </Card>
 
           {/* Layer Management Panel */}
-          <Card className={`overflow-hidden border border-neutral-200 dark:border-neutral-800 transition-all duration-200 ${openPanel === 'layers' ? 'block' : 'hidden lg:block'}`}>
+          <Card className="overflow-hidden">
             <button
               onClick={() => togglePanel('layers')}
               className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-neutral-50"
             >
               <span className="text-xs font-medium text-neutral-700">Layers ({objects.length})</span>
-              <div className="flex items-center gap-2">
-                <ChevronDown className={`w-4 h-4 text-neutral-500 transition-transform ${openPanel === 'layers' ? 'rotate-180' : ''}`} />
-                {openPanel === 'layers' && (
-                  <span
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      e.preventDefault();
-                      setOpenPanel(null);
-                    }}
-                    className="p-0.5 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-400 hover:text-neutral-600 block lg:hidden"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </span>
-                )}
-              </div>
+              <ChevronDown className={`w-4 h-4 text-neutral-500 transition-transform ${openPanel === 'layers' ? 'rotate-180' : ''}`} />
             </button>
             {openPanel === 'layers' && (
               <div className="p-4 pt-0 space-y-2 border-t border-neutral-100">

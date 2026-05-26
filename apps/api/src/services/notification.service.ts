@@ -192,6 +192,7 @@ export class NotificationService {
 
     const recipients: NotificationRecipient[] = [];
     for (const member of members) {
+      if (!member.user) continue; // skip pending members without accounts
       if (!member.user.emailVerified) continue;
       const preferences = await this.getUserPreferences(member.user.id);
       if (!preferences[event]) continue;

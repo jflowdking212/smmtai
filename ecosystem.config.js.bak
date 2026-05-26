@@ -19,7 +19,7 @@ module.exports = {
         STRIPE_WEBHOOK_SECRET: '',
         AI_SERVICE_URL: 'http://localhost:8016',
         AI_SERVICE_KEY: 'd67043b5220f59e6f4769557da725b0f',
-        FRONTEND_URL: 'https://smmtai.com',
+        FRONTEND_URL: 'https://smmt.entreprenreducation.com',
       },
       restart_delay: 4000,
       max_restarts: 10,

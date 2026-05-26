@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, type ChangeEvent } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, Button, Badge } from '@/components/ui';
 import { api } from '@/lib/api';
 import { PLATFORMS, type PlatformType } from '@ee-postmind/shared';
@@ -56,6 +57,7 @@ function toLocalInputValue(value: string | null): string {
 }
 
 export function CalendarPage() {
+  const routerNavigate = useNavigate();
   const [posts, setPosts] = useState<CalendarPost[]>([]);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<ViewMode>('month');
@@ -406,7 +408,10 @@ export function CalendarPage() {
             return (
               <div
                 key={i}
-                className={`bg-white min-h-[80px] p-1.5 ${!day ? 'bg-neutral-50' : ''} ${isToday ? 'ring-2 ring-inset ring-brand-blue/30' : ''}`}
+                onClick={() => {
+                  if (day) routerNavigate(`/compose?date=${dateStr}`);
+                }}
+                className={`bg-white min-h-[80px] p-1.5 transition-colors ${!day ? 'bg-neutral-50' : 'cursor-pointer hover:bg-neutral-50'} ${isToday ? 'ring-2 ring-inset ring-brand-blue/30' : ''}`}
               >
                 {day && (
                   <>
@@ -420,7 +425,11 @@ export function CalendarPage() {
                         return (
                           <div
                             key={p.id}
-                            className="text-[10px] px-1.5 py-0.5 rounded truncate cursor-pointer hover:opacity-80"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              // Could also navigate to a view post route or back to compose with draft ID
+                            }}
+                            className="text-[10px] px-1.5 py-0.5 rounded truncate cursor-pointer hover:opacity-80 border border-transparent hover:border-black/10"
                             style={{ backgroundColor: `${color}20`, color }}
                             title={p.content}
                           >

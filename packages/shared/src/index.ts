@@ -223,7 +223,7 @@ export function isPlatformType(value: string): value is PlatformType {
 
 export type SubscriptionTier = 'basic' | 'pro' | 'business' | 'enterprise';
 
-export type WorkspaceRole = 'owner' | 'admin' | 'editor' | 'viewer';
+export type WorkspaceRole = 'owner' | 'manager' | 'creator' | 'viewer';
 
 export interface User {
   id: string;
@@ -332,23 +332,23 @@ export const SUBSCRIPTION_LIMITS: Record<
   }
 > = {
   basic: {
-    socialAccounts: 4,
-    postsPerMonth: 30,
-    aiGenerationsPerMonth: 5,
-    templatesPerMonth: 10,
+    socialAccounts: 5,
+    postsPerMonth: 35,
+    aiGenerationsPerMonth: 25,
+    templatesPerMonth: 20,
     teamMembers: 1,
-    analyticsDays: 7,
+    analyticsDays: 15,
   },
   pro: {
     socialAccounts: 8,
     postsPerMonth: 200,
     aiGenerationsPerMonth: 100,
     templatesPerMonth: 50,
-    teamMembers: 3,
+    teamMembers: 5,
     analyticsDays: 30,
   },
   business: {
-    socialAccounts: 25,
+    socialAccounts: 15,
     postsPerMonth: Infinity,
     aiGenerationsPerMonth: 500,
     templatesPerMonth: Infinity,
@@ -360,7 +360,7 @@ export const SUBSCRIPTION_LIMITS: Record<
     postsPerMonth: Infinity,
     aiGenerationsPerMonth: Infinity,
     templatesPerMonth: Infinity,
-    teamMembers: Infinity,
+    teamMembers: 20,
     analyticsDays: Infinity,
   },
 };
@@ -410,7 +410,7 @@ export function hasFeatureAccess(userTier: SubscriptionTier, feature: AppFeature
 
 // Platforms available per subscription tier (each tier includes all platforms from tiers below it)
 export const TIER_PLATFORMS: Record<SubscriptionTier, PlatformType[]> = {
-  basic: ['entreprenrs', 'chrxstians', 'iohah', 'facebook'],
+  basic: ['entreprenrs', 'chrxstians', 'iohah', 'facebook', 'instagram'],
   pro: ['entreprenrs', 'chrxstians', 'iohah', 'facebook', 'instagram', 'twitter', 'youtube', 'pinterest'],
   business: [
     'entreprenrs', 'chrxstians', 'iohah', 'facebook', 'instagram', 'twitter', 'youtube',

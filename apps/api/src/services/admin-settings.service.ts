@@ -152,6 +152,7 @@ export interface SiteSettings {
   site_logo: string;
   seo_meta_title: string;
   seo_meta_description: string;
+  fb_pixel_id: string;
 }
 
 export async function getSiteSettings(): Promise<SiteSettings> {
@@ -164,11 +165,12 @@ export async function getSiteSettings(): Promise<SiteSettings> {
     site_logo: cfg.site_logo || '',
     seo_meta_title: seo.seo_meta_title || '',
     seo_meta_description: seo.seo_meta_description || '',
+    fb_pixel_id: cfg.fb_pixel_id || '',
   };
 }
 
 export async function saveSiteSettings(data: Partial<SiteSettings>): Promise<void> {
-  const allowed = ['site_title', 'site_tagline', 'site_favicon', 'site_logo', 'seo_meta_title', 'seo_meta_description'] as const;
+  const allowed = ['site_title', 'site_tagline', 'site_favicon', 'site_logo', 'seo_meta_title', 'seo_meta_description', 'fb_pixel_id'] as const;
   for (const key of allowed) {
     if (data[key] !== undefined) {
       await setConfig(key, data[key]);

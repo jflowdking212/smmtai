@@ -1,8 +1,18 @@
 import { Router, Response, NextFunction } from 'express';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
+import { getEffectiveLimits } from '../services/admin-settings.service.js';
+import { prisma } from '../config/database.js';
 import { analyticsService } from '../services/analytics.service.js';
 import { collectWorkspaceAnalytics } from '../jobs/scheduler.js';
 import { cacheResponse } from '../middleware/cache.js';
+
+
+async function getMaxAnalyticsDays(workspaceId: string): Promise<number> {
+  const sub = await prisma.subscription.findUnique({ where: { workspaceId } });
+  const tier = (sub?.tier || 'basic') as import('@ee-postmind/shared').SubscriptionTier;
+  const limits = await getEffectiveLimits(tier);
+  return limits.analyticsDays === Infinity ? 36500 : limits.analyticsDays;
+}
 
 export const analyticsRouter = Router();
 
@@ -34,7 +44,9 @@ analyticsRouter.get(
       if (!req.workspaceId) {
         return res.status(400).json({ success: false, error: { code: 'NO_WORKSPACE', message: 'Workspace required' } });
       }
-      const days = req.query.days ? Number(req.query.days) : 30;
+      const maxDays = await getMaxAnalyticsDays(req.workspaceId);
+      const rawDays = req.query.days ? Number(req.query.days) : 30;
+      const days = Math.min(rawDays, maxDays);
       const data = await analyticsService.getOverview(req.workspaceId, days);
       res.json({ success: true, data });
     } catch (err) {
@@ -52,7 +64,9 @@ analyticsRouter.get(
       if (!req.workspaceId) {
         return res.status(400).json({ success: false, error: { code: 'NO_WORKSPACE', message: 'Workspace required' } });
       }
-      const days = req.query.days ? Number(req.query.days) : 30;
+      const maxDays = await getMaxAnalyticsDays(req.workspaceId);
+      const rawDays = req.query.days ? Number(req.query.days) : 30;
+      const days = Math.min(rawDays, maxDays);
       const data = await analyticsService.getPlatformAnalytics(
         req.workspaceId, req.params.platform as string, days,
       );
@@ -89,7 +103,9 @@ analyticsRouter.get(
       if (!req.workspaceId) {
         return res.status(400).json({ success: false, error: { code: 'NO_WORKSPACE', message: 'Workspace required' } });
       }
-      const days = req.query.days ? Number(req.query.days) : 30;
+      const maxDays = await getMaxAnalyticsDays(req.workspaceId);
+      const rawDays = req.query.days ? Number(req.query.days) : 30;
+      const days = Math.min(rawDays, maxDays);
       const data = await analyticsService.getInsights(req.workspaceId, days);
       res.json({ success: true, data });
     } catch (err) {

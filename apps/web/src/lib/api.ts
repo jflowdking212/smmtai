@@ -151,6 +151,11 @@ export const api = {
         { method: 'POST', body: JSON.stringify(body) },
       ),
     logout: () => request('/auth/logout', { method: 'POST' }),
+    switchWorkspace: (workspaceId: string) =>
+      request<{ success: true; data: { workspaceId: string; accessToken: string; role: WorkspaceRole; tier: SubscriptionTier } }>('/auth/switch-workspace', {
+        method: 'POST',
+        body: JSON.stringify({ workspaceId }),
+      }),
     me: () =>
       request<{ success: true; data: { user: any; workspaceId: string; role?: WorkspaceRole; tier?: SubscriptionTier; usage?: Record<string, number> } }>('/auth/me'),
     forgotPassword: (email: string) =>
@@ -168,6 +173,8 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ token }),
       }),
+    resendVerification: () =>
+      request('/auth/resend-verification', { method: 'POST' }),
   },
   users: {
     getProfile: () => request<{ success: true; data: any }>('/users/profile'),
@@ -187,7 +194,7 @@ export const api = {
           connectedAt: string;
         }>;
       }>('/users/entrepreneurs'),
-    updateProfile: (body: { name?: string; bio?: string; timezone?: string }) =>
+    updateProfile: (body: { name?: string; bio?: string; timezone?: string; phone?: string; country?: string; avatar?: string }) =>
       request<{ success: true; data: any }>('/users/profile', {
         method: 'PATCH',
         body: JSON.stringify(body),
@@ -266,6 +273,8 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(body),
       }),
+    getCheckoutSession: (sessionId: string) =>
+      request<{ success: true; data: { amount: number; currency: string; status: string } }>(`/billing/checkout/session/${sessionId}`),
     changePlan: (body: { tier?: string; priceKey?: string; couponCode?: string }) =>
       request<{ success: true; data: any }>('/billing/change-plan', {
         method: 'POST',

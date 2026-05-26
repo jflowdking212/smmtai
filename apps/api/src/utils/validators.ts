@@ -52,7 +52,7 @@ export const updateNotificationPreferencesSchema = z.object({
 
 export const inviteMemberSchema = z.object({
   email: z.string().email('Invalid email address'),
-  role: z.enum(['admin', 'editor', 'viewer']),
+  role: z.enum(['manager', 'creator', 'viewer']),
 });
 
 export const createWorkspaceSchema = z.object({

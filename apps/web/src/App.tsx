@@ -26,6 +26,7 @@ import { CommentsPage } from '@/pages/CommentsPage';
 import { ConversationsPage } from '@/pages/ConversationsPage';
 import { KnowledgeBasePage } from '@/pages/KnowledgeBasePage';
 import { LandingPage } from '@/pages/LandingPage';
+import { ProfileCompletePage } from '@/pages/ProfileCompletePage';
 import { TermsPage } from '@/pages/TermsPage';
 import { PrivacyPolicyPage } from '@/pages/PrivacyPolicyPage';
 import { CookiePolicyPage } from '@/pages/CookiePolicyPage';
@@ -114,6 +115,7 @@ export default function App() {
           <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
           <Route path="/auth/verify-email" element={<VerifyEmailPage />} />
+                <Route path="/profile/complete" element={<ProfileCompletePage />} />
           <Route path="/auth/oauth/callback" element={<OAuthCallbackPage />} />
 
           {/* Protected app routes */}

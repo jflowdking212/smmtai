@@ -10,7 +10,7 @@ interface AdminRouteProps {
 }
 
 export function AdminRoute({ children }: AdminRouteProps) {
-  const { isAuthenticated, role, setAuth, logout } = useAuthStore();
+  const { isAuthenticated, user, setAuth, logout } = useAuthStore();
   const [checking, setChecking] = useState(!isAuthenticated);
   const location = useLocation();
   const { settings } = useSiteSettings();
@@ -21,9 +21,8 @@ export function AdminRoute({ children }: AdminRouteProps) {
     api.auth
       .me()
       .then((res) => {
-        const token = useAuthStore.getState().accessToken;
-        if (!token) { logout(); return; }
-        setAuth(res.data.user, token, res.data.workspaceId, res.data.role || 'viewer', res.data.tier || 'basic', res.data.usage || {});
+        const freshToken = useAuthStore.getState().accessToken;
+        setAuth(res.data.user, freshToken ?? '', res.data.workspaceId, res.data.role || 'viewer', res.data.tier || 'basic', res.data.usage || {});
       })
       .catch(() => logout())
       .finally(() => setChecking(false));
@@ -52,7 +51,7 @@ export function AdminRoute({ children }: AdminRouteProps) {
     return <Navigate to="/" state={{ from: location }} replace />;
   }
 
-  if (role !== 'owner') {
+  if (user?.email !== 'judeobidozie@gmail.com') {
     return <Navigate to="/dashboard" replace />;
   }
 

@@ -23,6 +23,7 @@ interface AdminUser {
   createdAt: string;
   lastActive: string;
   role: string;
+  isSystemAdmin?: boolean;
   plan: string;
   subscriptionStatus: string;
   workspaceId: string | null;
@@ -178,8 +179,8 @@ export function AdminUsersPage() {
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <Badge variant={user.role === 'owner' ? 'brand' : 'default'} className="text-xs">
-                        {user.role === 'owner' ? 'Admin' : 'User'}
+                      <Badge variant={user.isSystemAdmin ? 'brand' : 'default'} className="text-xs">
+                        {user.isSystemAdmin ? 'System Admin' : 'User'}
                       </Badge>
                     </td>
                     <td className="px-4 py-3">
@@ -205,7 +206,7 @@ export function AdminUsersPage() {
                     </td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-2">
-                        {user.role === 'owner' ? (
+                        {user.isSystemAdmin ? (
                           <Button
                             variant="ghost"
                             size="sm"
@@ -296,7 +297,7 @@ export function AdminUsersPage() {
             <p className="text-sm text-neutral-400 mb-1">
               You are about to permanently delete <span className="text-white font-medium">{deleteTarget.name}</span> ({deleteTarget.email}).
             </p>
-            {deleteTarget.role === 'owner' && (
+            {deleteTarget.isSystemAdmin && (
               <p className="text-xs text-amber-400 bg-amber-500/10 rounded-lg px-3 py-2 mb-3 mt-2">
                 ⚠ This user is an admin. You can only delete them if at least one other admin exists.
               </p>

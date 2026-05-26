@@ -16,18 +16,26 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const { settings } = useSiteSettings();
 
   useEffect(() => {
-    if (isAuthenticated) return;
+    if (isAuthenticated) {
+      setChecking(false);
+      return;
+    }
 
-    // Try to restore session via refresh token cookie
+    // Try to restore session via refresh token cookie.
+    // api.auth.me() will automatically use the refresh cookie to get a new access token if needed.
+    // IMPORTANT: Read the accessToken AFTER .me() resolves - not before - to avoid stale closure bugs.
     api.auth
       .me()
       .then((res) => {
-        const token = useAuthStore.getState().accessToken;
-        if (!token) {
-          logout();
-          return;
-        }
-        setAuth(res.data.user, token, res.data.workspaceId, res.data.role || 'viewer', res.data.tier || 'basic', res.data.usage || {});
+        const freshToken = useAuthStore.getState().accessToken;
+        setAuth(
+          res.data.user,
+          freshToken ?? '',
+          res.data.workspaceId,
+          res.data.role || 'viewer',
+          res.data.tier || 'basic',
+          res.data.usage || {}
+        );
       })
       .catch(() => {
         logout();
