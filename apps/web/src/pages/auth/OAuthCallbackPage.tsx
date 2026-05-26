@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui';
 import { api, ApiError } from '@/lib/api';
@@ -13,6 +14,7 @@ function normalizeNextPath(nextPath: string | null): string {
 }
 
 export function OAuthCallbackPage() {
+  const { settings } = useSiteSettings();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const setAuth = useAuthStore((state) => state.setAuth);

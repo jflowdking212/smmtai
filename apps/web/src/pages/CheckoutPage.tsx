@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { Button, Card, Input } from '@/components/ui';
 import { api, ApiError } from '@/lib/api';
 import { Sparkles, ArrowLeft, CreditCard, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { useSiteSettings } from '@/hooks/useSiteSettings';
 
 function resolvePlanLabel(priceKey: string): string {
   const tier = priceKey.split('_')[0] || '';
@@ -93,6 +94,8 @@ export function CheckoutPage() {
     }
   }
 
+  const { settings } = useSiteSettings();
+
   return (
     <div className="min-h-screen bg-neutral-50">
       <div className="max-w-2xl mx-auto px-4 py-12 space-y-6">
@@ -101,9 +104,13 @@ export function CheckoutPage() {
         </Link>
 
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-brand-500 rounded-xl flex items-center justify-center">
-            <Sparkles className="w-5 h-5 text-white" />
-          </div>
+          {settings.site_logo ? (
+            <img src={settings.site_logo} alt="Logo" className="w-10 h-10 object-contain rounded-xl" />
+          ) : (
+            <div className="w-10 h-10 bg-brand-500 rounded-xl flex items-center justify-center">
+              <Sparkles className="w-5 h-5 text-white" />
+            </div>
+          )}
           <div className="min-w-0">
             <h1 className="text-2xl font-heading font-bold text-neutral-900 truncate">Complete checkout</h1>
             <p className="text-sm text-neutral-500">Create your account and finish payment in one flow.</p>

@@ -79,10 +79,14 @@ export function CheckoutSuccessPage() {
     <div className="min-h-screen bg-neutral-50 flex items-center justify-center p-6">
       <div className="w-full max-w-lg space-y-6">
         <div className="flex items-center justify-center gap-3">
-          <div className="w-10 h-10 bg-brand-500 rounded-xl flex items-center justify-center">
-            <Sparkles className="w-5 h-5 text-white" />
-          </div>
-          <span className="font-heading font-bold text-xl text-neutral-900">SmmtAI</span>
+          {settings.site_logo ? (
+            <img src={settings.site_logo} alt="Logo" className="w-10 h-10 object-contain rounded-xl" />
+          ) : (
+            <div className="w-10 h-10 bg-brand-500 rounded-xl flex items-center justify-center">
+              <Sparkles className="w-5 h-5 text-white" />
+            </div>
+          )}
+          <span className="font-heading font-bold text-xl text-neutral-900">{settings.site_title || 'SmmtAI'}</span>
         </div>
 
         <Card className="p-8 text-center space-y-4">

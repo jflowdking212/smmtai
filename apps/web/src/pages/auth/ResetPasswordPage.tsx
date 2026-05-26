@@ -1,10 +1,12 @@
 import { FormEvent, useMemo, useState } from 'react';
+import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Button, Input } from '@/components/ui';
 import { api, ApiError } from '@/lib/api';
 import { ArrowLeft, CheckCircle2, Sparkles } from 'lucide-react';
 
 export function ResetPasswordPage() {
+  const { settings } = useSiteSettings();
   const [searchParams] = useSearchParams();
   const token = useMemo(() => searchParams.get('token') || '', [searchParams]);
 
@@ -43,10 +45,14 @@ export function ResetPasswordPage() {
     <div className="min-h-screen flex items-center justify-center p-6 bg-neutral-50">
       <div className="w-full max-w-md">
         <div className="flex items-center gap-3 mb-8">
-          <div className="w-10 h-10 bg-brand-500 rounded-xl flex items-center justify-center">
-            <Sparkles className="w-5 h-5 text-white" />
-          </div>
-          <span className="font-heading font-bold text-xl text-neutral-900">SmmtAI</span>
+          {settings.site_logo ? (
+            <img src={settings.site_logo} alt="Logo" className="w-10 h-10 object-contain rounded-xl" />
+          ) : (
+            <div className="w-10 h-10 bg-brand-500 rounded-xl flex items-center justify-center">
+              <Sparkles className="w-5 h-5 text-white" />
+            </div>
+          )}
+          <span className="font-heading font-bold text-xl text-neutral-900">{settings.site_title || 'SmmtAI'}</span>
         </div>
 
         {done ? (

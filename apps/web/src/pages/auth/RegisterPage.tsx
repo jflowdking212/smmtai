@@ -4,8 +4,10 @@ import { Button, Input } from '@/components/ui';
 import { api, ApiError } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
 import { Sparkles, Check, Chrome, Github, Facebook } from 'lucide-react';
+import { useSiteSettings } from '@/hooks/useSiteSettings';
 
 export function RegisterPage() {
+  const { settings } = useSiteSettings();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const setAuth = useAuthStore((s) => s.setAuth);
@@ -71,10 +73,14 @@ export function RegisterPage() {
       <div className="hidden lg:flex lg:w-1/2 bg-brand-500 items-center justify-center p-12">
         <div className="max-w-md text-white">
           <div className="flex items-center gap-3 mb-8">
-            <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
-              <Sparkles className="w-6 h-6 text-white" />
-            </div>
-            <span className="font-heading font-bold text-2xl">SmmtAI</span>
+            {settings.site_logo ? (
+              <img src={settings.site_logo} alt="Logo" className="w-12 h-12 object-contain rounded-xl" />
+            ) : (
+              <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
+                <Sparkles className="w-6 h-6 text-white" />
+              </div>
+            )}
+            <span className="font-heading font-bold text-2xl">{settings.site_title || 'SmmtAI'}</span>
           </div>
           <h2 className="text-3xl font-heading font-bold leading-tight mb-4">
             Start managing your social media like a pro
@@ -100,10 +106,14 @@ export function RegisterPage() {
       <div className="flex-1 flex items-center justify-center p-6 bg-neutral-50">
         <div className="w-full max-w-md">
           <div className="lg:hidden flex items-center gap-3 mb-8">
-            <div className="w-10 h-10 bg-brand-500 rounded-xl flex items-center justify-center">
-              <Sparkles className="w-5 h-5 text-white" />
-            </div>
-            <span className="font-heading font-bold text-xl text-neutral-900">SmmtAI</span>
+            {settings.site_logo ? (
+              <img src={settings.site_logo} alt="Logo" className="w-10 h-10 object-contain rounded-xl" />
+            ) : (
+              <div className="w-10 h-10 bg-brand-500 rounded-xl flex items-center justify-center">
+                <Sparkles className="w-5 h-5 text-white" />
+              </div>
+            )}
+            <span className="font-heading font-bold text-xl text-neutral-900">{settings.site_title || 'SmmtAI'}</span>
           </div>
 
           <h1 className="text-2xl font-heading font-bold text-neutral-900 mb-2">

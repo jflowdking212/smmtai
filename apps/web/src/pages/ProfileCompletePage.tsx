@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react';
+import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/authStore';
 import { api } from '@/lib/api';
@@ -37,6 +38,7 @@ const TIMEZONES = [
 ];
 
 export function ProfileCompletePage() {
+  const { settings } = useSiteSettings();
   const navigate = useNavigate();
   const { user, setUser } = useAuthStore();
   const toast = useToast();

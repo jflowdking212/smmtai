@@ -5,11 +5,24 @@ import { useToast } from '@/components/Toast';
 import { CircleHelp, Copy, Ticket, Users } from 'lucide-react';
 
 const PRICE_OPTIONS = [
+  { value: 'basic_monthly', label: 'Basic Monthly' },
+  { value: 'basic_quarterly', label: 'Basic Quarterly' },
+  { value: 'basic_6month', label: 'Basic 6-Month' },
+  { value: 'basic_yearly', label: 'Basic Yearly' },
+
   { value: 'pro_monthly', label: 'Pro Monthly' },
+  { value: 'pro_quarterly', label: 'Pro Quarterly' },
+  { value: 'pro_6month', label: 'Pro 6-Month' },
   { value: 'pro_yearly', label: 'Pro Yearly' },
+
   { value: 'business_monthly', label: 'Business Monthly' },
+  { value: 'business_quarterly', label: 'Business Quarterly' },
+  { value: 'business_6month', label: 'Business 6-Month' },
   { value: 'business_yearly', label: 'Business Yearly' },
+
   { value: 'enterprise_monthly', label: 'Enterprise Monthly' },
+  { value: 'enterprise_quarterly', label: 'Enterprise Quarterly' },
+  { value: 'enterprise_6month', label: 'Enterprise 6-Month' },
   { value: 'enterprise_yearly', label: 'Enterprise Yearly' },
 ] as const;
 

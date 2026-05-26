@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui';
 import { api } from '@/lib/api';
@@ -8,6 +9,7 @@ import { Sparkles, Loader2, CheckCircle2, AlertTriangle } from 'lucide-react';
 type Status = 'loading' | 'success' | 'error';
 
 export function VerifyEmailPage() {
+  const { settings } = useSiteSettings();
   const [searchParams] = useSearchParams();
   const token = useMemo(() => searchParams.get('token') || '', [searchParams]);
 
