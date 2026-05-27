@@ -13,15 +13,18 @@ import {
   Crown,
   ExternalLink,
   Loader2,
+  Clock,
+  AlertTriangle,
 } from 'lucide-react';
 
 const DEFAULT_PRICES: Record<SubscriptionTier, number> = { basic: 5, pro: 25, business: 50, enterprise: 0 };
 type BillingPeriodKey = 'monthly' | 'quarterly' | '6month' | 'yearly';
-const BILLING_PERIODS: { key: BillingPeriodKey; label: string; months: number; discount: number }[] = [
-  { key: 'monthly', label: 'Monthly', months: 1, discount: 0 },
-  { key: 'quarterly', label: 'Quarterly', months: 3, discount: 5 },
-  { key: '6month', label: '6 Months', months: 6, discount: 15 },
-  { key: 'yearly', label: 'Yearly', months: 12, discount: 30 },
+// Base billing periods — discounts overridden dynamically from admin planConfig
+const BASE_BILLING_PERIODS: { key: BillingPeriodKey; label: string; months: number; baseDiscount: number }[] = [
+  { key: 'monthly',   label: 'Monthly',   months: 1,  baseDiscount: 0  },
+  { key: 'quarterly', label: 'Quarterly', months: 3,  baseDiscount: 5  },
+  { key: '6month',    label: '6 Months',  months: 6,  baseDiscount: 15 },
+  { key: 'yearly',    label: 'Yearly',    months: 12, baseDiscount: 30 },
 ];
 
 const plans: {
@@ -56,7 +59,6 @@ const plans: {
     name: 'Enterprise',
     description: 'Dedicated support & custom limits',
     icon: Crown,
-    custom: true,
   },
 ];
 
@@ -69,25 +71,76 @@ const featureLabels: { key: keyof (typeof SUBSCRIPTION_LIMITS)['basic']; label: 
   { key: 'analyticsDays', label: 'Analytics history' },
 ];
 
-function formatLimit(value: number, isDays = false): string {
-  if (value === Infinity) return 'Unlimited';
+function formatLimit(value: number | string | null | undefined, isDays = false): string {
+  if (value === Infinity || value === '__INFINITY__' || value === null || value === undefined || (typeof value === 'number' && value < 0)) return 'Unlimited';
   if (isDays) return `${value} days`;
-  return value.toLocaleString();
+  return typeof value === 'number' ? value.toLocaleString() : String(value);
 }
 
-function computePrice(monthlyPrice: number, period: BillingPeriodKey): { display: string; period: string; badge?: string } {
+function computePrice(
+  monthlyPrice: number,
+  p: { key: string; months: number; discount: number; label: string },
+): { display: string; period: string; badge?: string } {
   if (monthlyPrice === 0) return { display: 'Custom', period: '' };
-  const p = BILLING_PERIODS.find((b) => b.key === period)!;
   const discountedMonthly = +(monthlyPrice * (1 - p.discount / 100)).toFixed(2);
   const total = +(discountedMonthly * p.months).toFixed(2);
   const dm = Number.isInteger(discountedMonthly) ? discountedMonthly : +discountedMonthly.toFixed(2);
   const totalStr = Number.isInteger(total) ? `$${total}` : `$${total.toFixed(2)}`;
-  if (period === 'monthly') return { display: `$${dm}`, period: '/month' };
+  if (p.key === 'monthly') return { display: `$${dm}`, period: '/month' };
   return {
     display: `$${dm}`,
     period: '/month',
     badge: `${totalStr} billed ${p.label.toLowerCase()} · Save ${p.discount}%`,
   };
+}
+
+
+// ?????? Trial Status Banner ?????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????
+function TrialBanner({ trialEndsAt, onUpgrade }: { trialEndsAt: string | null; onUpgrade: () => void }) {
+  if (!trialEndsAt) return null;
+  const now = new Date();
+  const end = new Date(trialEndsAt);
+  const daysLeft = Math.max(0, Math.ceil((end.getTime() - now.getTime()) / 86400000));
+  const expired = daysLeft === 0;
+
+  const bg = expired
+    ? 'bg-red-50 dark:bg-red-500/10 border-red-200 dark:border-red-500/30'
+    : daysLeft <= 1
+    ? 'bg-red-50 dark:bg-red-500/10 border-red-200 dark:border-red-500/30'
+    : daysLeft <= 3
+    ? 'bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/30'
+    : 'bg-blue-50 dark:bg-blue-500/10 border-blue-200 dark:border-blue-500/30';
+  const text = expired
+    ? 'text-red-800 dark:text-red-300'
+    : daysLeft <= 3
+    ? 'text-amber-800 dark:text-amber-300'
+    : 'text-blue-800 dark:text-blue-300';
+  const icon = expired || daysLeft <= 3 ? AlertTriangle : Clock;
+  const Icon = icon;
+  const message = expired
+    ? 'Your 14-day Pro trial has ended. Choose a plan to continue with full access.'
+    : daysLeft === 1
+    ? 'Last day of your Pro trial! Upgrade now to avoid interruption.'
+    : `Your Pro trial ends in ${daysLeft} days. Upgrade to keep full access.`;
+
+  return (
+    <div className={`flex items-center justify-between gap-4 p-4 rounded-xl border mb-6 ${bg}`}>
+      <div className="flex items-center gap-3">
+        <Icon className={`w-5 h-5 shrink-0 ${text}`} />
+        <p className={`text-sm font-medium ${text}`}>{message}</p>
+      </div>
+      <button
+        onClick={onUpgrade}
+        className={`shrink-0 px-4 py-1.5 rounded-lg text-sm font-semibold text-white transition-all ${
+          expired || daysLeft <= 3
+            ? 'bg-red-600 hover:bg-red-500'
+            : 'bg-blue-600 hover:bg-blue-500'
+        }`}
+      >
+        {expired ? 'Choose Plan' : 'Upgrade'}
+      </button>
+    </div>
+  );
 }
 
 export function BillingPage() {
@@ -102,6 +155,18 @@ export function BillingPage() {
   const autoUpgradeRef = useRef(false);
   const { tier: storeTier, role } = useSubscription();
   const setSubscription = useAuthStore((s) => s.setSubscription);
+
+  // Compute billing period discounts dynamically from admin planConfig
+  const BILLING_PERIODS = BASE_BILLING_PERIODS.map((p) => ({
+    ...p,
+    discount: p.key === 'quarterly'
+      ? (planConfig?.quarterlyDiscount ?? p.baseDiscount)
+      : p.key === '6month'
+      ? (planConfig?.sixMonthDiscount ?? p.baseDiscount)
+      : p.key === 'yearly'
+      ? (planConfig?.yearlyDiscount ?? p.baseDiscount)
+      : p.baseDiscount,
+  }));
 
   useEffect(() => {
     let active = true;
@@ -130,7 +195,9 @@ export function BillingPage() {
   }, [couponFromQuery]);
 
   function getMonthlyPrice(tier: SubscriptionTier): number {
-    return planConfig?.pricing?.[tier]?.monthlyPrice ?? DEFAULT_PRICES[tier];
+    const raw = planConfig?.[tier]?.monthlyPrice ?? planConfig?.pricing?.[tier]?.monthlyPrice;
+  if (raw === '__INFINITY__') return Infinity;
+  return raw != null ? raw : DEFAULT_PRICES[tier];
   }
 
   const currentTier = (billingStatus?.tier || storeTier || 'basic') as SubscriptionTier;
@@ -138,6 +205,10 @@ export function BillingPage() {
     () => ({ basic: 0, pro: 1, business: 2, enterprise: 3 }),
     [],
   );
+
+  const isTrialing = billingStatus?.status === 'trialing';
+  const trialEndsAt = billingStatus?.trialEndsAt || null;
+  const trialExpired = trialEndsAt && new Date(trialEndsAt) < new Date() && !isTrialing;
 
   async function handlePlanChange(target: { tier: SubscriptionTier; priceKey?: string; couponCode?: string }) {
     const isDowngrade = (tierOrder[target.tier] ?? 0) < (tierOrder[currentTier] ?? 0);
@@ -258,13 +329,43 @@ export function BillingPage() {
       )}
 
       {/* Pricing Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
+      
+        {/* Trial Status Banner */}
+        {(isTrialing || trialExpired) && (
+          <TrialBanner
+            trialEndsAt={trialEndsAt as string}
+            onUpgrade={() => {
+              const proKey = `pro_monthly`;
+              handlePlanChange({ tier: 'pro', priceKey: proKey });
+            }}
+          />
+        )}
+<div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
         {plans.map((plan) => {
-          const limits = SUBSCRIPTION_LIMITS[plan.tier];
-          const platforms = TIER_PLATFORMS[plan.tier];
-          const priceKey = plan.custom ? '' : `${plan.tier}_${billingPeriod}`;
           const monthlyPrice = getMonthlyPrice(plan.tier);
+          const isCustom = plan.tier === 'enterprise' && (monthlyPrice === null || monthlyPrice === undefined || monthlyPrice === 0);
+          const priceKey = isCustom ? '' : `${plan.tier}_${billingPeriod}`;
+          
+          // Merge dynamic limits from admin entries
+          const limits = (() => {
+            const defaults = SUBSCRIPTION_LIMITS[plan.tier];
+            const overrides = planConfig?.[plan.tier];
+            if (!overrides) return defaults;
+            return {
+              socialAccounts: overrides.socialAccounts != null ? (overrides.socialAccounts === '__INFINITY__' ? Infinity : overrides.socialAccounts) : defaults.socialAccounts,
+              postsPerMonth: overrides.postsPerMonth != null ? (overrides.postsPerMonth === '__INFINITY__' ? Infinity : overrides.postsPerMonth) : defaults.postsPerMonth,
+              aiGenerationsPerMonth: overrides.aiGenerationsPerMonth != null ? (overrides.aiGenerationsPerMonth === '__INFINITY__' ? Infinity : overrides.aiGenerationsPerMonth) : defaults.aiGenerationsPerMonth,
+              templatesPerMonth: overrides.templatesPerMonth != null ? (overrides.templatesPerMonth === '__INFINITY__' ? Infinity : overrides.templatesPerMonth) : defaults.templatesPerMonth,
+              teamMembers: overrides.teamMembers != null ? (overrides.teamMembers === '__INFINITY__' ? Infinity : overrides.teamMembers) : defaults.teamMembers,
+              analyticsDays: overrides.analyticsDays != null ? (overrides.analyticsDays === '__INFINITY__' ? Infinity : overrides.analyticsDays) : defaults.analyticsDays,
+            };
+          })();
 
+          const platforms: string[] = (() => {
+            const adminPlatforms = planConfig?.[plan.tier]?.platforms;
+            if (Array.isArray(adminPlatforms) && adminPlatforms.length > 0) return adminPlatforms;
+            return TIER_PLATFORMS[plan.tier] as string[];
+          })();
           const isCurrent = plan.tier === currentTier;
           const isDowngrade = (tierOrder[plan.tier] ?? 0) < (tierOrder[currentTier] ?? 0);
 
@@ -294,10 +395,11 @@ export function BillingPage() {
               </div>
 
               <div className="mb-4">
-                {plan.custom ? (
+                {isCustom ? (
                   <span className="text-3xl font-bold text-neutral-900">Custom</span>
                 ) : (() => {
-                  const price = computePrice(monthlyPrice, billingPeriod);
+                  const activePeriod = BILLING_PERIODS.find((p) => p.key === billingPeriod)!;
+          const price = computePrice(monthlyPrice, activePeriod);
                   return (
                     <>
                       <span className="text-3xl font-bold text-neutral-900">{price.display}</span>
@@ -323,9 +425,9 @@ export function BillingPage() {
                       <span
                         key={pid}
                         className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-neutral-100 text-neutral-700"
-                        style={{ borderLeft: `3px solid ${PLATFORMS[pid].color}` }}
+                        style={{ borderLeft: `3px solid ${(PLATFORMS as Record<string, {color: string; name: string}>)[pid]?.color ?? '#888'}` }}
                       >
-                        {PLATFORMS[pid].name}
+                        {(PLATFORMS as Record<string, {color: string; name: string}>)[pid]?.name ?? pid}
                       </span>
                     ))
                   )}
@@ -346,7 +448,7 @@ export function BillingPage() {
                 ))}
               </ul>
 
-              {plan.custom ? (
+              {isCustom ? (
                 <Button variant="secondary" className="w-full">
                   Contact Sales
                 </Button>
@@ -361,7 +463,7 @@ export function BillingPage() {
                   loading={loading === priceKey}
                   onClick={() => void handlePlanChange({ tier: plan.tier, priceKey, couponCode: couponCode || undefined })}
                 >
-                  {isDowngrade ? 'Downgrade' : plan.popular ? 'Get Pro' : 'Select Plan'}
+                  {isDowngrade ? 'Downgrade' : `Start ${plan.name} Plan`}
                 </Button>
               )}
             </Card>

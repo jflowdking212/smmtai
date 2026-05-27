@@ -25,6 +25,20 @@ import { couponService } from '../services/coupon.service.js';
 import { uploadPublicFile } from '../services/storage.service.js';
 import { prisma } from '../config/database.js';
 
+// Safe plan config serializer: preserves Infinity as __INFINITY__ through JSON
+function sendPlanConfig(res: Response, payload: Record<string, unknown>): void {
+  const body = JSON.stringify(payload, (_k, v) => (v === Infinity ? '__INFINITY__' : v));
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  res.end(body);
+}
+
+// Helper: safely serialize plan config (Infinity -> __INFINITY__ for JSON)
+function safeJsonPlanConfig(res: Response, payload: Record<string, unknown>): void {
+  const body = JSON.stringify(payload, (_k, v) => (v === Infinity ? '__INFINITY__' : v));
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  res.end(body);
+}
+
 export const adminRouter = Router();
 
 const logoUpload = multer({
@@ -42,7 +56,7 @@ const logoUpload = multer({
 adminRouter.get('/settings/site/public', async (_req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const config = await getSiteSettings();
-    res.json({ success: true, data: config });
+    res.json( { success: true, data: config });
   } catch (err) {
     next(err);
   }
@@ -52,7 +66,7 @@ adminRouter.get('/settings/site/public', async (_req: AuthRequest, res: Response
 adminRouter.get('/settings/plans/public', async (_req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const config = await getPlanConfig();
-    res.json({ success: true, data: config });
+    safeJsonPlanConfig(res, { success: true, data: config });
   } catch (err) {
     next(err);
   }
@@ -83,7 +97,7 @@ adminRouter.use(authenticate, requireSystemAdmin);
 adminRouter.get('/settings/site', async (_req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const config = await getSiteSettings();
-    res.json({ success: true, data: config });
+    res.json( { success: true, data: config });
   } catch (err) {
     next(err);
   }
@@ -93,7 +107,7 @@ adminRouter.put('/settings/site', async (req: AuthRequest, res: Response, next: 
   try {
     await saveSiteSettings(req.body);
     const config = await getSiteSettings();
-    res.json({ success: true, data: config });
+    res.json( { success: true, data: config });
   } catch (err) {
     next(err);
   }
@@ -150,7 +164,7 @@ adminRouter.post('/settings/site/favicon', logoUpload.single('favicon'), async (
 adminRouter.get('/settings/smtp', async (_req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const config = await getSmtpConfigMasked();
-    res.json({ success: true, data: config });
+    res.json( { success: true, data: config });
   } catch (err) {
     next(err);
   }
@@ -160,7 +174,7 @@ adminRouter.put('/settings/smtp', async (req: AuthRequest, res: Response, next: 
   try {
     await saveSmtpConfig(req.body);
     const config = await getSmtpConfigMasked();
-    res.json({ success: true, data: config });
+    res.json( { success: true, data: config });
   } catch (err) {
     next(err);
   }
@@ -184,7 +198,7 @@ adminRouter.post('/settings/smtp/test', async (req: AuthRequest, res: Response, 
 adminRouter.get('/settings/storage', async (_req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const config = await getStorageConfigMasked();
-    res.json({ success: true, data: config });
+    res.json( { success: true, data: config });
   } catch (err) {
     next(err);
   }
@@ -194,7 +208,7 @@ adminRouter.put('/settings/storage', async (req: AuthRequest, res: Response, nex
   try {
     await saveStorageConfig(req.body);
     const config = await getStorageConfigMasked();
-    res.json({ success: true, data: config });
+    res.json( { success: true, data: config });
   } catch (err) {
     next(err);
   }
@@ -214,7 +228,7 @@ adminRouter.post('/settings/storage/test', async (req: AuthRequest, res: Respons
 adminRouter.get('/settings/platforms', async (_req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const config = await getPlatformCredentialsMasked();
-    res.json({ success: true, data: config });
+    res.json( { success: true, data: config });
   } catch (err) {
     next(err);
   }
@@ -224,7 +238,7 @@ adminRouter.put('/settings/platforms', async (req: AuthRequest, res: Response, n
   try {
     await savePlatformCredentials(req.body);
     const config = await getPlatformCredentialsMasked();
-    res.json({ success: true, data: config });
+    res.json( { success: true, data: config });
   } catch (err) {
     next(err);
   }
@@ -235,7 +249,7 @@ adminRouter.put('/settings/platforms', async (req: AuthRequest, res: Response, n
 adminRouter.get('/settings/plans', async (_req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const config = await getPlanConfig();
-    res.json({ success: true, data: config });
+    safeJsonPlanConfig(res, { success: true, data: config });
   } catch (err) {
     next(err);
   }
@@ -245,7 +259,7 @@ adminRouter.put('/settings/plans', async (req: AuthRequest, res: Response, next:
   try {
     await savePlanConfig(req.body);
     const config = await getPlanConfig();
-    res.json({ success: true, data: config });
+    safeJsonPlanConfig(res, { success: true, data: config });
   } catch (err) {
     next(err);
   }

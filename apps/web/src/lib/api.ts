@@ -288,7 +288,14 @@ export const api = {
       }),
     getLimits: () =>
       request<{ success: true; data: { socialAccounts: number; postsPerMonth: number; aiGenerationsPerMonth: number; templatesPerMonth: number; teamMembers: number; analyticsDays: number } }>('/billing/limits'),
+    activateTrial: () =>
+      request<{ success: true; data: any }>('/billing/trial/activate', { method: 'POST' }),
+    getTrialStatus: () =>
+      request<{ success: true; data: any }>('/billing/trial/status'),
   },
+
+
+
   connections: {
     list: () =>
       request<{ success: true; data: any[] }>('/connections'),

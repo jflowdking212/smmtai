@@ -5,6 +5,7 @@ import { api, ApiError } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
 import { Sparkles, Check, Chrome, Github, Facebook } from 'lucide-react';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
+import { TrialActivationModal } from '@/components/TrialActivationModal';
 
 export function RegisterPage() {
   const { settings } = useSiteSettings();
@@ -16,6 +17,7 @@ export function RegisterPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showTrialModal, setShowTrialModal] = useState(false);
   const [inviteNotice, setInviteNotice] = useState('');
   const inviteToken = searchParams.get('invite_token');
   const inviteAction = searchParams.get('invite_action');
@@ -47,6 +49,8 @@ export function RegisterPage() {
     try {
       const res = await api.auth.register({ name, email, password });
       setAuth(res.data.user, res.data.accessToken, res.data.workspaceId, res.data.role || 'owner', res.data.tier || 'basic');
+      // Show trial activation modal for all new signups
+      localStorage.setItem('smmt_new_signup', '1');
 
       if (inviteToken && inviteAction !== 'decline') {
         try {
@@ -59,7 +63,8 @@ export function RegisterPage() {
         }
       }
 
-      navigate('/profile/complete');
+      setShowTrialModal(true);
+      return;;
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Something went wrong');
     } finally {
@@ -68,6 +73,7 @@ export function RegisterPage() {
   }
 
   return (
+    <>
     <div className="min-h-screen flex">
       {/* Left — Branding */}
       <div className="hidden lg:flex lg:w-1/2 bg-brand-500 items-center justify-center p-12">
@@ -217,5 +223,19 @@ export function RegisterPage() {
         </div>
       </div>
     </div>
+
+      {showTrialModal && (
+        <TrialActivationModal
+          onClose={() => {
+            setShowTrialModal(false);
+            navigate('/dashboard');
+          }}
+          onActivated={(_trialEndsAt: string) => {
+            setShowTrialModal(false);
+            navigate('/dashboard');
+          }}
+        />
+      )}
+    </>
   );
 }

@@ -71,7 +71,7 @@ export class StripeService {
     if (!periodCfg) throw new AppError(`Invalid billing period: ${period}`, 400, 'INVALID_PRICE');
 
     const planConfig = await getPlanConfig();
-    const monthlyPrice: number = planConfig?.pricing?.[tier]?.monthlyPrice ?? 0;
+    const monthlyPrice: number = planConfig?.[tier]?.monthlyPrice ?? planConfig?.pricing?.[tier]?.monthlyPrice ?? 0;
     if (!monthlyPrice || monthlyPrice <= 0) {
       throw new AppError(`No pricing configured for plan: ${tier}`, 400, 'INVALID_PRICE');
     }

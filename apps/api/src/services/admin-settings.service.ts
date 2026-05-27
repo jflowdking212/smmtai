@@ -153,11 +153,29 @@ export interface SiteSettings {
   seo_meta_title: string;
   seo_meta_description: string;
   fb_pixel_id: string;
+  promo_enabled?: string;
+  promo_badge?: string;
+  promo_headline?: string;
+  promo_subheadline?: string;
+  promo_pro_discounted_price?: string;
+  promo_pro_original_price?: string;
+  promo_biz_discounted_price?: string;
+  promo_biz_original_price?: string;
+  promo_pro_coupon?: string;
+  promo_biz_coupon?: string;
+  promo_min_months?: string;
+  promo_disclaimer?: string;
+  promo_primary_cta?: string;
+  promo_secondary_cta?: string;
+  promo_secondary_trial_days?: string;
+  promo_trust_bar?: string;
+  promo_footer?: string;
 }
 
 export async function getSiteSettings(): Promise<SiteSettings> {
   const cfg = await getConfigGroup('site_');
   const seo = await getConfigGroup('seo_');
+  const promo = await getConfigGroup('promo_');
   return {
     site_title: cfg.site_title || '',
     site_tagline: cfg.site_tagline || '',
@@ -166,11 +184,36 @@ export async function getSiteSettings(): Promise<SiteSettings> {
     seo_meta_title: seo.seo_meta_title || '',
     seo_meta_description: seo.seo_meta_description || '',
     fb_pixel_id: cfg.fb_pixel_id || '',
+    promo_enabled: promo.promo_enabled || 'false',
+    promo_badge: promo.promo_badge || 'Entrepreneurs Day exclusive offer',
+    promo_headline: promo.promo_headline || 'Happy Entrepreneurs Day — Your Exclusive Offer Awaits',
+    promo_subheadline: promo.promo_subheadline || 'Get 60% off SMMTAI and take full control of your social media — at a price that makes sense for every entrepreneur.',
+    promo_pro_discounted_price: promo.promo_pro_discounted_price || '10',
+    promo_pro_original_price: promo.promo_pro_original_price || '25',
+    promo_biz_discounted_price: promo.promo_biz_discounted_price || '20',
+    promo_biz_original_price: promo.promo_biz_original_price || '50',
+    promo_pro_coupon: promo.promo_pro_coupon || 'ENTREPRENEURS60PRO',
+    promo_biz_coupon: promo.promo_biz_coupon || 'ENTREPRENEURS60BIZ',
+    promo_min_months: promo.promo_min_months || '6',
+    promo_disclaimer: promo.promo_disclaimer || 'Discount applies only when you subscribe for a minimum of six months. Selecting less than six months removes the sixty percent discount automatically.',
+    promo_primary_cta: promo.promo_primary_cta || 'Claim 60% Off Now — Entrepreneurs Day Deal',
+    promo_secondary_cta: promo.promo_secondary_cta || 'Try Pro Free for 14 Days — No Credit Card Needed',
+    promo_secondary_trial_days: promo.promo_secondary_trial_days || '14',
+    promo_trust_bar: promo.promo_trust_bar || 'All Features Included,Cancel Anytime After Six Months,Trusted by Entrepreneurs Worldwide',
+    promo_footer: promo.promo_footer || 'This offer is exclusive to Entrepreneurs Day and available only through this page. SMMTAI.com',
   };
 }
 
 export async function saveSiteSettings(data: Partial<SiteSettings>): Promise<void> {
-  const allowed = ['site_title', 'site_tagline', 'site_favicon', 'site_logo', 'seo_meta_title', 'seo_meta_description', 'fb_pixel_id'] as const;
+  const allowed = [
+    'site_title', 'site_tagline', 'site_favicon', 'site_logo', 'seo_meta_title', 'seo_meta_description', 'fb_pixel_id',
+    'promo_enabled', 'promo_badge', 'promo_headline', 'promo_subheadline',
+    'promo_pro_discounted_price', 'promo_pro_original_price',
+    'promo_biz_discounted_price', 'promo_biz_original_price',
+    'promo_pro_coupon', 'promo_biz_coupon', 'promo_min_months', 'promo_disclaimer',
+    'promo_primary_cta', 'promo_secondary_cta', 'promo_secondary_trial_days',
+    'promo_trust_bar', 'promo_footer'
+  ] as const;
   for (const key of allowed) {
     if (data[key] !== undefined) {
       await setConfig(key, data[key]);

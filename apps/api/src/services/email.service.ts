@@ -491,6 +491,37 @@ View full analytics: ${input.link}`;
       html,
     });
   }
+
+  async sendTrialActivated(email: string, name: string, trialEndsAt: Date): Promise<void> {
+    const endDate = trialEndsAt.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    await this.sendEmail({
+      to: email,
+      subject: '???? Your 14-Day Pro Trial is Active!',
+      text: `Hi ${name},\n\nYour free 14-day Pro trial is now active! You have full access to all Pro features until ${endDate}.\n\nThe SmmtAI Team`,
+      html: `<div style="font-family:sans-serif;max-width:600px;margin:auto;padding:32px"><h1 style="color:#2563eb">???? Your Pro Trial is Active!</h1><p>Hi <strong>${name}</strong>,</p><p>Your free 14-day Pro trial is now live until <strong>${endDate}</strong>.</p><ul style="line-height:1.8"><li>??? 100 AI generations/month</li><li>??? 8 social accounts</li><li>??? Visual Design Studio</li><li>??? 5 team members</li><li>??? 30-day analytics</li></ul><a href="${process.env.FRONTEND_URL || 'https://smmtai.com'}/dashboard" style="display:inline-block;background:#2563eb;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;margin-top:16px">Go to Dashboard ???</a><p style="color:#6b7280;margin-top:24px;font-size:14px">The SmmtAI Team</p></div>`,
+    });
+  }
+
+  async sendTrialReminder(email: string, name: string, daysLeft: number, upgradeUrl: string): Promise<void> {
+    const urgency = daysLeft === 1 ? '?????? Last Day!' : daysLeft <= 3 ? '??? 3 Days Left' : '???? 7 Days Left';
+    const color = daysLeft === 1 ? '#dc2626' : daysLeft <= 3 ? '#d97706' : '#2563eb';
+    await this.sendEmail({
+      to: email,
+      subject: `${urgency} Your SmmtAI Pro Trial Expires in ${daysLeft} Day${daysLeft === 1 ? '' : 's'}`,
+      text: `Hi ${name},\n\nYour SmmtAI Pro trial expires in ${daysLeft} day${daysLeft === 1 ? '' : 's'}. Upgrade: ${upgradeUrl}\n\nThe SmmtAI Team`,
+      html: `<div style="font-family:sans-serif;max-width:600px;margin:auto;padding:32px"><h1 style="color:${color}">${urgency} Trial expires in ${daysLeft} day${daysLeft === 1 ? '' : 's'}</h1><p>Hi <strong>${name}</strong>,</p><p>Your free Pro trial is ending soon. Upgrade to keep full access.</p><a href="${upgradeUrl}" style="display:inline-block;background:${color};color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;margin-top:16px">Upgrade to Pro ???</a><p style="color:#6b7280;margin-top:24px;font-size:14px">The SmmtAI Team</p></div>`,
+    });
+  }
+
+  async sendTrialExpired(email: string, name: string, upgradeUrl: string): Promise<void> {
+    await this.sendEmail({
+      to: email,
+      subject: 'Your SmmtAI Pro Trial Has Ended ??? Choose a Plan',
+      text: `Hi ${name},\n\nYour 14-day Pro trial has ended. Choose a plan to continue: ${upgradeUrl}\n\nThe SmmtAI Team`,
+      html: `<div style="font-family:sans-serif;max-width:600px;margin:auto;padding:32px"><h1 style="color:#374151">Your Pro Trial Has Ended</h1><p>Hi <strong>${name}</strong>,</p><p>Your 14-day Pro trial has ended. Choose a plan to restore full access.</p><a href="${upgradeUrl}" style="display:inline-block;background:#2563eb;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;margin-top:16px">Choose a Plan ???</a><p style="color:#6b7280;margin-top:24px;font-size:14px">The SmmtAI Team</p></div>`,
+    });
+  }
+
 }
 
 export const emailService = new EmailService();

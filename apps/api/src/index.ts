@@ -1,4 +1,5 @@
 import express from 'express';
+import { scheduleTrialChecker } from './jobs/scheduler.js';
 import cors from 'cors';
 import helmet from 'helmet';
 import hpp from 'hpp';
@@ -98,6 +99,7 @@ if (config.sentry.dsn) {
 app.use(errorHandler);
 
 app.listen(config.port, () => {
+scheduleTrialChecker();
   console.log(`🚀 SmmtAI API running on port ${config.port}`);
   console.log(`   Environment: ${config.nodeEnv}`);
   void scheduleAnalyticsIngestion()

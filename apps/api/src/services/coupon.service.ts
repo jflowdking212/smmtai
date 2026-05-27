@@ -3,11 +3,21 @@ import { AppError } from '../middleware/errorHandler.js';
 import { config } from '../config/index.js';
 
 const PRICE_KEYS = [
+  'basic_monthly',
+  'basic_quarterly',
+  'basic_6month',
+  'basic_yearly',
   'pro_monthly',
+  'pro_quarterly',
+  'pro_6month',
   'pro_yearly',
   'business_monthly',
+  'business_quarterly',
+  'business_6month',
   'business_yearly',
   'enterprise_monthly',
+  'enterprise_quarterly',
+  'enterprise_6month',
   'enterprise_yearly',
 ] as const;
 
@@ -133,9 +143,18 @@ export class CouponService {
     }
   }
 
-  private assertCouponPriceEligibility(coupon: { allowedPriceKeys: string[] }, priceKey: string): void {
+  private assertCouponPriceEligibility(coupon: { code: string; allowedPriceKeys: string[] }, priceKey: string): void {
     if (coupon.allowedPriceKeys.length > 0 && !coupon.allowedPriceKeys.includes(priceKey)) {
       throw new AppError('Coupon does not apply to this package', 400, 'COUPON_PLAN_MISMATCH');
+    }
+
+    const codeUpper = coupon.code.toUpperCase();
+    if (codeUpper === 'ENTREPRENEURS60PRO' || codeUpper === 'ENTREPRENEURS60BIZ') {
+      const parts = priceKey.split('_');
+      const period = parts[parts.length - 1];
+      if (period === 'monthly' || period === 'quarterly') {
+        throw new AppError('This coupon requires a minimum billing period of 6 months.', 400, 'COUPON_MIN_MONTHS_REQUIRED');
+      }
     }
   }
 

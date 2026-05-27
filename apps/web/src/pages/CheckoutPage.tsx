@@ -27,6 +27,15 @@ export function CheckoutPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [existingAccount, setExistingAccount] = useState(false);
+  const [planConfig, setPlanConfig] = useState<Record<string, any>>({});
+
+  useEffect(() => {
+    let active = true;
+    api.site.getPublicPlans()
+      .then((res) => { if (active) setPlanConfig(res.data); })
+      .catch(() => { /* ignore */ });
+    return () => { active = false; };
+  }, []);
 
   const nextPath = useMemo(() => {
     const params = new URLSearchParams();
@@ -96,12 +105,38 @@ export function CheckoutPage() {
 
   const { settings } = useSiteSettings();
 
+  const planSummary = useMemo(() => {
+    const tier = priceKey.split('_')[0] || '';
+    const interval = priceKey.split('_')[1] || '';
+    const baseMonthly = planConfig?.[tier]?.monthlyPrice || (tier === 'pro' ? 25 : tier === 'business' ? 50 : 0);
+    
+    let months = 1;
+    if (interval === '6month') months = 6;
+    if (interval === 'yearly') months = 12;
+    if (interval === 'quarterly') months = 3;
+    
+    let subtotal = baseMonthly * months;
+    let total = subtotal;
+    
+    if (couponPreview?.discountPercent) {
+      total = subtotal * (1 - couponPreview.discountPercent / 100);
+    }
+
+    return {
+      tierName: tier.charAt(0).toUpperCase() + tier.slice(1),
+      periodName: interval === '6month' ? '6 Months' : interval === 'yearly' ? 'Annually' : interval === 'quarterly' ? 'Quarterly' : 'Monthly',
+      subtotal,
+      total,
+      hasDiscount: !!couponPreview?.discountPercent
+    };
+  }, [priceKey, planConfig, couponPreview]);
+
   return (
     <div className="min-h-screen bg-neutral-50">
       <div className="max-w-2xl mx-auto px-4 py-12 space-y-6">
-        <Link to="/#pricing" className="inline-flex items-center gap-2 text-sm text-brand-blue hover:underline">
+        <a href="/#pricing" className="inline-flex items-center gap-2 text-sm text-brand-blue hover:underline">
           <ArrowLeft className="w-4 h-4" /> Back to pricing
-        </Link>
+        </a>
 
         <div className="flex items-center gap-3">
           {settings.site_logo ? (
@@ -130,11 +165,38 @@ export function CheckoutPage() {
         )}
 
         <Card className="p-6 space-y-5">
-          <div className="flex items-center gap-2">
-            <CreditCard className="w-5 h-5 text-neutral-500" />
-            <p className="text-sm font-medium text-neutral-700">
-              Selected plan: <span className="font-semibold">{resolvePlanLabel(priceKey)}</span>
-            </p>
+          <div className="bg-white border border-neutral-200 rounded-xl p-5 shadow-sm space-y-4">
+            <div className="flex items-start justify-between border-b border-neutral-100 pb-4">
+              <div className="space-y-1">
+                <p className="text-lg font-bold text-neutral-900">
+                  {planSummary.tierName} Plan
+                </p>
+                <p className="text-sm text-neutral-500 font-medium">
+                  Billing Period: {planSummary.periodName}
+                </p>
+              </div>
+              <a href="/#pricing" className="text-xs font-semibold text-brand-blue bg-brand-50 hover:bg-brand-100 px-3 py-1.5 rounded-lg transition-colors border border-brand-200">
+                Change plan
+              </a>
+            </div>
+            
+            <div className="flex items-center justify-between pt-1">
+              <span className="text-sm text-neutral-600">Subtotal</span>
+              <span className="text-sm font-medium text-neutral-900">${planSummary.subtotal.toFixed(2)}</span>
+            </div>
+            
+            {planSummary.hasDiscount && (
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-emerald-600 font-medium">Discount ({couponPreview.discountPercent}%)</span>
+                <span className="text-sm font-bold text-emerald-600">-${(planSummary.subtotal - planSummary.total).toFixed(2)}</span>
+              </div>
+            )}
+
+            <div className="flex items-center justify-between pt-3 border-t border-neutral-100">
+              <span className="text-base font-bold text-neutral-900">Estimated Total</span>
+              <span className="text-xl font-extrabold text-neutral-900">${planSummary.total.toFixed(2)}</span>
+            </div>
+            <p className="text-[10px] text-neutral-400 text-right mt-1">Final exact amount computed securely at Stripe checkout</p>
           </div>
 
           <Input

@@ -215,6 +215,62 @@ billingRouter.post(
   },
 );
 
+
+// Activate free trial (no credit card, no Stripe)
+billingRouter.post(
+  '/trial/activate',
+  authenticate,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      if (!req.workspaceId) {
+        return res.status(400).json({ success: false, error: { code: 'NO_WORKSPACE', message: 'Workspace required' } });
+      }
+      const { prisma } = await import('../config/database.js');
+      const sub = await prisma.subscription.findUnique({
+        where: { workspaceId: req.workspaceId },
+        include: {
+          workspace: {
+            include: {
+              owner: { select: { email: true, name: true } }
+            }
+          }
+        }
+      });
+      if (!sub) return res.status(404).json({ success: false, error: { code: 'NO_SUBSCRIPTION', message: 'Subscription not found' } });
+      if (sub.trialEndsAt) return res.status(409).json({ success: false, error: { code: 'TRIAL_ALREADY_USED', message: 'A free trial has already been used on this account' } });
+      const trialEndsAt = new Date();
+      trialEndsAt.setDate(trialEndsAt.getDate() + 14);
+      await prisma.subscription.update({ where: { workspaceId: req.workspaceId }, data: { tier: 'pro', status: 'trialing', trialEndsAt } });
+      try {
+        const user = sub.workspace?.owner;
+        if (user?.email) {
+          const { emailService } = await import('../services/email.service.js');
+          await emailService.sendTrialActivated(user.email, user.name || 'there', trialEndsAt);
+        }
+      } catch (e) { console.error('[trial/activate] Email failed:', e); }
+      return res.json({ success: true, data: { trialEndsAt, daysLeft: 14 } });
+    } catch (err) { return next(err); }
+  },
+);
+
+// Check if trial is available for this account
+billingRouter.get(
+  '/trial/status',
+  authenticate,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      if (!req.workspaceId) return res.json({ success: true, data: { available: false } });
+      const { prisma } = await import('../config/database.js');
+      const sub = await prisma.subscription.findUnique({ where: { workspaceId: req.workspaceId } });
+      const available = !sub?.trialEndsAt;
+      const isTrialing = sub?.status === 'trialing';
+      const trialEndsAt = sub?.trialEndsAt || null;
+      const daysLeft = trialEndsAt ? Math.max(0, Math.ceil((new Date(trialEndsAt).getTime() - Date.now()) / 86400000)) : 0;
+      return res.json({ success: true, data: { available, isTrialing, trialEndsAt, daysLeft } });
+    } catch (err) { return next(err); }
+  },
+);
+
 // Stripe webhook (raw body required)
 billingRouter.post(
   '/webhook',

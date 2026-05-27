@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { PLATFORMS } from '@ee-postmind/shared';
 import { useState } from 'react';
 import { Footer } from '@/components/Footer';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
@@ -32,7 +33,7 @@ const plans = [
     features: ['25 social accounts', 'Unlimited posts', '500 AI generations', 'Unlimited templates', '10 team members', '90-day analytics'],
   },
   {
-    name: 'Enterprise', monthlyPrice: 0, description: 'Dedicated support & custom limits', icon: Crown, popular: false, custom: true,
+    name: 'Enterprise', monthlyPrice: 0, description: 'Dedicated support & custom limits', icon: Crown, popular: false,
     platforms: ['All 13 platforms'],
     features: ['Unlimited accounts', 'Unlimited posts', 'Unlimited AI', 'Unlimited templates', '20 team members', 'Full analytics history', 'Dedicated support', 'Custom integrations'],
   },
@@ -70,30 +71,27 @@ function ThemeToggle() {
   );
 }
 
-function PricingSection() {
+function PricingSection({ planConfig }: { planConfig: Record<string, any> }) {
   const [sliderIndex, setSliderIndex] = useState(0); // 0 = Monthly, 1 = Quarterly, 2 = 6 Months, 3 = Yearly
-  const [planConfig, setPlanConfig] = useState<Record<string, any>>({});
 
+  const qDiscount = planConfig?.quarterlyDiscount ?? 5;
+  const sDiscount = planConfig?.sixMonthDiscount ?? 15;
+  const yDiscount = planConfig?.yearlyDiscount ?? 30;
   const PERIODS_INFO = [
-    { id: 'monthly', label: 'Monthly', months: 1, discount: 0, saveText: '' },
-    { id: 'quarterly', label: 'Quarterly', months: 3, discount: 5, saveText: 'Save 5%' },
-    { id: '6month', label: '6 Months', months: 6, discount: 15, saveText: 'Save 15%' },
-    { id: 'yearly', label: 'Yearly', months: 12, discount: 30, saveText: 'Save 30%' },
-  ] as const;
+    { id: 'monthly',   label: 'Monthly',   months: 1,  discount: 0,         saveText: '' } as const,
+    { id: 'quarterly', label: 'Quarterly', months: 3,  discount: qDiscount, saveText: `Save ${qDiscount}%` } as const,
+    { id: '6month',    label: '6 Months',  months: 6,  discount: sDiscount, saveText: `Save ${sDiscount}%` } as const,
+    { id: 'yearly',    label: 'Yearly',    months: 12, discount: yDiscount, saveText: `Save ${yDiscount}%` } as const,
+  ];
 
   const selectedPeriod = PERIODS_INFO[sliderIndex].id;
 
-  useEffect(() => {
-    let active = true;
-    api.site.getPublicPlans()
-      .then((res) => { if (active) setPlanConfig(res.data); })
-      .catch(() => { /* use defaults */ });
-    return () => { active = false; };
-  }, []);
-
   function getMonthlyPrice(planName: string): number {
     const tier = TIER_MAP[planName];
-    return planConfig?.pricing?.[tier]?.monthlyPrice ?? DEFAULT_PRICES[planName];
+    const rawPrice = planConfig?.[tier]?.monthlyPrice ?? planConfig?.pricing?.[tier]?.monthlyPrice;
+    if (rawPrice === '__INFINITY__') return Infinity;
+    if (rawPrice != null) return rawPrice as number;
+    return DEFAULT_PRICES[planName];
   }
 
   function formatSliderPrice(baseMonthlyPrice: number, index: number) {
@@ -178,22 +176,40 @@ function PricingSection() {
           const monthlyPrice = getMonthlyPrice(plan.name);
           const price = formatSliderPrice(monthlyPrice, sliderIndex);
           const tier = TIER_MAP[plan.name] || '';
+          const planPlatforms: string[] = (() => {
+            const adminPlatforms = planConfig?.[tier]?.platforms;
+            if (Array.isArray(adminPlatforms) && adminPlatforms.length > 0) return adminPlatforms;
+            return plan.platforms;
+          })();
 
-          const selectedPriceKey = tier && tier !== 'enterprise'
-            ? `${tier}_${selectedPeriod}`
-            : '';
+          const isCustom = plan.name === 'Enterprise' && (monthlyPrice === 0) && !planConfig?.[tier]?.monthlyPrice;
 
-          const href = plan.custom 
+          const selectedPriceKey = tier ? `${tier}_${selectedPeriod}` : '';
+
+          const href = isCustom 
             ? '#contact' 
             : `/checkout?priceKey=${encodeURIComponent(selectedPriceKey)}`;
 
-          const label = plan.custom 
+          const label = isCustom 
             ? 'Contact Sales' 
-            : tier === 'basic' 
-              ? 'Start Basic Plan' 
-              : tier === 'pro' 
-                ? 'Start 14-Day Free Trial' 
-                : 'Continue';
+            : `Start ${plan.name} Plan`;
+
+          // Dynamically compute the features array from the admin entries
+          const planFeatures = (() => {
+            const overrides = planConfig?.[tier];
+            if (!overrides) return plan.features;
+            
+            const formatVal = (val: unknown) => (val == null || val === Infinity || val === '__INFINITY__' || val === 'Infinity' || (typeof val === 'number' && val < 0)) ? 'Unlimited' : val;
+            
+            return [
+              `${formatVal(overrides.socialAccounts)} social accounts`,
+              `${formatVal(overrides.postsPerMonth)} posts/month`,
+              `${formatVal(overrides.aiGenerationsPerMonth)} AI generations`,
+              `${formatVal(overrides.templatesPerMonth)} templates/month`,
+              `${formatVal(overrides.teamMembers)} team member${(overrides.teamMembers == null || overrides.teamMembers > 1) ? 's' : ''}`,
+              `${(overrides.analyticsDays == null || overrides.analyticsDays === '__INFINITY__' || overrides.analyticsDays === Infinity || overrides.analyticsDays === 'Infinity' || overrides.analyticsDays < 0) ? 'Full' : `${overrides.analyticsDays}-day`} analytics`,
+            ];
+          })();
 
           const className = `block w-full text-center py-2.5 rounded-lg font-medium text-sm transition-all ${
             plan.popular
@@ -221,7 +237,7 @@ function PricingSection() {
               <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">{plan.description}</p>
               
               <div className="mt-4 mb-2">
-                {plan.custom ? (
+                {isCustom ? (
                   <span className="text-4xl font-bold text-neutral-900 dark:text-white">Custom</span>
                 ) : (
                   <>
@@ -239,22 +255,22 @@ function PricingSection() {
 
               {/* Platform badges */}
               <div className="flex flex-wrap gap-1 mb-4 mt-3">
-                {plan.platforms.map((p) => (
+                {planPlatforms.map((p) => (
                   <span key={p} className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-neutral-100 dark:bg-white/8 text-neutral-600 dark:text-neutral-300">
-                    {p}
+                    {(PLATFORMS as Record<string, {name?: string}>)[p]?.name ?? p}
                   </span>
                 ))}
               </div>
 
               <ul className="space-y-3 mb-8 mt-4">
-                {plan.features.map((f) => (
+                {planFeatures.map((f) => (
                   <li key={f} className="flex items-center gap-2 text-sm text-neutral-700 dark:text-neutral-300">
                     <Check className="w-4 h-4 text-green-500 shrink-0" /> {f}
                   </li>
                 ))}
               </ul>
               
-              {plan.custom ? (
+              {isCustom ? (
                 <a href="#contact" className={className}>
                   {label}
                 </a>
@@ -275,6 +291,25 @@ export function LandingPage() {
   const { settings } = useSiteSettings();
   const siteName = settings.site_title || 'SmmtAI';
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [planConfig, setPlanConfig] = useState<Record<string, any>>({});
+
+  useEffect(() => {
+    // Scroll to #pricing hash when navigating from another page
+    if (window.location.hash === '#pricing') {
+      const tryScroll = () => {
+        const el = document.getElementById('pricing');
+        if (el) { el.scrollIntoView({ behavior: 'smooth' }); return true; }
+        return false;
+      };
+      if (!tryScroll()) setTimeout(tryScroll, 300);
+    }
+    // Fetch dynamic plan config from admin settings
+    let active = true;
+    api.site.getPublicPlans()
+      .then((res) => { if (active) setPlanConfig(res.data || {}); })
+      .catch(() => {});
+    return () => { active = false; };
+  }, []);
 
   return (
     <div className="min-h-screen bg-white dark:bg-[#0d0d18] transition-colors duration-300">
@@ -304,7 +339,7 @@ export function LandingPage() {
             <div className="hidden md:flex items-center gap-3">
               <ThemeToggle />
               <Link to="/auth/login" className="text-sm font-medium text-neutral-700 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white transition-colors px-4 py-2">Log In</Link>
-              <Link to="/checkout?priceKey=pro_monthly" className="text-sm font-semibold text-white bg-blue-600 hover:bg-blue-500 px-5 py-2.5 rounded-lg transition-all shadow-sm shadow-blue-600/20">
+              <Link to="/auth/register?trial=pro&trial_days=14" className="text-sm font-semibold text-white bg-blue-600 hover:bg-blue-500 px-5 py-2.5 rounded-lg transition-all shadow-sm shadow-blue-600/20">
                 Start 14-Day Free Trial
               </Link>
             </div>
@@ -341,7 +376,7 @@ export function LandingPage() {
               <a href="#contact" onClick={() => setMobileMenuOpen(false)} className="flex items-center px-3 py-2.5 text-sm font-medium text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-white/5 rounded-lg transition-colors">Contact</a>
               <div className="pt-2 pb-1">
                 <Link
-                  to="/checkout?priceKey=pro_monthly"
+                  to="/auth/register?trial=pro&trial_days=14"
                   onClick={() => setMobileMenuOpen(false)}
                   className="flex items-center justify-center gap-2 w-full py-3 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-xl transition-all shadow-md shadow-blue-600/20"
                 >
@@ -379,7 +414,7 @@ export function LandingPage() {
             {/* CTA Buttons */}
             <div className="mt-8 sm:mt-10 flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3">
               <Link
-                to="/checkout?priceKey=pro_monthly"
+                to="/auth/register?trial=pro&trial_days=14"
                 className="inline-flex items-center justify-center gap-2 px-7 py-3.5 bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-semibold rounded-xl transition-all shadow-lg shadow-blue-600/25 text-sm sm:text-base"
               >
                 Start 14-Day Free Trial <ArrowRight className="w-4 h-4" />
@@ -471,7 +506,7 @@ export function LandingPage() {
 
       {/* Pricing */}
       <section id="pricing" className="py-20 sm:py-28 bg-white dark:bg-[#0d0d18] transition-colors duration-300">
-        <PricingSection />
+        <PricingSection planConfig={planConfig} />
       </section>
 
       {/* CTA */}
@@ -484,7 +519,7 @@ export function LandingPage() {
           <h2 className="text-3xl sm:text-4xl font-bold font-heading text-white">Ready to supercharge your social media?</h2>
           <p className="mt-4 text-lg text-blue-100 max-w-2xl mx-auto">Join thousands of creators and teams who use SmmtAI to save time, create better content, and grow their audience.</p>
           <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Link to="/checkout?priceKey=pro_monthly" className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-3.5 bg-white hover:bg-blue-50 text-blue-700 font-medium rounded-xl transition-all shadow-lg text-base">
+            <Link to="/auth/register?trial=pro&trial_days=14" className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-3.5 bg-white hover:bg-blue-50 text-blue-700 font-medium rounded-xl transition-all shadow-lg text-base">
               Start 14-Day Free Trial <ArrowRight className="w-5 h-5" />
             </Link>
             <Link to="/auth/login" className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-3.5 border-2 border-white/30 hover:border-white/60 text-white font-medium rounded-xl transition-all text-base hover:bg-white/5">

@@ -47,6 +47,8 @@ import { AdminCouponsPage } from '@/pages/admin/AdminCouponsPage';
 import { AdminAnalyticsPage } from '@/pages/admin/AdminAnalyticsPage';
 import { AdminMessagesPage } from '@/pages/admin/AdminMessagesPage';
 import { AdminSettingsPage } from '@/pages/admin/AdminSettingsPage';
+import { EntrepreneursPromoPage } from '@/pages/EntrepreneursPromoPage';
+
 
 // Lazy-load heavy pages
 const EditorPage = lazy(() => import('@/pages/EditorPage').then((m) => ({ default: m.EditorPage })));
@@ -108,6 +110,7 @@ export default function App() {
            <Route path="/cookies" element={<CookiePolicyPage />} />
            <Route path="/checkout" element={<CheckoutPage />} />
            <Route path="/checkout/success" element={<CheckoutSuccessPage />} />
+           <Route path="/promo/entrepreneurs" element={<EntrepreneursPromoPage />} />
 
            {/* Public auth routes */}
           <Route path="/auth/login" element={<LoginPage />} />

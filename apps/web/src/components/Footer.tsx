@@ -8,6 +8,7 @@ const footerLinks = {
     { label: 'Pricing', href: '#pricing' },
     { label: 'AI Assistant', href: '#features' },
     { label: 'Templates', href: '#features' },
+    { label: 'Special Promo', href: '/promo/entrepreneurs' },
   ],
   Resources: [
     { label: 'Help Center', href: '/auth/login' },

@@ -600,3 +600,69 @@ export async function getQueueStats() {
     recurring: repeatableJobs.length,
   };
 }
+
+// ?????? Daily Trial Reminder & Expiry Job ????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????
+export async function runTrialCheckJob(): Promise<void> {
+  try {
+    const { prisma } = await import('../config/database.js');
+    const { emailService } = await import('../services/email.service.js');
+    const now = new Date();
+    const FRONTEND_URL = process.env.FRONTEND_URL || 'https://smmtai.com';
+    const upgradeUrl = `${FRONTEND_URL}/checkout?priceKey=pro_monthly`;
+
+    function dayBoundary(daysFromNow: number): { start: Date; end: Date } {
+      const start = new Date(now);
+      start.setDate(start.getDate() + daysFromNow);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(start);
+      end.setHours(23, 59, 59, 999);
+      return { start, end };
+    }
+
+    // 1. Expire overdue trials
+    const expired = await prisma.subscription.findMany({
+      where: { status: 'trialing', trialEndsAt: { lt: now } },
+    });
+    for (const sub of expired) {
+      await prisma.subscription.update({ where: { id: sub.id }, data: { tier: 'basic', status: 'active' } });
+      const workspace = await prisma.workspace.findUnique({
+        where: { id: sub.workspaceId },
+        include: { owner: { select: { email: true, name: true } } }
+      }).catch(() => null);
+      const user = workspace?.owner;
+      if (user?.email) await emailService.sendTrialExpired(user.email, user.name || 'there', upgradeUrl).catch(console.error);
+      console.log(`[TrialJob] Expired: workspace ${sub.workspaceId}`);
+    }
+
+    // 2. Send reminders at 7, 3, 1 days remaining
+    for (const daysLeft of [7, 3, 1]) {
+      const { start, end } = dayBoundary(daysLeft);
+      const reminders = await prisma.subscription.findMany({
+        where: { status: 'trialing', trialEndsAt: { gte: start, lte: end } },
+      });
+      for (const sub of reminders) {
+        const workspace = await prisma.workspace.findUnique({
+          where: { id: sub.workspaceId },
+          include: { owner: { select: { email: true, name: true } } }
+        }).catch(() => null);
+        const user = workspace?.owner;
+        if (user?.email) {
+          await emailService.sendTrialReminder(user.email, user.name || 'there', daysLeft, upgradeUrl).catch(console.error);
+          console.log(`[TrialJob] Sent ${daysLeft}d reminder to ${user.email}`);
+        }
+      }
+    }
+
+    console.log(`[TrialJob] Done. Expired: ${expired.length}`);
+  } catch (err) { console.error('[TrialJob] Error:', err); }
+}
+
+export function scheduleTrialChecker(): void {
+  const now = new Date();
+  const nextRun = new Date();
+  nextRun.setUTCHours(8, 0, 0, 0);
+  if (nextRun <= now) nextRun.setUTCDate(nextRun.getUTCDate() + 1);
+  const delay = nextRun.getTime() - now.getTime();
+  console.log(`[TrialJob] First run in ${Math.round(delay/60000)}min`);
+  setTimeout(() => { runTrialCheckJob(); setInterval(runTrialCheckJob, 24*60*60*1000); }, delay);
+}
