@@ -52,9 +52,12 @@ export function EntrepreneursPromoPage() {
   const proOriginalPrice = settings?.promo_pro_original_price || '25';
   const bizDiscountPrice = settings?.promo_biz_discounted_price || '20';
   const bizOriginalPrice = settings?.promo_biz_original_price || '50';
+  const entDiscountPrice = settings?.promo_enterprise_discounted_price || '40';
+  const entOriginalPrice = settings?.promo_enterprise_original_price || '100';
   
   const proCoupon = settings?.promo_pro_coupon || 'ENTREPRENEURS60PRO';
   const bizCoupon = settings?.promo_biz_coupon || 'ENTREPRENEURS60BIZ';
+  const entCoupon = settings?.promo_enterprise_coupon || 'ENTREPRENEURS60ENT';
   
   const disclaimerText = settings?.promo_disclaimer || 'Discount applies exclusively when you subscribe for a minimum of six months. The checkout defaults to the six-month plan. Selecting any period less than six months will invalidate and remove the 60% discount automatically.';
   const primaryCtaText = settings?.promo_primary_cta || 'Claim 60% Off Now — Entrepreneurs Day Deal';
@@ -68,10 +71,13 @@ export function EntrepreneursPromoPage() {
   
   const footerText = settings?.promo_footer || 'This offer is exclusive to Entrepreneurs Day SMMTAI.com';
 
-  const getCheckoutUrl = (tier: 'pro' | 'business') => {
+  const getCheckoutUrl = (tier: 'pro' | 'business' | 'enterprise') => {
     const params = new URLSearchParams();
     params.set('priceKey', `${tier}_6month`);
-    params.set('coupon', tier === 'pro' ? proCoupon : bizCoupon);
+    let coupon = proCoupon;
+    if (tier === 'business') coupon = bizCoupon;
+    if (tier === 'enterprise') coupon = entCoupon;
+    params.set('coupon', coupon);
     Object.entries(utmParams).forEach(([k, v]) => params.set(k, v));
     return `/checkout?${params.toString()}`;
   };
@@ -138,7 +144,7 @@ export function EntrepreneursPromoPage() {
         </section>
 
         {/* Pricing Cards */}
-        <section className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+        <section className="grid grid-cols-1 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
           {/* Pro Card */}
           <Card className="p-8 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 shadow-xl rounded-3xl relative backdrop-blur-md hover:border-blue-300 dark:hover:border-blue-700 hover:shadow-2xl transition-all duration-300 group flex flex-col justify-between">
             <div className="absolute top-4 right-4 bg-gradient-to-r from-blue-600 to-violet-600 text-white text-[11px] font-extrabold px-3 py-1 rounded-full uppercase tracking-wider shadow-md">
@@ -270,6 +276,72 @@ export function EntrepreneursPromoPage() {
               </a>
             </div>
           </Card>
+
+          {/* Enterprise Card */}
+          <Card className="p-8 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 shadow-xl rounded-3xl relative backdrop-blur-md hover:border-emerald-300 dark:hover:border-emerald-700 hover:shadow-2xl transition-all duration-300 group flex flex-col justify-between">
+            <div className="absolute top-4 right-4 bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-[11px] font-extrabold px-3 py-1 rounded-full uppercase tracking-wider shadow-md">
+              60% OFF
+            </div>
+
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-xl font-bold text-slate-900 dark:text-white">Enterprise Plan</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">For corporate teams, brands, & large agencies</p>
+              </div>
+
+              <div className="flex items-baseline gap-3">
+                <span className="text-5xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+                  ${entDiscountPrice}
+                </span>
+                <span className="text-sm text-slate-500 dark:text-slate-400">/month</span>
+                <span className="text-sm text-slate-400 dark:text-slate-500 line-through">
+                  ${entOriginalPrice}/mo
+                </span>
+              </div>
+
+              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900/50 rounded-xl p-4 flex items-start gap-2 shadow-sm">
+                <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
+                <p className="text-sm text-red-800 dark:text-red-200 leading-relaxed font-bold">
+                  Important: Requires 6-month minimum. Checkout defaults to the 6-month selection to secure this rate. Selecting a shorter period will remove the 60% discount.
+                </p>
+              </div>
+
+              <div className="border-t border-slate-200 dark:border-slate-800 pt-5 space-y-3">
+                <p className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Features included:</p>
+                <ul className="space-y-2.5 text-xs text-slate-600 dark:text-slate-300">
+                  <li className="flex items-center gap-2">
+                    <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                    <span><strong>{getLimit('enterprise', 'socialAccounts')}</strong> Connected Social Accounts</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                    <span><strong>{getLimit('enterprise', 'postsPerMonth')}</strong> Posts per Month</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                    <span><strong>{getLimit('enterprise', 'aiGenerationsPerMonth')}</strong> AI generations</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                    <span><strong>{getLimit('enterprise', 'teamMembers')}</strong> Team seats</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                    <span>Dedicated Support & Custom limits</span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+
+            <div className="mt-8 pt-4">
+              <a href={getCheckoutUrl('enterprise')}>
+                <Button className="w-full py-6 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-sm tracking-wide shadow-lg flex items-center justify-center gap-2">
+                  {primaryCtaText}
+                  <ArrowRight className="w-4 h-4" />
+                </Button>
+              </a>
+            </div>
+          </Card>
         </section>
 
         {/* Invalidation Disclaimer */}
@@ -354,7 +426,13 @@ export function EntrepreneursPromoPage() {
                   <td className="p-4 text-center">${getLimit('basic', 'monthlyPrice')}</td>
                   <td className="p-4 text-center text-blue-700 dark:text-blue-400 font-bold bg-blue-50 dark:bg-blue-900/20">${proDiscountPrice} <span className="text-[10px] text-slate-400 dark:text-slate-500 line-through font-normal">${proOriginalPrice}</span></td>
                   <td className="p-4 text-center text-violet-700 dark:text-violet-400 font-bold bg-violet-50 dark:bg-violet-900/20">${bizDiscountPrice} <span className="text-[10px] text-slate-400 dark:text-slate-500 line-through font-normal">${bizOriginalPrice}</span></td>
-                  <td className="p-4 text-center font-medium">Custom</td>
+                  <td className="p-4 text-center font-medium">
+                    {(() => {
+                      const ep = (planConfig as any)?.enterprise?.monthlyPrice;
+                      if (!ep || Number(ep) === 0) return 'Custom';
+                      return '$' + ep;
+                    })()}
+                  </td>
                 </tr>
                 <tr>
                   <td className="p-4 font-semibold text-slate-800 dark:text-slate-200">Social Accounts</td>
@@ -385,6 +463,13 @@ export function EntrepreneursPromoPage() {
                   <td className="p-4 text-center text-slate-900 dark:text-slate-100">{getLimit('enterprise', 'teamMembers')}</td>
                 </tr>
                 <tr>
+                  <td className="p-4 font-semibold text-slate-800 dark:text-slate-200">Visual Templates</td>
+                  <td className="p-4 text-center">{getLimit('basic', 'templatesPerMonth')}</td>
+                  <td className="p-4 text-center text-slate-900 dark:text-slate-100 bg-blue-50 dark:bg-blue-900/20">{getLimit('pro', 'templatesPerMonth')}</td>
+                  <td className="p-4 text-center text-slate-900 dark:text-slate-100 bg-violet-50 dark:bg-violet-900/20 font-semibold">{getLimit('business', 'templatesPerMonth')}</td>
+                  <td className="p-4 text-center text-slate-900 dark:text-slate-100 font-semibold">{getLimit('enterprise', 'templatesPerMonth')}</td>
+                </tr>
+                <tr>
                   <td className="p-4 font-semibold text-slate-800 dark:text-slate-200">AI Chatbot</td>
                   <td className="p-4 text-center">Standard</td>
                   <td className="p-4 text-center text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20"><CheckCircle2 className="w-4 h-4 mx-auto" /></td>
@@ -404,6 +489,20 @@ export function EntrepreneursPromoPage() {
                   <td className="p-4 text-center text-slate-900 dark:text-slate-100 bg-blue-50 dark:bg-blue-900/20">{getLimit('pro', 'analyticsDays', true)}</td>
                   <td className="p-4 text-center text-slate-900 dark:text-slate-100 bg-violet-50 dark:bg-violet-900/20">{getLimit('business', 'analyticsDays', true)}</td>
                   <td className="p-4 text-center text-slate-900 dark:text-slate-100">{getLimit('enterprise', 'analyticsDays', true)}</td>
+                </tr>
+                <tr>
+                  <td className="p-4 font-semibold text-slate-800 dark:text-slate-200">Platforms</td>
+                  <td className="p-4 text-center text-xs">{((planConfig as any)?.platforms?.basic || []).length || ((planConfig as any)?.basic?.platforms || []).length || 4} platforms</td>
+                  <td className="p-4 text-center text-xs bg-blue-50 dark:bg-blue-900/20">{((planConfig as any)?.platforms?.pro || []).length || ((planConfig as any)?.pro?.platforms || []).length || 8} platforms</td>
+                  <td className="p-4 text-center text-xs bg-violet-50 dark:bg-violet-900/20">{((planConfig as any)?.platforms?.business || []).length || ((planConfig as any)?.business?.platforms || []).length || 13} platforms</td>
+                  <td className="p-4 text-center text-xs">{((planConfig as any)?.platforms?.enterprise || []).length || ((planConfig as any)?.enterprise?.platforms || []).length || 13} platforms</td>
+                </tr>
+                <tr>
+                  <td className="p-4 font-semibold text-slate-800 dark:text-slate-200">Dedicated Support</td>
+                  <td className="p-4 text-center text-slate-400">&#8212;</td>
+                  <td className="p-4 text-center text-slate-400 bg-blue-50 dark:bg-blue-900/20">&#8212;</td>
+                  <td className="p-4 text-center text-slate-400 bg-violet-50 dark:bg-violet-900/20">&#8212;</td>
+                  <td className="p-4 text-center text-slate-600 dark:text-slate-400"><CheckCircle2 className="w-4 h-4 mx-auto" /></td>
                 </tr>
               </tbody>
             </table>

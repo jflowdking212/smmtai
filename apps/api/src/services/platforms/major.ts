@@ -381,7 +381,11 @@ export class FacebookAdapter implements PlatformAdapter {
   }
 
   getAuthUrl(state: string): string {
-    return `https://www.facebook.com/v21.0/dialog/oauth?client_id=${this.clientId}&redirect_uri=${encodeURIComponent(this.redirectUri)}&scope=${FACEBOOK_GRAPH_OAUTH_SCOPES}&state=${state}&response_type=code`;
+    let url = `https://www.facebook.com/v21.0/dialog/oauth?client_id=${this.clientId}&redirect_uri=${encodeURIComponent(this.redirectUri)}&scope=${FACEBOOK_GRAPH_OAUTH_SCOPES}&state=${state}&response_type=code`;
+    if (process.env.FACEBOOK_CONFIG_ID) {
+      url += `&config_id=${process.env.FACEBOOK_CONFIG_ID}`;
+    }
+    return url;
   }
 
   async exchangeCode(code: string): Promise<PlatformTokens> {
@@ -568,7 +572,11 @@ export class InstagramAdapter implements PlatformAdapter {
   }
 
   getAuthUrl(state: string): string {
-    return `https://www.facebook.com/v21.0/dialog/oauth?client_id=${this.clientId}&redirect_uri=${encodeURIComponent(this.redirectUri)}&scope=${INSTAGRAM_GRAPH_OAUTH_SCOPES}&state=${state}&response_type=code`;
+    let url = `https://www.facebook.com/v21.0/dialog/oauth?client_id=${this.clientId}&redirect_uri=${encodeURIComponent(this.redirectUri)}&scope=${INSTAGRAM_GRAPH_OAUTH_SCOPES}&state=${state}&response_type=code`;
+    if (process.env.FACEBOOK_CONFIG_ID) {
+      url += `&config_id=${process.env.FACEBOOK_CONFIG_ID}`;
+    }
+    return url;
   }
 
   async exchangeCode(code: string): Promise<PlatformTokens> {

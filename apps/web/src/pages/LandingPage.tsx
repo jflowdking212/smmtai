@@ -1,5 +1,6 @@
+import React from 'react';
 import { Link } from 'react-router-dom';
-import { PLATFORMS } from '@ee-postmind/shared';
+import { PLATFORMS, SUBSCRIPTION_LIMITS } from '@ee-postmind/shared';
 import { useState } from 'react';
 import { Footer } from '@/components/Footer';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
@@ -12,7 +13,7 @@ import {
   Sun, Moon,
 } from 'lucide-react';
 
-const DEFAULT_PRICES: Record<string, number> = { Basic: 5, Pro: 19, Business: 49, Enterprise: 0 };
+const DEFAULT_PRICES: Record<string, number> = { Basic: 5, Pro: 19, Business: 49, Enterprise: 99 };
 const DEFAULT_YEARLY_DISCOUNT = 30;
 const TIER_MAP: Record<string, string> = { Basic: 'basic', Pro: 'pro', Business: 'business', Enterprise: 'enterprise' };
 
@@ -34,7 +35,7 @@ const plans = [
   },
   {
     name: 'Enterprise', monthlyPrice: 0, description: 'Dedicated support & custom limits', icon: Crown, popular: false,
-    platforms: ['All 13 platforms'],
+    platforms: ['All 25 platforms'],
     features: ['Unlimited accounts', 'Unlimited posts', 'Unlimited AI', 'Unlimited templates', '20 team members', 'Full analytics history', 'Dedicated support', 'Custom integrations'],
   },
 ];
@@ -182,8 +183,11 @@ function PricingSection({ planConfig }: { planConfig: Record<string, any> }) {
             return plan.platforms;
           })();
 
-          const isCustom = plan.name === 'Enterprise' && (monthlyPrice === 0) && !planConfig?.[tier]?.monthlyPrice;
+          const adminPrice = planConfig?.[tier]?.monthlyPrice ?? planConfig?.pricing?.[tier]?.monthlyPrice;
+          // Custom only when admin explicitly sets Enterprise to $0. Undefined = use $99 default.
+          const isCustom = plan.name === 'Enterprise' && adminPrice === 0;
 
+          const planDescription = (planConfig as any)?.[tier]?.description || plan.description;
           const selectedPriceKey = tier ? `${tier}_${selectedPeriod}` : '';
 
           const href = isCustom 
@@ -234,7 +238,7 @@ function PricingSection({ planConfig }: { planConfig: Record<string, any> }) {
                 <plan.icon className="w-5 h-5 text-blue-600 dark:text-blue-400" />
               </div>
               <h3 className="text-lg font-semibold text-neutral-900 dark:text-white">{plan.name}</h3>
-              <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">{plan.description}</p>
+              <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">{planDescription}</p>
               
               <div className="mt-4 mb-2">
                 {isCustom ? (
@@ -538,122 +542,87 @@ export function LandingPage() {
           </div>
           
           <div className="overflow-x-auto border border-neutral-100 dark:border-white/10 rounded-2xl shadow-sm bg-neutral-50/50 dark:bg-[#141420]/50 backdrop-blur-sm">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="border-b border-neutral-100 dark:border-white/10 text-neutral-400 dark:text-neutral-400 text-xs sm:text-sm font-semibold">
-                  <th className="p-4 sm:p-6 w-1/3">Feature</th>
-                  <th className="p-4 sm:p-6 text-center">Basic ($5/mo)</th>
-                  <th className="p-4 sm:p-6 text-center text-blue-600 dark:text-blue-400 font-bold bg-blue-50/20 dark:bg-blue-500/5">Pro ($19/mo)</th>
-                  <th className="p-4 sm:p-6 text-center">Business ($49/mo)</th>
-                  <th className="p-4 sm:p-6 text-center">Enterprise</th>
-                </tr>
-              </thead>
-              <tbody className="text-neutral-700 dark:text-neutral-300 text-xs sm:text-sm">
-                {/* Group 1: Channels & Limits */}
-                <tr className="bg-neutral-100/50 dark:bg-white/5 font-semibold text-neutral-900 dark:text-white border-b border-neutral-100 dark:border-white/10">
-                  <td colSpan={5} className="p-3 sm:p-4 text-xs sm:text-sm uppercase tracking-wider">Channels &amp; Publishing</td>
-                </tr>
-                <tr className="border-b border-neutral-100 dark:border-white/8">
-                  <td className="p-4 sm:p-5 font-medium">Social Accounts</td>
-                  <td className="p-4 sm:p-5 text-center">4 Accounts</td>
-                  <td className="p-4 sm:p-5 text-center bg-blue-50/10 dark:bg-blue-500/5">8 Accounts</td>
-                  <td className="p-4 sm:p-5 text-center">25 Accounts</td>
-                  <td className="p-4 sm:p-5 text-center">Unlimited</td>
-                </tr>
-                <tr className="border-b border-neutral-100 dark:border-white/8">
-                  <td className="p-4 sm:p-5 font-medium">Posts Per Month</td>
-                  <td className="p-4 sm:p-5 text-center">30 Posts</td>
-                  <td className="p-4 sm:p-5 text-center bg-blue-50/10 dark:bg-blue-500/5">200 Posts</td>
-                  <td className="p-4 sm:p-5 text-center">Unlimited</td>
-                  <td className="p-4 sm:p-5 text-center">Unlimited</td>
-                </tr>
-                <tr className="border-b border-neutral-100 dark:border-white/8">
-                  <td className="p-4 sm:p-5 font-medium">Included Channels</td>
-                  <td className="p-4 sm:p-5 text-center text-xs text-neutral-500 dark:text-neutral-400">FB, Entr, Chrx, Iohah</td>
-                  <td className="p-4 sm:p-5 text-center bg-blue-50/10 dark:bg-blue-500/5 text-xs text-neutral-500 dark:text-neutral-400">FB, Entr, Chrx, Iohah, Insta, X/Twitter, YT, Pinterest</td>
-                  <td className="p-4 sm:p-5 text-center text-xs text-neutral-500 dark:text-neutral-400">Everything in Pro + TikTok, LinkedIn, Bluesky, Mastodon, Telegram</td>
-                  <td className="p-4 sm:p-5 text-center text-xs text-neutral-500 dark:text-neutral-400">All 13 Supported Platforms</td>
-                </tr>
-                
-                {/* Group 2: AI & Creative Suite */}
-                <tr className="bg-neutral-100/50 dark:bg-white/5 font-semibold text-neutral-900 dark:text-white border-b border-neutral-100 dark:border-white/10">
-                  <td colSpan={5} className="p-3 sm:p-4 text-xs sm:text-sm uppercase tracking-wider">AI &amp; Creative Suite</td>
-                </tr>
-                <tr className="border-b border-neutral-100 dark:border-white/8">
-                  <td className="p-4 sm:p-5 font-medium">AI Generations / mo</td>
-                  <td className="p-4 sm:p-5 text-center">5 generations</td>
-                  <td className="p-4 sm:p-5 text-center bg-blue-50/10 dark:bg-blue-500/5 font-semibold">100 generations</td>
-                  <td className="p-4 sm:p-5 text-center">500 generations</td>
-                  <td className="p-4 sm:p-5 text-center">Unlimited</td>
-                </tr>
-                <tr className="border-b border-neutral-100 dark:border-white/8">
-                  <td className="p-4 sm:p-5 font-medium">Visual Templates / mo</td>
-                  <td className="p-4 sm:p-5 text-center">10 templates</td>
-                  <td className="p-4 sm:p-5 text-center bg-blue-50/10 dark:bg-blue-500/5">50 templates</td>
-                  <td className="p-4 sm:p-5 text-center">Unlimited</td>
-                  <td className="p-4 sm:p-5 text-center">Unlimited</td>
-                </tr>
-                <tr className="border-b border-neutral-100 dark:border-white/8">
-                  <td className="p-4 sm:p-5 font-medium">Visual Design Studio</td>
-                  <td className="p-4 sm:p-5 text-center"><Check className="w-4 h-4 mx-auto text-green-500" /></td>
-                  <td className="p-4 sm:p-5 text-center bg-blue-50/10 dark:bg-blue-500/5"><Check className="w-4 h-4 mx-auto text-green-500" /></td>
-                  <td className="p-4 sm:p-5 text-center"><Check className="w-4 h-4 mx-auto text-green-500" /></td>
-                  <td className="p-4 sm:p-5 text-center"><Check className="w-4 h-4 mx-auto text-green-500" /></td>
-                </tr>
-                <tr className="border-b border-neutral-100 dark:border-white/8">
-                  <td className="p-4 sm:p-5 font-medium">AI Humanizer &amp; Rewriter</td>
-                  <td className="p-4 sm:p-5 text-center text-neutral-400">—</td>
-                  <td className="p-4 sm:p-5 text-center bg-blue-50/10 dark:bg-blue-500/5"><Check className="w-4 h-4 mx-auto text-green-500" /></td>
-                  <td className="p-4 sm:p-5 text-center"><Check className="w-4 h-4 mx-auto text-green-500" /></td>
-                  <td className="p-4 sm:p-5 text-center"><Check className="w-4 h-4 mx-auto text-green-500" /></td>
-                </tr>
-                
-                {/* Group 3: Collaboration & Workspace */}
-                <tr className="bg-neutral-100/50 dark:bg-white/5 font-semibold text-neutral-900 dark:text-white border-b border-neutral-100 dark:border-white/10">
-                  <td colSpan={5} className="p-3 sm:p-4 text-xs sm:text-sm uppercase tracking-wider">Collaboration &amp; Management</td>
-                </tr>
-                <tr className="border-b border-neutral-100 dark:border-white/8">
-                  <td className="p-4 sm:p-5 font-medium">Team Members</td>
-                  <td className="p-4 sm:p-5 text-center">1 member</td>
-                  <td className="p-4 sm:p-5 text-center bg-blue-50/10 dark:bg-blue-500/5">5 members</td>
-                  <td className="p-4 sm:p-5 text-center">10 members</td>
-                  <td className="p-4 sm:p-5 text-center">20 members</td>
-                </tr>
-                <tr className="border-b border-neutral-100 dark:border-white/8">
-                  <td className="p-4 sm:p-5 font-medium">Structured Workspace Roles</td>
-                  <td className="p-4 sm:p-5 text-center text-neutral-400">—</td>
-                  <td className="p-4 sm:p-5 text-center bg-blue-50/10 dark:bg-blue-500/5"><Check className="w-4 h-4 mx-auto text-green-500" /></td>
-                  <td className="p-4 sm:p-5 text-center"><Check className="w-4 h-4 mx-auto text-green-500" /></td>
-                  <td className="p-4 sm:p-5 text-center"><Check className="w-4 h-4 mx-auto text-green-500" /></td>
-                </tr>
-                <tr className="border-b border-neutral-100 dark:border-white/8">
-                  <td className="p-4 sm:p-5 font-medium">Structured Approval Flows</td>
-                  <td className="p-4 sm:p-5 text-center text-neutral-400">—</td>
-                  <td className="p-4 sm:p-5 text-center bg-blue-50/10 dark:bg-blue-500/5"><Check className="w-4 h-4 mx-auto text-green-500" /></td>
-                  <td className="p-4 sm:p-5 text-center"><Check className="w-4 h-4 mx-auto text-green-500" /></td>
-                  <td className="p-4 sm:p-5 text-center"><Check className="w-4 h-4 mx-auto text-green-500" /></td>
-                </tr>
-                
-                {/* Group 4: Analytics & Support */}
-                <tr className="bg-neutral-100/50 dark:bg-white/5 font-semibold text-neutral-900 dark:text-white border-b border-neutral-100 dark:border-white/10">
-                  <td colSpan={5} className="p-3 sm:p-4 text-xs sm:text-sm uppercase tracking-wider">Analytics &amp; Support</td>
-                </tr>
-                <tr className="border-b border-neutral-100 dark:border-white/8">
-                  <td className="p-4 sm:p-5 font-medium">Analytics History</td>
-                  <td className="p-4 sm:p-5 text-center">7 days</td>
-                  <td className="p-4 sm:p-5 text-center bg-blue-50/10 dark:bg-blue-500/5">30 days</td>
-                  <td className="p-4 sm:p-5 text-center">90 days</td>
-                  <td className="p-4 sm:p-5 text-center">Full history</td>
-                </tr>
-                <tr className="border-b border-neutral-100 dark:border-white/8">
-                  <td className="p-4 sm:p-5 font-medium">Dedicated Support Manager</td>
-                  <td className="p-4 sm:p-5 text-center text-neutral-400">—</td>
-                  <td className="p-4 sm:p-5 text-center bg-blue-50/10 dark:bg-blue-500/5 text-neutral-400">—</td>
-                  <td className="p-4 sm:p-5 text-center text-neutral-400">—</td>
-                  <td className="p-4 sm:p-5 text-center"><Check className="w-4 h-4 mx-auto text-green-500" /></td>
-                </tr>
-              </tbody>
-            </table>
+            {/* ── Dynamic Compare Table (reads planConfig) ── */}
+            {(() => {
+              const TIERS = ['basic', 'pro', 'business', 'enterprise'] as const;
+              const gl = (t: string, k: string): string => {
+                const v = (planConfig as any)?.[t]?.[k] ?? (planConfig as any)?.pricing?.[t]?.[k] ?? (SUBSCRIPTION_LIMITS as any)?.[t]?.[k];
+                if (v == null || v === Infinity || v === '__INFINITY__') return 'Unlimited';
+                if (k === 'analyticsDays') return v === 0 ? 'Full' : v + ' days';
+                return typeof v === 'number' ? v.toLocaleString() : String(v);
+              };
+              const fp = (t: string): string => {
+                if (t === 'enterprise') {
+                  const ep = (planConfig as any)?.enterprise?.monthlyPrice ?? (planConfig as any)?.pricing?.enterprise?.monthlyPrice;
+                  if (ep === 0) return 'Custom';
+                  return '$' + (ep ?? 99) + '/mo';
+                }
+                const p = (planConfig as any)?.[t]?.monthlyPrice ?? (planConfig as any)?.pricing?.[t]?.monthlyPrice ?? ({ basic: 5, pro: 19, business: 49 } as Record<string,number>)[t];
+                return p != null ? ('$' + p + '/mo') : '—';
+              };
+              const gp = (t: string): string[] => {
+                const a = (planConfig as any)?.[t]?.platforms;
+                if (Array.isArray(a) && a.length) return a;
+                const b = (planConfig as any)?.platforms?.[t];
+                if (Array.isArray(b) && b.length) return b;
+                if (typeof b === 'string' && b.trim()) return b.trim().split(/s+/);
+                const d: Record<string,string[]> = {
+                  basic:['entreprenrs','chrxstians','iohah','facebook'],
+                  pro:['entreprenrs','chrxstians','iohah','facebook','instagram','twitter','youtube','pinterest'],
+                  business:['entreprenrs','chrxstians','iohah','facebook','instagram','twitter','youtube','tiktok','linkedin','pinterest','bluesky','mastodon','telegram'],
+                  enterprise:['entreprenrs','chrxstians','iohah','facebook','instagram','twitter','youtube','tiktok','linkedin','pinterest','bluesky','mastodon','telegram'],
+                };
+                return d[t] ?? [];
+              };
+              const Y = () => <Check className="w-4 h-4 mx-auto text-green-500" />;
+              const N = () => <span className="text-neutral-400">—</span>;
+              const rows: Array<{label:string; render:(t:string)=>React.ReactNode}> = [
+                {label:'Price', render: t => fp(t)},
+                {label:'Social Accounts', render: t => gl(t,'socialAccounts')},
+                {label:'Posts / Month', render: t => gl(t,'postsPerMonth')},
+                {label:'AI Generations / Month', render: t => gl(t,'aiGenerationsPerMonth')},
+                {label:'Templates / Month', render: t => gl(t,'templatesPerMonth')},
+                {label:'Team Members', render: t => gl(t,'teamMembers')},
+                {label:'Analytics History', render: t => gl(t,'analyticsDays')},
+                {label:'Platforms', render: t => (
+                  <span className="text-[10px] text-neutral-500 dark:text-neutral-400">
+                    {gp(t).map(id => (PLATFORMS as Record<string,{name?:string}>)[id]?.name ?? id).join(', ')}
+                  </span>
+                )},
+                {label:'Visual Design Studio', render: _t => <Y />},
+                {label:'AI Humanizer & Rewriter', render: t => t==='basic' ? <N /> : <Y />},
+                {label:'Workspace Roles', render: t => t==='basic' ? <N /> : <Y />},
+                {label:'Approval Flows', render: t => t==='basic' ? <N /> : <Y />},
+                {label:'Dedicated Support', render: t => t==='enterprise' ? <Y /> : <N />},
+              ];
+              return (
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="border-b border-neutral-200 dark:border-white/10 bg-neutral-50 dark:bg-white/3 text-[10px] uppercase tracking-widest text-neutral-500">
+                      <th className="p-4 sm:p-5 font-semibold">Feature</th>
+                      {TIERS.map(t => (
+                        <th key={t} className={'p-4 sm:p-5 text-center font-semibold capitalize' + (t==='pro' ? ' text-blue-600 dark:text-blue-400 bg-blue-50/20 dark:bg-blue-500/5' : '')}>
+                          {t.charAt(0).toUpperCase()+t.slice(1)}
+                          {t==='pro' && <span className="ml-1 px-1 py-0.5 bg-blue-600 text-white rounded text-[8px] align-middle">Popular</span>}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="text-neutral-700 dark:text-neutral-300 text-xs sm:text-sm divide-y divide-neutral-100 dark:divide-white/8">
+                    {rows.map(({label,render}) => (
+                      <tr key={label} className="hover:bg-neutral-50/50 dark:hover:bg-white/3 transition-colors">
+                        <td className="p-4 sm:p-5 font-medium text-neutral-800 dark:text-neutral-200">{label}</td>
+                        {TIERS.map(t => (
+                          <td key={t} className={'p-4 sm:p-5 text-center'+(t==='pro'?' bg-blue-50/10 dark:bg-blue-500/5 font-semibold':'')}>
+                            {render(t)}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              );
+            })()}
           </div>
         </div>
       </section>

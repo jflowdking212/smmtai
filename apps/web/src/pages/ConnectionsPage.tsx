@@ -15,6 +15,8 @@ import { useSubscription } from '@/hooks/useSubscription';
 
 const allPlatforms: PlatformType[] = [...OAUTH_PLATFORMS, ...MANUAL_CONNECTION_PLATFORMS];
 
+const COMING_SOON_PLATFORMS: PlatformType[] = ['threads', 'reddit', 'tumblr', 'google_business', 'blogger'];
+
 interface ManualField {
   key: string;
   label: string;
@@ -78,6 +80,34 @@ const MANUAL_FIELDS: Partial<Record<PlatformType, ManualField[]>> = {
       type: 'password',
       helpText: 'Use your Iohah account password.',
     },
+  ],
+  discord: [
+    { key: 'webhookUrl', label: 'Webhook URL', placeholder: 'https://discord.com/api/webhooks/...' },
+  ],
+  slack: [
+    { key: 'webhookUrl', label: 'Webhook URL', placeholder: 'https://hooks.slack.com/services/...' },
+  ],
+  wordpress: [
+    { key: 'url', label: 'Site URL', placeholder: 'https://yourwebsite.com' },
+    { key: 'username', label: 'Username' },
+    { key: 'password', label: 'Application Password', type: 'password', helpText: 'Create in Users > Profile in your WordPress admin dashboard.' },
+  ],
+  medium: [
+    { key: 'accessToken', label: 'Integration Token', type: 'password', helpText: 'Get from your Medium account settings.' },
+  ],
+  lemmy: [
+    { key: 'instanceUrl', label: 'Instance URL', placeholder: 'https://lemmy.ml' },
+    { key: 'username', label: 'Username' },
+    { key: 'password', label: 'Password', type: 'password' },
+    { key: 'communityId', label: 'Default Community ID', placeholder: '1', helpText: 'Default community ID to post to.' },
+  ],
+  truth_social: [
+    { key: 'instanceUrl', label: 'Instance URL', placeholder: 'https://truthsocial.com' },
+    { key: 'accessToken', label: 'Access token', type: 'password' },
+  ],
+  pleroma: [
+    { key: 'instanceUrl', label: 'Instance URL', placeholder: 'https://pleroma.social' },
+    { key: 'accessToken', label: 'Access token', type: 'password' },
   ],
 };
 
@@ -159,6 +189,35 @@ function buildCredentials(platform: PlatformType, values: Record<string, string>
           ...(password ? { password } : {}),
         });
       }
+    case 'discord':
+      return values.webhookUrl?.trim() || '';
+    case 'slack':
+      return values.webhookUrl?.trim() || '';
+    case 'wordpress':
+      return JSON.stringify({
+        url: values.url?.trim(),
+        username: values.username?.trim(),
+        password: values.password || '',
+      });
+    case 'medium':
+      return values.accessToken?.trim() || '';
+    case 'lemmy':
+      return JSON.stringify({
+        instanceUrl: values.instanceUrl?.trim(),
+        username: values.username?.trim(),
+        password: values.password || '',
+        communityId: Number(values.communityId) || 1,
+      });
+    case 'truth_social':
+      return JSON.stringify({
+        instanceUrl: values.instanceUrl?.trim() || 'https://truthsocial.com',
+        accessToken: values.accessToken?.trim() || '',
+      });
+    case 'pleroma':
+      return JSON.stringify({
+        instanceUrl: values.instanceUrl?.trim() || 'https://pleroma.social',
+        accessToken: values.accessToken?.trim() || '',
+      });
     default:
       return '';
   }
@@ -167,6 +226,12 @@ function buildCredentials(platform: PlatformType, values: Record<string, string>
 function getInitialForm(platform: PlatformType): Record<string, string> {
   if (platform === 'mastodon') {
     return { instanceUrl: 'https://mastodon.social', accessToken: '' };
+  }
+  if (platform === 'truth_social') {
+    return { instanceUrl: 'https://truthsocial.com', accessToken: '' };
+  }
+  if (platform === 'pleroma') {
+    return { instanceUrl: 'https://pleroma.social', accessToken: '' };
   }
   return {};
 }
@@ -458,6 +523,10 @@ export function ConnectionsPage() {
                       <CheckCircle2 className="w-3 h-3 mr-1" /> Connected
                     </Badge>
                   )
+                ) : COMING_SOON_PLATFORMS.includes(platformId) ? (
+                  <Badge variant="default" className="bg-amber-50 text-amber-700 border-amber-200">
+                    Coming Soon
+                  </Badge>
                 ) : (
                   <Badge variant="default">Not connected</Badge>
                 )}
@@ -519,6 +588,15 @@ export function ConnectionsPage() {
                   onClick={() => setMessage({ type: 'error', text: `Upgrade your plan to connect ${platform.name}.` })}
                 >
                   <Lock className="w-4 h-4" /> Upgrade to Connect
+                </Button>
+              ) : COMING_SOON_PLATFORMS.includes(platformId) ? (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="w-full text-neutral-400 cursor-not-allowed opacity-75"
+                  disabled
+                >
+                  Coming Soon
                 </Button>
               ) : (
                 <Button

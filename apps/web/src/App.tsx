@@ -47,6 +47,7 @@ import { AdminCouponsPage } from '@/pages/admin/AdminCouponsPage';
 import { AdminAnalyticsPage } from '@/pages/admin/AdminAnalyticsPage';
 import { AdminMessagesPage } from '@/pages/admin/AdminMessagesPage';
 import { AdminSettingsPage } from '@/pages/admin/AdminSettingsPage';
+import { AdminBillingPage } from '@/pages/admin/AdminBillingPage';
 import { EntrepreneursPromoPage } from '@/pages/EntrepreneursPromoPage';
 
 
@@ -164,6 +165,7 @@ export default function App() {
             <Route path="/admin/conversations" element={<ConversationsPage />} />
             <Route path="/admin/knowledge-base" element={<KnowledgeBasePage />} />
             <Route path="/admin/settings" element={<AdminSettingsPage />} />
+            <Route path="/admin/billing" element={<AdminBillingPage />} />
             <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
           </Route>
               </Routes>

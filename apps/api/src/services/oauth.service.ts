@@ -92,6 +92,9 @@ class OAuthService {
       scope: 'email,public_profile',
       state,
     });
+    if (process.env.FACEBOOK_CONFIG_ID) {
+      params.append('config_id', process.env.FACEBOOK_CONFIG_ID);
+    }
     return `https://www.facebook.com/v18.0/dialog/oauth?${params.toString()}`;
   }
 

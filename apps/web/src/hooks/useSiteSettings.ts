@@ -20,6 +20,9 @@ export interface SiteSettings {
   promo_pro_coupon?: string;
   promo_biz_coupon?: string;
   promo_min_months?: string;
+  promo_enterprise_discounted_price?: string;
+  promo_enterprise_original_price?: string;
+  promo_enterprise_coupon?: string;
   promo_disclaimer?: string;
   promo_primary_cta?: string;
   promo_secondary_cta?: string;
@@ -47,6 +50,9 @@ const DEFAULTS: SiteSettings = {
   promo_pro_coupon: 'ENTREPRENEURS60PRO',
   promo_biz_coupon: 'ENTREPRENEURS60BIZ',
   promo_min_months: '6',
+  promo_enterprise_discounted_price: '40',
+  promo_enterprise_original_price: '100',
+  promo_enterprise_coupon: 'ENTREPRENEURS60ENT',
   promo_disclaimer: 'Discount applies only when you subscribe for a minimum of six months. Selecting less than six months removes the sixty percent discount automatically.',
   promo_primary_cta: 'Claim 60% Off Now — Entrepreneurs Day Deal',
   promo_secondary_cta: 'Try Pro Free for 14 Days — No Credit Card Needed',

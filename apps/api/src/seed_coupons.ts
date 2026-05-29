@@ -42,6 +42,26 @@ async function main() {
     }
   });
 
+  await prisma.coupon.upsert({
+    where: { code: 'ENTREPRENEURS60ENT' },
+    update: {
+      discountPercent: 60,
+      isActive: true,
+      allowedPriceKeys: ['enterprise_6month', 'enterprise_yearly'],
+      maxUsesPerUser: 1
+    },
+    create: {
+      code: 'ENTREPRENEURS60ENT',
+      name: 'Entrepreneurs Day Enterprise 60% Off',
+      description: 'Exclusive 60% discount for Entrepreneurs Day on Enterprise plans (6-month minimum).',
+      discountPercent: 60,
+      isActive: true,
+      allowedPriceKeys: ['enterprise_6month', 'enterprise_yearly'],
+      maxUsesPerUser: 1,
+      requireCardForFreeCheckout: true
+    }
+  });
+
   console.log('Coupons created/updated successfully!');
 }
 

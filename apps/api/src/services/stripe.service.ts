@@ -124,6 +124,95 @@ export class StripeService {
     return customer.id;
   }
 
+  // Create checkout session for new (unauthenticated) users.
+  // Does NOT create any DB records. Account is provisioned in the webhook.
+  async createPublicCheckoutSession(options: {
+    name: string;
+    email: string;
+    priceKey: string;
+    couponCode?: string;
+    successUrl: string;
+    cancelUrl: string;
+  }): Promise<string> {
+    const { name, email, priceKey, couponCode, successUrl, cancelUrl } = options;
+    const derivedTier = priceKey.split('_')[0] || 'basic';
+    // Trial only applies when no discount coupon is used — can't stack 60% off + free trial
+    let trialPeriodDays = 0; // Free trials are DB-based, not handled in Stripe checkout
+
+    // Create a transient Stripe customer (no DB workspace yet)
+    const customer = await getStripe().customers.create({
+      email,
+      name,
+      metadata: { pendingCheckout: 'true' },
+    });
+
+    let stripeCouponId: string | undefined;
+    let discountPercent: number | null = null;
+    let discountDurationMonths: number | null = null;
+    let requireCardForFreeCheckout = true;
+
+    // Validate coupon code (no DB reservation yet — will be finalized in webhook)
+    if (couponCode) {
+      try {
+        const couponRow = await prisma.coupon.findUnique({ where: { code: couponCode.toUpperCase() } });
+        if (couponRow && couponRow.isActive) {
+          discountPercent = couponRow.discountPercent;
+          discountDurationMonths = couponRow.discountDurationMonths;
+          requireCardForFreeCheckout = couponRow.requireCardForFreeCheckout;
+          if (couponRow.freeDurationDays) trialPeriodDays = couponRow.freeDurationDays;
+          else trialPeriodDays = 0; // coupon present but no explicit free days — no trial
+        }
+      } catch { /* ignore coupon errors — proceed without discount */ }
+    }
+
+    if (discountPercent && discountPercent > 0) {
+      const stripeCoupon = await getStripe().coupons.create({
+        duration: discountDurationMonths && discountDurationMonths > 0 ? 'repeating' : 'forever',
+        duration_in_months: discountDurationMonths && discountDurationMonths > 0 ? discountDurationMonths : undefined,
+        percent_off: discountPercent,
+        name: couponCode ? `SmmtAI ${couponCode}` : 'SmmtAI Discount',
+        metadata: { pendingEmail: email, couponCode: couponCode || '' },
+      });
+      stripeCouponId = stripeCoupon.id;
+    }
+
+    const lineItem = await this.buildLineItem(priceKey);
+    const freeAtCheckout = (trialPeriodDays > 0) || ((discountPercent ?? 0) >= 100);
+    const paymentMethodCollection: 'always' | 'if_required' =
+      (!requireCardForFreeCheckout && freeAtCheckout) ? 'if_required' : 'always';
+
+    const session = await getStripe().checkout.sessions.create({
+      customer: customer.id,
+      mode: 'subscription',
+      payment_method_collection: paymentMethodCollection,
+      payment_method_types: ['card'],
+      line_items: [lineItem],
+      success_url: successUrl,
+      cancel_url: cancelUrl,
+      discounts: stripeCouponId ? [{ coupon: stripeCouponId }] : undefined,
+      subscription_data: {
+        trial_period_days: trialPeriodDays > 0 ? trialPeriodDays : undefined,
+        metadata: {
+          pendingName: name,
+          pendingEmail: email,
+          tier: derivedTier,
+          priceKey,
+          ...(couponCode ? { couponCode } : {}),
+        },
+      },
+      metadata: {
+        pendingName: name,
+        pendingEmail: email,
+        tier: derivedTier,
+        priceKey,
+        ...(couponCode ? { couponCode } : {}),
+      },
+      allow_promotion_codes: stripeCouponId ? undefined : true,
+    });
+
+    return session.url!;
+  }
+
   // Create checkout session for upgrading
   async createCheckoutSession(
     workspaceId: string,
@@ -144,7 +233,8 @@ export class StripeService {
     let discountPercent: number | null = null;
     let discountDurationMonths: number | null = null;
     let requireCardForFreeCheckout = true;
-    let trialPeriodDays = derivedTier === 'pro' ? 14 : 0;
+    // Trial only when no discount coupon is applied
+    let trialPeriodDays = 0; // Free trials are DB-based, not handled in Stripe checkout
 
     if (options?.couponCode) {
       if (!options.userId) {
@@ -161,7 +251,7 @@ export class StripeService {
       discountPercent = reservation.discountPercent;
       discountDurationMonths = reservation.discountDurationMonths;
       requireCardForFreeCheckout = reservation.requireCardForFreeCheckout;
-      trialPeriodDays = reservation.freeDurationDays ?? 14;
+      trialPeriodDays = reservation.freeDurationDays ?? 0; // coupon = no trial unless explicitly configured
     }
 
     try {
@@ -212,7 +302,7 @@ export class StripeService {
           ...(couponRedemptionId ? { couponRedemptionId } : {}),
           ...(couponCode ? { couponCode } : {}),
         },
-        allow_promotion_codes: true,
+        allow_promotion_codes: stripeCouponId ? undefined : true,
       });
 
       if (couponRedemptionId) {
@@ -313,7 +403,23 @@ export class StripeService {
     return session.url;
   }
 
-  // Get current subscription status
+  // Cancel subscription directly (stops auto-renewal)
+  async cancelSubscription(workspaceId: string): Promise<Awaited<ReturnType<StripeService['getSubscriptionStatus']>>> {
+    const subscription = await prisma.subscription.findUnique({ where: { workspaceId } });
+    if (!subscription) throw new AppError('Subscription not found', 404, 'SUB_NOT_FOUND');
+    if (!subscription.stripeSubscriptionId) {
+      throw new AppError('No active subscription found to cancel', 400, 'NO_ACTIVE_SUB');
+    }
+
+    const updated = await getStripe().subscriptions.update(subscription.stripeSubscriptionId, {
+      cancel_at_period_end: true,
+    });
+
+    await this.handleSubscriptionUpdated(updated);
+    return this.getSubscriptionStatus(workspaceId);
+  }
+
+  // Get current subscription status (includes on-site card info and invoices history)
   async getSubscriptionStatus(workspaceId: string) {
     const subscription = await prisma.subscription.findUnique({
       where: { workspaceId },
@@ -334,6 +440,47 @@ export class StripeService {
       usage[record.metric] = record.count;
     }
 
+    // Fetch active card details
+    let cardDetails = null;
+    if (subscription.stripeCustomerId) {
+      try {
+        const customer = await getStripe().customers.retrieve(subscription.stripeCustomerId) as Stripe.Customer;
+        const defaultPmId = customer.invoice_settings?.default_payment_method as string;
+        if (defaultPmId) {
+          const pm = await getStripe().paymentMethods.retrieve(defaultPmId);
+          if (pm.type === 'card') {
+            cardDetails = {
+              brand: pm.card?.brand,
+              last4: pm.card?.last4,
+              expMonth: pm.card?.exp_month,
+              expYear: pm.card?.exp_year,
+            };
+          }
+        }
+      } catch (err) {
+        console.error("Error fetching payment method for workspace status:", err);
+      }
+    }
+
+    // Fetch recent invoices
+    let invoices: any[] = [];
+    if (subscription.stripeCustomerId) {
+      try {
+        const invs = await getStripe().invoices.list({ customer: subscription.stripeCustomerId, limit: 5 });
+        invoices = invs.data.map(inv => ({
+          id: inv.id,
+          number: inv.number,
+          amountPaid: inv.amount_paid / 100,
+          currency: inv.currency.toUpperCase(),
+          status: inv.status,
+          date: new Date(inv.created * 1000).toISOString(),
+          pdfUrl: inv.invoice_pdf,
+        }));
+      } catch (err) {
+        console.error("Error fetching invoices for workspace status:", err);
+      }
+    }
+
     return {
       tier: subscription.tier,
       status: subscription.status,
@@ -341,7 +488,99 @@ export class StripeService {
       currentPeriodEnd: subscription.currentPeriodEnd,
       cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
       usage,
+      cardDetails,
+      invoices,
     };
+  }
+
+  // Get system-wide billing and payments stats for admin dashboard
+  async getAdminBillingStats() {
+    // Only count subscriptions backed by a real Stripe subscription ID (excludes seed/test data)
+    const realSubFilter = { stripeSubscriptionId: { not: null } };
+
+    const [totalSubs, activeCount, trialingCount, canceledCount, localSubs] = await Promise.all([
+      prisma.subscription.count({ where: realSubFilter }),
+      prisma.subscription.count({ where: { status: 'active', ...realSubFilter } }),
+      prisma.subscription.count({ where: { status: 'trialing', ...realSubFilter } }),
+      prisma.subscription.count({ where: { status: 'canceled', ...realSubFilter } }),
+      prisma.subscription.findMany({
+        take: 50,
+        orderBy: { updatedAt: 'desc' },
+        include: { workspace: { include: { owner: { select: { name: true, email: true } } } } }
+      })
+    ]);
+
+    let stripeInvoices: any[] = [];
+    let mrr = 0;
+
+    try {
+      const invoices = await getStripe().invoices.list({ limit: 50, status: 'paid' });
+      stripeInvoices = invoices.data.map(inv => ({
+        id: inv.id,
+        number: inv.number,
+        customerEmail: inv.customer_email,
+        amountPaid: inv.amount_paid / 100,
+        currency: inv.currency.toUpperCase(),
+        status: inv.status,
+        date: new Date(inv.created * 1000).toISOString(),
+        pdfUrl: inv.invoice_pdf,
+      }));
+    } catch (err) {
+      console.error("Stripe invoice fetch error for admin stats:", err);
+    }
+
+    // Calculate real MRR from Stripe active subscriptions directly
+    try {
+      const stripeSubs = await getStripe().subscriptions.list({
+        status: 'active',
+        limit: 100,
+        expand: ['data.items.data.price'],
+      });
+      mrr = stripeSubs.data.reduce((sum, sub) => {
+        const monthlyAmount = sub.items.data.reduce((itemSum, item) => {
+          const price = item.price;
+          const unitAmount = (price.unit_amount || 0) / 100;
+          if (price.recurring?.interval === 'year') {
+            return itemSum + (unitAmount / 12);
+          }
+          return itemSum + unitAmount;
+        }, 0);
+        return sum + monthlyAmount;
+      }, 0);
+    } catch (err) {
+      console.error("Stripe MRR fetch error:", err);
+      mrr = 0;
+    }
+
+    return {
+      mrr: Math.round(mrr * 100) / 100,
+      totalSubs,
+      activeCount,
+      trialingCount,
+      canceledCount,
+      invoices: stripeInvoices,
+      subscriptions: localSubs.map(s => ({
+        id: s.id,
+        workspaceId: s.workspaceId,
+        workspaceName: s.workspace.name,
+        ownerName: s.workspace.owner.name,
+        ownerEmail: s.workspace.owner.email,
+        tier: s.tier,
+        status: s.status,
+        cancelAtPeriodEnd: s.cancelAtPeriodEnd,
+        currentPeriodEnd: s.currentPeriodEnd,
+        stripeSubscriptionId: s.stripeSubscriptionId,
+      }))
+    };
+  }
+
+  // Admin manually cancel a subscription
+  async adminCancelSubscription(stripeSubscriptionId: string) {
+    const updated = await getStripe().subscriptions.update(stripeSubscriptionId, {
+      cancel_at_period_end: true,
+    });
+    await this.handleSubscriptionUpdated(updated);
+    return updated;
   }
 
   // =========================================================
@@ -380,6 +619,58 @@ export class StripeService {
 
   private async handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     const workspaceId = session.metadata?.workspaceId;
+    const pendingEmail = session.metadata?.pendingEmail;
+    const pendingName = session.metadata?.pendingName;
+
+    // New public checkout flow: provision account on payment success
+    if (!workspaceId && pendingEmail && pendingName) {
+      try {
+        // Import authService lazily to avoid circular deps
+        const { authService } = await import('./auth.service.js');
+        const provisioned = await authService.provisionCheckoutAccount({
+          name: pendingName,
+          email: pendingEmail,
+        });
+
+        // Update the Stripe customer with the real workspace info
+        if (session.customer) {
+          await getStripe().customers.update(session.customer as string, {
+            metadata: { workspaceId: provisioned.workspaceId, pendingCheckout: '' },
+          });
+        }
+
+        // Link subscription to the new workspace
+        if (session.subscription) {
+          const priceKey = session.metadata?.priceKey;
+          const tier = session.metadata?.tier || (priceKey ? priceKey.split('_')[0] : 'basic');
+          await prisma.subscription.update({
+            where: { workspaceId: provisioned.workspaceId },
+            data: {
+              stripeCustomerId: session.customer as string || null,
+              stripeSubscriptionId: session.subscription as string,
+              tier,
+              status: 'active',
+            },
+          });
+        }
+
+        // Finalize coupon if present
+        const couponCode = session.metadata?.couponCode;
+        if (couponCode) {
+          await couponService.finalizeReservationFromCheckoutSession({
+            id: session.id,
+            metadata: { ...session.metadata, workspaceId: provisioned.workspaceId } as Record<string, string> | null,
+            subscription: session.subscription as string | null,
+          });
+        }
+      } catch (err: any) {
+        // If account already exists (e.g. duplicate webhook), just link subscription
+        console.error('handleCheckoutCompleted pendingEmail error:', err?.message);
+      }
+      return;
+    }
+
+    // Existing flow: workspaceId already set (upgrade for logged-in user)
     if (!workspaceId) return;
 
     if (session.subscription) {

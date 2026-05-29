@@ -45,6 +45,9 @@ export function AdminSettingsPage() {
     promo_biz_original_price: '',
     promo_pro_coupon: '',
     promo_biz_coupon: '',
+    promo_enterprise_discounted_price: '',
+    promo_enterprise_original_price: '',
+    promo_enterprise_coupon: '',
     promo_min_months: '',
     promo_disclaimer: '',
     promo_primary_cta: '',
@@ -441,6 +444,25 @@ export function AdminSettingsPage() {
                 </div>
 
                 <div>
+                  <label className="block text-xs text-neutral-400 mb-1">Enterprise Plan Discounted Price ($/month)</label>
+                  <input
+                    type="number"
+                    value={siteConfig.promo_enterprise_discounted_price}
+                    onChange={(e) => setSiteConfig((prev) => ({ ...prev, promo_enterprise_discounted_price: e.target.value }))}
+                    className={inputClass}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-neutral-400 mb-1">Enterprise Plan Original Price ($/month)</label>
+                  <input
+                    type="number"
+                    value={siteConfig.promo_enterprise_original_price}
+                    onChange={(e) => setSiteConfig((prev) => ({ ...prev, promo_enterprise_original_price: e.target.value }))}
+                    className={inputClass}
+                  />
+                </div>
+
+                <div>
                   <label className="block text-xs text-neutral-400 mb-1">Pro Plan Promo Coupon</label>
                   <input
                     value={siteConfig.promo_pro_coupon}
@@ -453,6 +475,15 @@ export function AdminSettingsPage() {
                   <input
                     value={siteConfig.promo_biz_coupon}
                     onChange={(e) => setSiteConfig((prev) => ({ ...prev, promo_biz_coupon: e.target.value }))}
+                    className={inputClass}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs text-neutral-400 mb-1">Enterprise Plan Promo Coupon</label>
+                  <input
+                    value={siteConfig.promo_enterprise_coupon}
+                    onChange={(e) => setSiteConfig((prev) => ({ ...prev, promo_enterprise_coupon: e.target.value }))}
                     className={inputClass}
                   />
                 </div>

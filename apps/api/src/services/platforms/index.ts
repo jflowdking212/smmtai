@@ -3,6 +3,20 @@ import type { PlatformAdapter } from './base.js';
 import { FacebookAdapter, InstagramAdapter, InstagramDirectAdapter, TwitterAdapter, LinkedInAdapter, TikTokAdapter, YouTubeAdapter, PinterestAdapter } from './major.js';
 import { BlueskyAdapter, MastodonAdapter, TelegramAdapter } from './new.js';
 import { EntreprenrsAdapter, ChrxstiansAdapter, IohahAdapter } from './custom.js';
+import {
+  ThreadsAdapter,
+  RedditAdapter,
+  TumblrAdapter,
+  GoogleBusinessAdapter,
+  DiscordAdapter,
+  SlackAdapter,
+  WordPressAdapter,
+  MediumAdapter,
+  BloggerAdapter,
+  TruthSocialAdapter,
+  LemmyAdapter,
+  PleromaAdapter,
+} from './additions.js';
 
 export type { PlatformAdapter, PlatformTokens, PlatformAccount, PlatformPostPayload, PlatformPostResult, PlatformAnalytics, PlatformAccountAnalytics } from './base.js';
 
@@ -22,6 +36,18 @@ const adapterFactories: Record<PlatformType, AdapterFactory> = {
   entreprenrs: () => new EntreprenrsAdapter(),
   chrxstians: () => new ChrxstiansAdapter(),
   iohah: () => new IohahAdapter(),
+  threads: () => new ThreadsAdapter(),
+  reddit: () => new RedditAdapter(),
+  tumblr: () => new TumblrAdapter(),
+  google_business: () => new GoogleBusinessAdapter(),
+  discord: () => new DiscordAdapter(),
+  slack: () => new SlackAdapter(),
+  wordpress: () => new WordPressAdapter(),
+  medium: () => new MediumAdapter(),
+  blogger: () => new BloggerAdapter(),
+  truth_social: () => new TruthSocialAdapter(),
+  lemmy: () => new LemmyAdapter(),
+  pleroma: () => new PleromaAdapter(),
 };
 
 export function getPlatformAdapter(platform: PlatformType, mode?: string): PlatformAdapter {

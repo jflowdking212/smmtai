@@ -113,7 +113,7 @@ export function LoginPage() {
             Manage all your social media in one place
           </h2>
           <p className="text-white/80 text-lg leading-relaxed">
-            Create, design, schedule, and analyze posts across 13 platforms — powered by AI.
+            Create, design, schedule, and analyze posts across 25 platforms — powered by AI.
           </p>
         </div>
       </div>

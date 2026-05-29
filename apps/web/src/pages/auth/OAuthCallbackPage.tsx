@@ -4,6 +4,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui';
 import { api, ApiError } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
+import { TrialActivationModal } from '@/components/TrialActivationModal';
 import { Sparkles, Loader2, AlertTriangle } from 'lucide-react';
 
 function normalizeNextPath(nextPath: string | null): string {
@@ -21,6 +22,8 @@ export function OAuthCallbackPage() {
   const setAccessToken = useAuthStore((state) => state.setAccessToken);
   const logout = useAuthStore((state) => state.logout);
   const [error, setError] = useState('');
+  const [showTrial, setShowTrial] = useState(false);
+  const [pendingNav, setPendingNav] = useState('');
 
   const accessToken = useMemo(
     () => searchParams.get('accessToken') || '',
@@ -43,13 +46,33 @@ export function OAuthCallbackPage() {
       .me()
       .then((res) => {
         setAuth(res.data.user, accessToken, res.data.workspaceId, res.data.role || 'viewer', res.data.tier || 'basic', res.data.usage || {});
-        navigate(nextPath, { replace: true });
+        // Check if a free trial is available for this new OAuth user
+        return api.billing.getTrialStatus().then((trialRes) => {
+          if (trialRes.data?.available) {
+            setPendingNav(nextPath);
+            setShowTrial(true);
+          } else {
+            navigate(nextPath, { replace: true });
+          }
+        }).catch(() => {
+          // Trial status check failed — navigate normally
+          navigate(nextPath, { replace: true });
+        });
       })
       .catch((err) => {
         logout();
         setError(err instanceof ApiError ? err.message : 'Unable to complete social sign-in.');
       });
   }, [accessToken, logout, navigate, nextPath, setAccessToken, setAuth]);
+
+  if (showTrial) {
+    return (
+      <TrialActivationModal
+        onClose={() => { setShowTrial(false); navigate(pendingNav, { replace: true }); }}
+        onActivated={() => { setShowTrial(false); navigate(pendingNav, { replace: true }); }}
+      />
+    );
+  }
 
   if (!error) {
     return (
@@ -59,7 +82,7 @@ export function OAuthCallbackPage() {
             <div className="w-10 h-10 bg-brand-500 rounded-xl flex items-center justify-center">
               <Sparkles className="w-5 h-5 text-white" />
             </div>
-            <span className="font-heading font-bold text-xl text-neutral-900">SmmtAI</span>
+            <span className="font-heading font-bold text-xl text-neutral-900">{settings?.site_title || 'SmmtAI'}</span>
           </div>
           <Loader2 className="w-10 h-10 mx-auto mb-4 text-brand-500 animate-spin" />
           <h1 className="text-2xl font-heading font-bold text-neutral-900 mb-2">
@@ -78,7 +101,7 @@ export function OAuthCallbackPage() {
           <div className="w-10 h-10 bg-brand-500 rounded-xl flex items-center justify-center">
             <Sparkles className="w-5 h-5 text-white" />
           </div>
-          <span className="font-heading font-bold text-xl text-neutral-900">SmmtAI</span>
+          <span className="font-heading font-bold text-xl text-neutral-900">{settings?.site_title || 'SmmtAI'}</span>
         </div>
         <AlertTriangle className="w-12 h-12 mx-auto mb-4 text-red-600" />
         <h1 className="text-2xl font-heading font-bold text-neutral-900 mb-2">

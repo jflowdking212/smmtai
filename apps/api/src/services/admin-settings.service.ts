@@ -163,6 +163,9 @@ export interface SiteSettings {
   promo_biz_original_price?: string;
   promo_pro_coupon?: string;
   promo_biz_coupon?: string;
+  promo_enterprise_discounted_price?: string;
+  promo_enterprise_original_price?: string;
+  promo_enterprise_coupon?: string;
   promo_min_months?: string;
   promo_disclaimer?: string;
   promo_primary_cta?: string;
@@ -194,6 +197,9 @@ export async function getSiteSettings(): Promise<SiteSettings> {
     promo_biz_original_price: promo.promo_biz_original_price || '50',
     promo_pro_coupon: promo.promo_pro_coupon || 'ENTREPRENEURS60PRO',
     promo_biz_coupon: promo.promo_biz_coupon || 'ENTREPRENEURS60BIZ',
+    promo_enterprise_discounted_price: promo.promo_enterprise_discounted_price || '40',
+    promo_enterprise_original_price: promo.promo_enterprise_original_price || '100',
+    promo_enterprise_coupon: promo.promo_enterprise_coupon || 'ENTREPRENEURS60ENT',
     promo_min_months: promo.promo_min_months || '6',
     promo_disclaimer: promo.promo_disclaimer || 'Discount applies only when you subscribe for a minimum of six months. Selecting less than six months removes the sixty percent discount automatically.',
     promo_primary_cta: promo.promo_primary_cta || 'Claim 60% Off Now — Entrepreneurs Day Deal',
@@ -210,6 +216,7 @@ export async function saveSiteSettings(data: Partial<SiteSettings>): Promise<voi
     'promo_enabled', 'promo_badge', 'promo_headline', 'promo_subheadline',
     'promo_pro_discounted_price', 'promo_pro_original_price',
     'promo_biz_discounted_price', 'promo_biz_original_price',
+    'promo_enterprise_discounted_price', 'promo_enterprise_original_price', 'promo_enterprise_coupon',
     'promo_pro_coupon', 'promo_biz_coupon', 'promo_min_months', 'promo_disclaimer',
     'promo_primary_cta', 'promo_secondary_cta', 'promo_secondary_trial_days',
     'promo_trust_bar', 'promo_footer'
@@ -518,10 +525,40 @@ export function getGlobalCredentialPlatforms(): PlatformType[] {
 
 export async function getPlanConfig(): Promise<Record<string, any>> {
   const raw = await getConfig('plan_config');
-  if (!raw) return {};
-  try {
-    return JSON.parse(raw, (_k, v) => (v === '__INFINITY__' ? Infinity : v));
-  } catch { return {}; }
+  const saved: Record<string, any> = (() => {
+    if (!raw) return {};
+    try { return JSON.parse(raw, (_k, v) => (v === '__INFINITY__' ? Infinity : v)); }
+    catch { return {}; }
+  })();
+
+  // Merge with SUBSCRIPTION_LIMITS so every tier always has all fields populated.
+  // Admin overrides take priority; missing fields fall back to shared defaults.
+  const { SUBSCRIPTION_LIMITS } = await import('@ee-postmind/shared');
+  const TIERS = ['basic', 'pro', 'business', 'enterprise'] as const;
+  const FIELDS = ['socialAccounts','postsPerMonth','aiGenerationsPerMonth','templatesPerMonth','teamMembers','analyticsDays'] as const;
+  const DEFAULT_PRICES: Record<string, number> = { basic: 5, pro: 19, business: 49, enterprise: 99 };
+
+  for (const tier of TIERS) {
+    const defaults = SUBSCRIPTION_LIMITS[tier as keyof typeof SUBSCRIPTION_LIMITS] as Record<string, any>;
+    const existing = saved[tier] ?? {};
+    const merged: Record<string, any> = { ...existing };
+
+    // Price: use saved, fall to pricing sub-key, fall to hard default
+    merged.monthlyPrice = existing.monthlyPrice
+      ?? saved?.pricing?.[tier]?.monthlyPrice
+      ?? DEFAULT_PRICES[tier];
+
+    // Limit fields: use saved value if set, otherwise shared default
+    for (const field of FIELDS) {
+      if (merged[field] == null) {
+        merged[field] = defaults?.[field] ?? null;
+      }
+    }
+
+    saved[tier] = merged;
+  }
+
+  return saved;
 }
 
 export async function savePlanConfig(config: Record<string, any>): Promise<void> {

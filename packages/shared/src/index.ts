@@ -17,7 +17,19 @@ export type PlatformType =
   | 'telegram'
   | 'entreprenrs'
   | 'chrxstians'
-  | 'iohah';
+  | 'iohah'
+  | 'threads'
+  | 'reddit'
+  | 'tumblr'
+  | 'google_business'
+  | 'discord'
+  | 'slack'
+  | 'wordpress'
+  | 'medium'
+  | 'blogger'
+  | 'truth_social'
+  | 'lemmy'
+  | 'pleroma';
 
 export interface Platform {
   id: PlatformType;
@@ -175,6 +187,138 @@ export const PLATFORMS: Record<PlatformType, Platform> = {
     supportsAnalytics: true,
     supportsAds: false,
   },
+  threads: {
+    id: 'threads',
+    name: 'Threads',
+    icon: 'threads',
+    color: '#000000',
+    maxCharacters: 500,
+    supportsStories: false,
+    supportsReels: false,
+    supportsAnalytics: true,
+    supportsAds: false,
+  },
+  reddit: {
+    id: 'reddit',
+    name: 'Reddit',
+    icon: 'reddit',
+    color: '#FF4500',
+    maxCharacters: 40000,
+    supportsStories: false,
+    supportsReels: false,
+    supportsAnalytics: true,
+    supportsAds: false,
+  },
+  tumblr: {
+    id: 'tumblr',
+    name: 'Tumblr',
+    icon: 'tumblr',
+    color: '#36465D',
+    maxCharacters: null,
+    supportsStories: false,
+    supportsReels: false,
+    supportsAnalytics: true,
+    supportsAds: false,
+  },
+  google_business: {
+    id: 'google_business',
+    name: 'Google Business Profile',
+    icon: 'google',
+    color: '#4285F4',
+    maxCharacters: 1500,
+    supportsStories: false,
+    supportsReels: false,
+    supportsAnalytics: true,
+    supportsAds: false,
+  },
+  discord: {
+    id: 'discord',
+    name: 'Discord',
+    icon: 'discord',
+    color: '#5865F2',
+    maxCharacters: 2000,
+    supportsStories: false,
+    supportsReels: false,
+    supportsAnalytics: false,
+    supportsAds: false,
+  },
+  slack: {
+    id: 'slack',
+    name: 'Slack',
+    icon: 'slack',
+    color: '#4A154B',
+    maxCharacters: 4000,
+    supportsStories: false,
+    supportsReels: false,
+    supportsAnalytics: false,
+    supportsAds: false,
+  },
+  wordpress: {
+    id: 'wordpress',
+    name: 'WordPress',
+    icon: 'wordpress',
+    color: '#21759B',
+    maxCharacters: null,
+    supportsStories: false,
+    supportsReels: false,
+    supportsAnalytics: false,
+    supportsAds: false,
+  },
+  medium: {
+    id: 'medium',
+    name: 'Medium',
+    icon: 'medium',
+    color: '#000000',
+    maxCharacters: null,
+    supportsStories: false,
+    supportsReels: false,
+    supportsAnalytics: false,
+    supportsAds: false,
+  },
+  blogger: {
+    id: 'blogger',
+    name: 'Blogger',
+    icon: 'blogger',
+    color: '#FF9900',
+    maxCharacters: null,
+    supportsStories: false,
+    supportsReels: false,
+    supportsAnalytics: false,
+    supportsAds: false,
+  },
+  truth_social: {
+    id: 'truth_social',
+    name: 'Truth Social',
+    icon: 'truth',
+    color: '#1F82C0',
+    maxCharacters: 500,
+    supportsStories: false,
+    supportsReels: false,
+    supportsAnalytics: true,
+    supportsAds: false,
+  },
+  lemmy: {
+    id: 'lemmy',
+    name: 'Lemmy',
+    icon: 'lemmy',
+    color: '#0C5A30',
+    maxCharacters: null,
+    supportsStories: false,
+    supportsReels: false,
+    supportsAnalytics: false,
+    supportsAds: false,
+  },
+  pleroma: {
+    id: 'pleroma',
+    name: 'Pleroma',
+    icon: 'pleroma',
+    color: '#FBA857',
+    maxCharacters: 500,
+    supportsStories: false,
+    supportsReels: false,
+    supportsAnalytics: true,
+    supportsAds: false,
+  },
 };
 
 export const OAUTH_PLATFORMS: PlatformType[] = [
@@ -185,6 +329,11 @@ export const OAUTH_PLATFORMS: PlatformType[] = [
   'twitter',
   'youtube',
   'pinterest',
+  'threads',
+  'reddit',
+  'tumblr',
+  'google_business',
+  'blogger',
 ];
 
 export const MANUAL_CONNECTION_PLATFORMS: PlatformType[] = [
@@ -194,6 +343,13 @@ export const MANUAL_CONNECTION_PLATFORMS: PlatformType[] = [
   'entreprenrs',
   'chrxstians',
   'iohah',
+  'discord',
+  'slack',
+  'wordpress',
+  'medium',
+  'truth_social',
+  'lemmy',
+  'pleroma',
 ];
 
 // Custom platforms that support owner-configured global credentials
@@ -211,6 +367,18 @@ export const GLOBAL_CREDENTIAL_PLATFORMS: PlatformType[] = [
   'entreprenrs',
   'chrxstians',
   'iohah',
+  'threads',
+  'reddit',
+  'tumblr',
+  'google_business',
+  'discord',
+  'slack',
+  'wordpress',
+  'medium',
+  'blogger',
+  'truth_social',
+  'lemmy',
+  'pleroma',
 ];
 
 export function isPlatformType(value: string): value is PlatformType {
@@ -411,14 +579,18 @@ export function hasFeatureAccess(userTier: SubscriptionTier, feature: AppFeature
 // Platforms available per subscription tier (each tier includes all platforms from tiers below it)
 export const TIER_PLATFORMS: Record<SubscriptionTier, PlatformType[]> = {
   basic: ['entreprenrs', 'chrxstians', 'iohah', 'facebook', 'instagram'],
-  pro: ['entreprenrs', 'chrxstians', 'iohah', 'facebook', 'instagram', 'twitter', 'youtube', 'pinterest'],
+  pro: ['entreprenrs', 'chrxstians', 'iohah', 'facebook', 'instagram', 'twitter', 'youtube', 'pinterest', 'threads', 'reddit'],
   business: [
     'entreprenrs', 'chrxstians', 'iohah', 'facebook', 'instagram', 'twitter', 'youtube',
     'tiktok', 'linkedin', 'pinterest', 'bluesky', 'mastodon', 'telegram',
+    'threads', 'reddit', 'tumblr', 'google_business', 'discord', 'slack',
+    'wordpress', 'medium', 'blogger',
   ],
   enterprise: [
     'entreprenrs', 'chrxstians', 'iohah', 'facebook', 'instagram', 'twitter', 'youtube',
     'tiktok', 'linkedin', 'pinterest', 'bluesky', 'mastodon', 'telegram',
+    'threads', 'reddit', 'tumblr', 'google_business', 'discord', 'slack',
+    'wordpress', 'medium', 'blogger', 'truth_social', 'lemmy', 'pleroma',
   ],
 };
 
@@ -470,6 +642,18 @@ export const PLATFORM_CANVAS_SIZES: Record<PlatformType, CanvasSize[]> = {
   entreprenrs: [{ label: 'Post', width: 1200, height: 630 }],
   chrxstians: [{ label: 'Post', width: 1200, height: 630 }],
   iohah: [{ label: 'Post', width: 1200, height: 630 }],
+  threads: [{ label: 'Post', width: 1080, height: 1080 }],
+  reddit: [{ label: 'Post', width: 1200, height: 630 }],
+  tumblr: [{ label: 'Post', width: 1200, height: 630 }],
+  google_business: [{ label: 'Post', width: 1200, height: 630 }],
+  discord: [{ label: 'Post', width: 1200, height: 630 }],
+  slack: [{ label: 'Post', width: 1200, height: 630 }],
+  wordpress: [{ label: 'Post', width: 1200, height: 630 }],
+  medium: [{ label: 'Post', width: 1200, height: 630 }],
+  blogger: [{ label: 'Post', width: 1200, height: 630 }],
+  truth_social: [{ label: 'Post', width: 1200, height: 630 }],
+  lemmy: [{ label: 'Post', width: 1200, height: 630 }],
+  pleroma: [{ label: 'Post', width: 1200, height: 630 }],
 };
 
 // ============================================================

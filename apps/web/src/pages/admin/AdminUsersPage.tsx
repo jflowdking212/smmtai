@@ -28,6 +28,9 @@ interface AdminUser {
   subscriptionStatus: string;
   workspaceId: string | null;
   postCount: number;
+  trialEndsAt?: string | null;
+  currentPeriodEnd?: string | null;
+  cancelAtPeriodEnd?: boolean;
 }
 
 const TIERS = ['basic', 'pro', 'business', 'enterprise'];
@@ -176,6 +179,22 @@ export function AdminUsersPage() {
                       <div>
                         <p className="text-sm font-medium text-neutral-200">{user.name}</p>
                         <p className="text-xs text-neutral-500">{user.email}</p>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {user.trialEndsAt && new Date(user.trialEndsAt) > new Date() && (
+                            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                              ⚠️ Trial ends {new Date(user.trialEndsAt).toLocaleDateString()}
+                            </span>
+                          )}
+                          {user.currentPeriodEnd && user.plan !== 'basic' && (
+                            <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded border ${
+                              user.cancelAtPeriodEnd 
+                                ? 'bg-red-500/10 text-red-400 border-red-500/20' 
+                                : 'bg-neutral-800 text-neutral-400 border-neutral-700'
+                            }`}>
+                              {user.cancelAtPeriodEnd ? '🛑 Expires' : '📅 Renews'} {new Date(user.currentPeriodEnd).toLocaleDateString()}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </td>
                     <td className="px-4 py-3">

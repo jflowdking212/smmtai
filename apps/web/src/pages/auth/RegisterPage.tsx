@@ -93,7 +93,7 @@ export function RegisterPage() {
           </h2>
           <ul className="space-y-3 text-white/80">
             <li className="flex items-center gap-3">
-              <Check className="w-5 h-5 text-emerald-300" /> 13 platforms supported
+              <Check className="w-5 h-5 text-emerald-300" /> 25 platforms supported
             </li>
             <li className="flex items-center gap-3">
               <Check className="w-5 h-5 text-emerald-300" /> AI-powered content generation

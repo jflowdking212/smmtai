@@ -9,7 +9,7 @@ import { tryRouteLocally, logSuccessfulRoute, logRoutingOutcome } from './nlp-ro
 // Set to true to disable the OpenAI fallback and test ONLY the local NLP router.
 // When a query cannot be matched locally, a diagnostic message is returned instead
 // of calling OpenAI. Flip back to false when testing is complete.
-const LOCAL_ONLY_MODE = false; // ← Testing complete. OpenAI fallback re-enabled.
+const LOCAL_ONLY_MODE = true; // ← OpenAI disabled for local router testing.
 // ──────────────────────────────────────────────────────────────────────────────
 
 // In-memory cache
@@ -108,6 +108,7 @@ export async function chatWithCustomer(message: string, context = 'general', ses
     }
 
     const defaultSystemPrompt = `ROLE: You are a helpful AI assistant for SmmtAI, a social media management platform.
+SmmtAI supports exactly 25 social media platforms: Facebook, Instagram, TikTok, LinkedIn, X (Twitter), YouTube, Pinterest, Threads, Reddit, Tumblr, Google Business Profile, Blogger, Bluesky, Mastodon, Telegram, Discord, Slack, WordPress, Medium, Truth Social, Lemmy, Pleroma, Entreprenrs, Chrxstians, Iohah. NEVER say 13 platforms.
 
 PERSONA:
 You help users with questions about social media management, post scheduling, analytics, content creation, and platform connections.

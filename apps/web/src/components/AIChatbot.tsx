@@ -206,6 +206,18 @@ export function AIChatbot() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Sync auth state to customerInfo so logged in users never get prompted for name or email
+  useEffect(() => {
+    if (isLoggedIn && authUser) {
+      setCustomerInfo({
+        name: authUser.name || '',
+        email: authUser.email || '',
+      });
+      setIsContactSubmitted(true);
+      setContactStage('none');
+    }
+  }, [isLoggedIn, authUser]);
+
   const scrollToBottom = () => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
 
   // ---- Voice recording ----
@@ -425,7 +437,7 @@ export function AIChatbot() {
       sender: 'bot', timestamp: new Date(),
     };
     setMessages(prev => [...prev, botMessage]);
-    if (!isContactSubmitted && contactStage === 'none') {
+    if (!isLoggedIn && !isContactSubmitted && contactStage === 'none') {
       setTimeout(() => {
         setContactStage('name');
         setMessages(prev => [...prev, { id: (Date.now() + 10).toString(), content: 'To help connect you, may I know your name?', sender: 'bot', timestamp: new Date() }]);

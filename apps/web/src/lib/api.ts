@@ -286,6 +286,10 @@ export const api = {
       request<{ success: true; data: { url: string } }>('/billing/portal', {
         method: 'POST',
       }),
+    cancel: () =>
+      request<{ success: true; data: any }>('/billing/cancel', {
+        method: 'POST',
+      }),
     getLimits: () =>
       request<{ success: true; data: { socialAccounts: number; postsPerMonth: number; aiGenerationsPerMonth: number; templatesPerMonth: number; teamMembers: number; analyticsDays: number } }>('/billing/limits'),
     activateTrial: () =>
@@ -615,6 +619,13 @@ export const api = {
       request<{ success: true; data: { message: string } }>(`/admin/users/${id}`, { method: 'DELETE', body: JSON.stringify({ password }) }),
     getAnalytics: () =>
       request<{ success: true; data: any }>('/admin/analytics'),
+    getBillingStats: () =>
+      request<{ success: true; data: any }>('/admin/billing/stats'),
+    adminCancelSubscription: (stripeSubscriptionId: string) =>
+      request<{ success: true; data: any }>('/admin/billing/subscriptions/cancel', {
+        method: 'POST',
+        body: JSON.stringify({ stripeSubscriptionId }),
+      }),
     getMessages: (params?: { status?: string; search?: string; page?: string; limit?: string }) =>
       request<{ success: true; data: { conversations: any[]; total: number; page: number; limit: number } }>(`/admin/messages${params ? '?' + new URLSearchParams(params as Record<string, string>) : ''}`),
     getAuditLog: (params?: { page?: string; limit?: string }) =>

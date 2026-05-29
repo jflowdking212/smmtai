@@ -4,6 +4,7 @@ import { validate } from '../middleware/validate.js';
 import { stripeService } from '../services/stripe.service.js';
 import { authService } from '../services/auth.service.js';
 import { config } from '../config/index.js';
+import { prisma } from '../config/database.js';
 import { changePlanSchema, publicCheckoutSchema } from '../utils/validators.js';
 import { getEffectiveLimits } from '../services/admin-settings.service.js';
 import { couponService } from '../services/coupon.service.js';
@@ -28,6 +29,8 @@ billingRouter.get(
 );
 
 // Public checkout (new user purchase flow)
+// Account is NOT created here — it is provisioned in the Stripe webhook
+// after payment succeeds (checkout.session.completed).
 billingRouter.post(
   '/checkout/public',
   validate(publicCheckoutSchema),
@@ -39,24 +42,27 @@ billingRouter.post(
         priceKey: string;
         couponCode?: string;
       };
-      const provisioned = await authService.provisionCheckoutAccount({ name, email });
-      const cancelParams = new URLSearchParams({
-        canceled: '1',
-        priceKey,
-      });
-      if (couponCode?.trim()) {
-        cancelParams.set('coupon', couponCode.trim());
+
+      // Reject if account already exists — user should log in instead
+      const existing = await prisma.user.findUnique({ where: { email: email.toLowerCase().trim() } });
+      if (existing) {
+        return res.status(409).json({
+          success: false,
+          error: { code: 'EMAIL_EXISTS', message: 'An account with this email already exists. Please log in to continue.' },
+        });
       }
-      const url = await stripeService.createCheckoutSession(
-        provisioned.workspaceId,
+
+      const cancelParams = new URLSearchParams({ canceled: '1', priceKey });
+      if (couponCode?.trim()) cancelParams.set('coupon', couponCode.trim());
+
+      const url = await stripeService.createPublicCheckoutSession({
+        name: name.trim(),
+        email: email.toLowerCase().trim(),
         priceKey,
-        `${config.frontend.url}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
-        `${config.frontend.url}/checkout?${cancelParams.toString()}`,
-        {
-          userId: provisioned.user.id,
-          couponCode: couponCode?.trim() || undefined,
-        },
-      );
+        couponCode: couponCode?.trim() || undefined,
+        successUrl: `${config.frontend.url}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
+        cancelUrl: `${config.frontend.url}/checkout?${cancelParams.toString()}`,
+      });
       res.json({ success: true, data: { url } });
     } catch (err) {
       next(err);
@@ -209,6 +215,27 @@ billingRouter.post(
       );
 
       res.json({ success: true, data: { url } });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+// Cancel subscription (stops auto-renewal)
+billingRouter.post(
+  '/cancel',
+  authenticate,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      if (!req.workspaceId) {
+        return res.status(400).json({
+          success: false,
+          error: { code: 'NO_WORKSPACE', message: 'Workspace context required' },
+        });
+      }
+
+      const status = await stripeService.cancelSubscription(req.workspaceId);
+      res.json({ success: true, data: status });
     } catch (err) {
       next(err);
     }

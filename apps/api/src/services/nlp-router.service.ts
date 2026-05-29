@@ -217,6 +217,32 @@ const hardcodedPatterns: Pattern[] = [
     regex: /\b(design|create|generate|make)\s+.*(ad|banner|square|designed|story|luxurious|premium|landscape|classic|theme|palette|font)\b/i,
     negative: /\b(how|where|what|why|who|when|can|could|should|are|explain|tell|do)\b/i
   },
+  // EXPANDED PATTERNS
+  { intent: 'get_dashboard_stats', regex: /^(stats|analytics|numbers|metrics|insights|overview|summary|performance)$/i },
+  { intent: 'get_dashboard_stats', regex: /whats?(\s+the)?\s+analytics/i },
+  { intent: 'get_dashboard_stats', regex: /whats?\s+my\s+stats/i },
+  { intent: 'get_dashboard_stats', regex: /show\s+me\s+(analytics|stats)/i },
+
+  { intent: 'get_calendar', regex: /any\s+schedule/i },
+  { intent: 'get_calendar', regex: /^(calendar|schedule|cal)$/i },
+  { intent: 'get_calendar', regex: /do\s+i\s+have\s+(any\s+)?schedule/i },
+  { intent: 'get_calendar', regex: /check\s+(the\s+)?calendar/i },
+
+  { intent: 'get_user_posts', regex: /post\s+history|show\s+post|list\s+(my\s+)?post/i },
+  { intent: 'get_user_posts', regex: /do\s+i\s+have\s+(any\s+)?(posts?|drafts?)/i },
+
+  { intent: 'get_workspace_members', regex: /any\s+(team\s+)?member/i },
+  { intent: 'get_workspace_members', regex: /member\s+on\s+my\s+team/i },
+  { intent: 'get_workspace_members', regex: /^team$/i },
+
+  { intent: 'get_connected_platforms', regex: /show\s+my\s+connections/i },
+  { intent: 'get_connected_platforms', regex: /how\s+many\s+platform.*am\s+i/i },
+  { intent: 'get_connected_platforms', regex: /how\s+many.*connected/i },
+
+  { intent: 'get_billing_info', regex: /^(billing|plan|subscription)$/i },
+  { intent: 'get_billing_info', regex: /billing\s+info/i },
+
+
 ];
 
 // ─── Argument Extraction (Token-Free) ────────────────────────────────────────

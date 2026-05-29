@@ -23,6 +23,9 @@ const CHAR_LIMITS: Record<string, number> = {
   twitter: 280, linkedin: 3000, facebook: 63206, instagram: 2200,
   tiktok: 2200, youtube: 5000, pinterest: 500, bluesky: 300,
   mastodon: 500, telegram: 4096, entreprenrs: 5000, chrxstians: 5000, iohah: 5000,
+  threads: 500, reddit: 40000, tumblr: 5000, google_business: 1500,
+  discord: 2000, slack: 4000, wordpress: 100000, medium: 100000,
+  blogger: 100000, truth_social: 500, lemmy: 10000, pleroma: 500,
 };
 const HASHTAG_LIMITS: Record<string, number> = {
   instagram: 30,
@@ -104,6 +107,15 @@ function buildPlatformUrl(platform: string, postId: string): string | null {
   if (platform === 'iohah') return `https://iohah.com/posts/${encodeURIComponent(id)}`;
   if (platform === 'chrxstians') return `https://chrxstians.com/posts/${encodeURIComponent(id)}`;
   if (platform === 'tiktok' && /^\d+$/.test(id)) return `https://www.tiktok.com/video/${id}`;
+  if (platform === 'threads') return `https://threads.net/@placeholder/post/${id}`;
+  if (platform === 'reddit') return `https://reddit.com/comments/${id}`;
+  if (platform === 'tumblr') return `https://tumblr.com/post/${id}`;
+  if (platform === 'truth_social') return `https://truthsocial.com`;
+  if (platform === 'pleroma') return `https://pleroma.social`;
+  if (platform === 'lemmy') return `https://lemmy.ml`;
+  if (platform === 'wordpress') return id.startsWith('http') ? id : null;
+  if (platform === 'medium') return id.startsWith('http') ? id : null;
+  if (platform === 'blogger') return id.startsWith('http') ? id : null;
   return null;
 }
 
@@ -210,7 +222,6 @@ export function ComposePage() {
   const [searchParams] = useSearchParams();
   const toast = useToast();
   const role = useAuthStore((s) => s.role);
-  const user = useAuthStore((s) => s.user);
   const canPublish = role !== 'viewer';
   const [content, setContent] = useState('');
   const [link, setLink] = useState('');
@@ -237,7 +248,6 @@ export function ComposePage() {
   const [scheduledAt, setScheduledAt] = useState('');
 
   const [showScheduleModal, setShowScheduleModal] = useState(false);
-  const [showProfileCompleteModal, setShowProfileCompleteModal] = useState(false);
   const [showPlatformModal, setShowPlatformModal] = useState(false);
   const [activeSidebarSection, setActiveSidebarSection] = useState<'destinations' | 'drafts' | null>('destinations');
   const [tempScheduledAt, setTempScheduledAt] = useState('');
@@ -319,14 +329,6 @@ export function ComposePage() {
       setTempScheduledAt(localDatetime);
       setShowScheduleModal(true);
     }
-  }, [searchParams]);
-
-  useEffect(() => {
-    const draftIdParam = searchParams.get('draftId');
-    if (draftIdParam && draftIdParam !== currentDraftId) {
-      void handleOpenDraft(draftIdParam);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
   useEffect(() => {
@@ -1214,11 +1216,6 @@ export function ComposePage() {
   }
 
   async function handlePublish(action: 'draft' | 'publish' | 'schedule' = 'publish', dateOverride?: string) {
-    // Gate: email must be verified and profile complete to publish/schedule
-    if (action !== 'draft') {
-      // Gates removed for seamless publishing and local staging
-      console.log('Publish/schedule gate bypassed');
-    }
     if (!content.trim() || selectedIds.size === 0) return;
 
     let payload: ReturnType<typeof buildPostPayload>;
@@ -2209,43 +2206,6 @@ export function ComposePage() {
       </div>
 
       
-      {/* Profile Incomplete Modal */}
-      {showProfileCompleteModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-in fade-in duration-200">
-          <Card className="w-full max-w-sm p-6 space-y-6 animate-in zoom-in-95 duration-200">
-            <div className="flex flex-col items-center text-center">
-              <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center text-amber-600 mb-2">
-                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                </svg>
-              </div>
-              <h2 className="text-lg font-bold text-neutral-800">Profile Incomplete</h2>
-              <p className="text-sm text-neutral-500 mt-2 leading-relaxed">
-                Please complete your profile details (phone number, country, and profile picture) before you can publish or schedule posts.
-              </p>
-            </div>
-            <div className="flex gap-3 w-full pt-2">
-              <Button
-                variant="ghost"
-                onClick={() => setShowProfileCompleteModal(false)}
-                className="flex-1 border border-neutral-200 text-neutral-500 font-medium py-2.5 rounded-xl"
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={() => {
-                  setShowProfileCompleteModal(false);
-                  navigate('/settings');
-                }}
-                className="flex-1 bg-brand-blue hover:bg-brand-blue-dark text-white font-medium py-2.5 rounded-xl shadow-md shadow-brand-blue/15"
-              >
-                Complete Profile
-              </Button>
-            </div>
-          </Card>
-        </div>
-      )}
-
       {/* Schedule Modal */}
       {showScheduleModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">

@@ -24,6 +24,7 @@ import {
 import { couponService } from '../services/coupon.service.js';
 import { uploadPublicFile } from '../services/storage.service.js';
 import { prisma } from '../config/database.js';
+import { stripeService } from '../services/stripe.service.js';
 
 // Safe plan config serializer: preserves Infinity as __INFINITY__ through JSON
 function sendPlanConfig(res: Response, payload: Record<string, unknown>): void {
@@ -313,6 +314,30 @@ async function logAdminAction(adminId: string, action: string, targetType?: stri
   });
 }
 
+// Admin Billing Stats
+adminRouter.get('/billing/stats', async (_req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const stats = await stripeService.getAdminBillingStats();
+    res.json({ success: true, data: stats });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Admin manually cancel a subscription
+adminRouter.post('/billing/subscriptions/cancel', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { stripeSubscriptionId } = req.body;
+    if (!stripeSubscriptionId) {
+      return res.status(400).json({ success: false, error: { message: 'stripeSubscriptionId is required', code: 'VALIDATION_ERROR' } });
+    }
+    await stripeService.adminCancelSubscription(stripeSubscriptionId);
+    res.json({ success: true, message: 'Subscription canceled successfully' });
+  } catch (err) {
+    next(err);
+  }
+});
+
 adminRouter.get('/dashboard', async (_req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const [totalUsers, scheduledPosts, activeSubscriptions, allSubscriptions] = await Promise.all([
@@ -381,7 +406,13 @@ adminRouter.get('/users', async (req: AuthRequest, res: Response, next: NextFunc
                   id: true,
                   name: true,
                   subscription: {
-                    select: { tier: true, status: true },
+                    select: { 
+                      tier: true, 
+                      status: true,
+                      trialEndsAt: true,
+                      currentPeriodEnd: true,
+                      cancelAtPeriodEnd: true
+                    },
                   },
                 },
               },
@@ -407,6 +438,9 @@ adminRouter.get('/users', async (req: AuthRequest, res: Response, next: NextFunc
         isSystemAdmin: u.email === 'judeobidozie@gmail.com',
         plan: primaryWorkspace?.workspace?.subscription?.tier || 'basic',
         subscriptionStatus: primaryWorkspace?.workspace?.subscription?.status || 'none',
+        trialEndsAt: primaryWorkspace?.workspace?.subscription?.trialEndsAt || null,
+        currentPeriodEnd: primaryWorkspace?.workspace?.subscription?.currentPeriodEnd || null,
+        cancelAtPeriodEnd: primaryWorkspace?.workspace?.subscription?.cancelAtPeriodEnd || false,
         workspaceId: primaryWorkspace?.workspace?.id || null,
         postCount: u._count.posts,
       };

@@ -27,6 +27,7 @@ import {
   Moon,
   BookOpen,
   Ticket,
+  Receipt,
 } from 'lucide-react';
 
 const adminNavigation = [
@@ -34,6 +35,7 @@ const adminNavigation = [
   { name: 'Users', href: '/admin/users', icon: Users },
   { name: 'Plans', href: '/admin/plans', icon: CreditCard },
   { name: 'Coupons', href: '/admin/coupons', icon: Ticket },
+  { name: 'Payments & Billing', href: '/admin/billing', icon: Receipt },
   { name: 'Analytics', href: '/admin/analytics', icon: BarChart3 },
   { name: 'Messages', href: '/admin/messages', icon: MessageCircle },
   { name: 'Conversations', href: '/admin/conversations', icon: MessagesSquare },
