@@ -268,6 +268,58 @@ export function AdminPlansPage() {
                   </div>
                 ))}
 
+                {/* Trend Discovery Features */}
+                <div className="pt-3 border-t border-neutral-800">
+                  <label className="block text-xs text-neutral-400 mb-2">🔥 Trend Discovery Features</label>
+                  <div className="space-y-3 bg-neutral-950/40 p-3 rounded-lg border border-neutral-800/60 max-h-60 overflow-y-auto custom-scrollbar">
+                    {[
+                      { id: 'trendEngineAccess', name: 'Enable Trend Discovery System', description: 'Basic access to the Trend Intelligence Engine' },
+                      { id: 'trendSavedTrends', name: 'Saved Trends & Bookmarks', description: 'Ability to bookmark and save active trends' },
+                      { id: 'trendCampaignGeneration', name: 'AI Post & Campaign Generation', description: 'AI content/post creation from active trends' },
+                      { id: 'trendOpportunityDetection', name: 'Opportunity Detection', description: 'AI-driven high-probability trend discovery' },
+                      { id: 'trendForecasting', name: 'Trend Forecasting', description: 'Predict peak activity and lifespan of trends' },
+                      { id: 'trendViralScore', name: 'Virality Scoring & Analytics', description: 'Access granular virality probabilities and growth metrics' },
+                      { id: 'trendGeoIntelligence', name: 'Regional Geo-Intelligence', description: 'Filter and identify trends specific to regions' },
+                      { id: 'trendPersonalization', name: 'Personalized Trend Feeds', description: 'Tailor trend recommendations to your workspace niche' },
+                      { id: 'trendAdvancedAnalytics', name: 'Advanced Trend Analytics', description: 'In-depth historical engagement charts for trends' },
+                    ].map((f) => {
+                      // Enterprise gets all features by default
+                      const isEnterprise = tier === 'enterprise';
+                      
+                      // Resolve defaults if not saved in database yet
+                      let defaultValue = false;
+                      if (tier === 'pro') {
+                        defaultValue = ['trendEngineAccess', 'trendSavedTrends', 'trendCampaignGeneration'].includes(f.id);
+                      } else if (tier === 'business' || tier === 'enterprise') {
+                        defaultValue = true;
+                      }
+
+                      const checked = isEnterprise ? true : (config[f.id] ?? defaultValue);
+                      const disabled = isEnterprise;
+
+                      return (
+                        <label key={f.id} className={`flex items-start gap-2.5 ${disabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'} group`}>
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            disabled={disabled}
+                            onChange={(e) => updatePlan(tier, f.id, e.target.checked)}
+                            className="w-4 h-4 rounded accent-red-500 mt-0.5 cursor-pointer disabled:cursor-not-allowed"
+                          />
+                          <div className="text-left">
+                            <p className="text-xs font-semibold text-neutral-300 group-hover:text-white transition-colors">
+                              {f.name}
+                            </p>
+                            <p className="text-[10px] text-neutral-500 leading-normal">
+                              {f.description}
+                            </p>
+                          </div>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+
                 {/* Platform Assignment */}
                 <div className="pt-3 border-t border-neutral-800">
                   <div className="flex items-center justify-between mb-2">

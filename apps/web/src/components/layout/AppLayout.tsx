@@ -12,6 +12,7 @@ import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { useToast } from '@/components/Toast';
 import type { AppFeature } from '@ee-postmind/shared';
 import {
+  TrendingUp,
   LayoutDashboard,
   PenSquare,
   History,
@@ -54,6 +55,7 @@ const navigation: { name: string; href: string; icon: typeof LayoutDashboard; fe
   { name: 'Comments', href: '/comments', icon: MessageSquare, feature: 'connections' },
   { name: 'Templates', href: '/templates', icon: Palette, feature: 'templates' },
   { name: 'AI Assistant', href: '/ai', icon: Sparkles, feature: 'ai_assistant' },
+  { name: 'Trend Engine', href: '/trends', icon: TrendingUp, feature: 'ai_assistant' },
 ];
 
 const bottomNav: { name: string; href: string; icon: typeof Users; feature: AppFeature; ownerOnly?: boolean }[] = [

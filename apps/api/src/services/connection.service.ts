@@ -488,7 +488,7 @@ export class ConnectionService {
       connectionMetadata.profileError = accountLookupError.message;
     }
     const metadataJson = Object.keys(connectionMetadata).length > 0
-      ? connectionMetadata as Prisma.InputJsonValue
+      ? connectionMetadata as unknown
       : undefined;
 
     const connection = await prisma.socialConnection.upsert({

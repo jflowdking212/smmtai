@@ -579,12 +579,22 @@ export async function getEffectiveLimits(tier: string): Promise<{
   templatesPerMonth: number;
   teamMembers: number;
   analyticsDays: number;
+  trendEngineAccess: boolean;
+  trendOpportunityDetection: boolean;
+  trendForecasting: boolean;
+  trendCampaignGeneration: boolean;
+  trendViralScore: boolean;
+  trendGeoIntelligence: boolean;
+  trendPersonalization: boolean;
+  trendSavedTrends: boolean;
+  trendAdvancedAnalytics: boolean;
+  trendDailyLimit: number;
 }> {
   const { SUBSCRIPTION_LIMITS } = await import('@ee-postmind/shared');
-  const defaults = SUBSCRIPTION_LIMITS[tier as keyof typeof SUBSCRIPTION_LIMITS];
+  const defaults = SUBSCRIPTION_LIMITS[tier as keyof typeof SUBSCRIPTION_LIMITS] as any;
   const config = await getPlanConfig();
   const overrides = config[tier];
-  if (!overrides) return { ...defaults };
+  if (!overrides) return { ...defaults, trendEngineAccess: false, trendOpportunityDetection: false, trendForecasting: false, trendCampaignGeneration: false, trendViralScore: false, trendGeoIntelligence: false, trendPersonalization: false, trendSavedTrends: false, trendAdvancedAnalytics: false, trendDailyLimit: 0, ...(defaults as any) } as any;
 
   return {
     socialAccounts: overrides.socialAccounts ?? defaults.socialAccounts,
@@ -593,5 +603,15 @@ export async function getEffectiveLimits(tier: string): Promise<{
     templatesPerMonth: overrides.templatesPerMonth ?? defaults.templatesPerMonth,
     teamMembers: overrides.teamMembers ?? defaults.teamMembers,
     analyticsDays: overrides.analyticsDays ?? defaults.analyticsDays,
+    trendEngineAccess: (overrides as any).trendEngineAccess ?? (defaults as any).trendEngineAccess ?? false,
+    trendOpportunityDetection: (overrides as any).trendOpportunityDetection ?? (defaults as any).trendOpportunityDetection ?? false,
+    trendForecasting: (overrides as any).trendForecasting ?? (defaults as any).trendForecasting ?? false,
+    trendCampaignGeneration: (overrides as any).trendCampaignGeneration ?? (defaults as any).trendCampaignGeneration ?? false,
+    trendViralScore: (overrides as any).trendViralScore ?? (defaults as any).trendViralScore ?? false,
+    trendGeoIntelligence: (overrides as any).trendGeoIntelligence ?? (defaults as any).trendGeoIntelligence ?? false,
+    trendPersonalization: (overrides as any).trendPersonalization ?? (defaults as any).trendPersonalization ?? false,
+    trendSavedTrends: (overrides as any).trendSavedTrends ?? (defaults as any).trendSavedTrends ?? false,
+    trendAdvancedAnalytics: (overrides as any).trendAdvancedAnalytics ?? (defaults as any).trendAdvancedAnalytics ?? false,
+    trendDailyLimit: (overrides as any).trendDailyLimit ?? (defaults as any).trendDailyLimit ?? 0,
   };
 }

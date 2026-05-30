@@ -20,13 +20,13 @@ import { AIPage } from '@/pages/AIPage';
 import { SettingsPage } from '@/pages/SettingsPage';
 import { BillingPage } from '@/pages/BillingPage';
 import { HelpPage } from '@/pages/HelpPage';
+import { TrendPage } from '@/pages/TrendPage';
 import { EntrepreneursPage } from '@/pages/EntrepreneursPage';
 import { InboxPage } from '@/pages/InboxPage';
 import { CommentsPage } from '@/pages/CommentsPage';
 import { ConversationsPage } from '@/pages/ConversationsPage';
 import { KnowledgeBasePage } from '@/pages/KnowledgeBasePage';
 import { LandingPage } from '@/pages/LandingPage';
-import { ProfileCompletePage } from '@/pages/ProfileCompletePage';
 import { TermsPage } from '@/pages/TermsPage';
 import { PrivacyPolicyPage } from '@/pages/PrivacyPolicyPage';
 import { CookiePolicyPage } from '@/pages/CookiePolicyPage';
@@ -47,9 +47,6 @@ import { AdminCouponsPage } from '@/pages/admin/AdminCouponsPage';
 import { AdminAnalyticsPage } from '@/pages/admin/AdminAnalyticsPage';
 import { AdminMessagesPage } from '@/pages/admin/AdminMessagesPage';
 import { AdminSettingsPage } from '@/pages/admin/AdminSettingsPage';
-import { AdminBillingPage } from '@/pages/admin/AdminBillingPage';
-import { EntrepreneursPromoPage } from '@/pages/EntrepreneursPromoPage';
-
 
 // Lazy-load heavy pages
 const EditorPage = lazy(() => import('@/pages/EditorPage').then((m) => ({ default: m.EditorPage })));
@@ -111,7 +108,6 @@ export default function App() {
            <Route path="/cookies" element={<CookiePolicyPage />} />
            <Route path="/checkout" element={<CheckoutPage />} />
            <Route path="/checkout/success" element={<CheckoutSuccessPage />} />
-           <Route path="/promo/entrepreneurs" element={<EntrepreneursPromoPage />} />
 
            {/* Public auth routes */}
           <Route path="/auth/login" element={<LoginPage />} />
@@ -119,7 +115,6 @@ export default function App() {
           <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
           <Route path="/auth/verify-email" element={<VerifyEmailPage />} />
-                <Route path="/profile/complete" element={<ProfileCompletePage />} />
           <Route path="/auth/oauth/callback" element={<OAuthCallbackPage />} />
 
           {/* Protected app routes */}
@@ -142,6 +137,7 @@ export default function App() {
             <Route path="/templates" element={<TemplatesPage />} />
             <Route path="/editor" element={<Suspense fallback={<div className="p-8 text-center text-neutral-400">Loading editor...</div>}><EditorPage /></Suspense>} />
             <Route path="/ai" element={<AIPage />} />
+            <Route path="/trends" element={<TrendPage />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/team" element={<UpgradeGate feature="team"><SettingsPage /></UpgradeGate>} />
             <Route path="/billing" element={<BillingPage />} />
@@ -165,7 +161,6 @@ export default function App() {
             <Route path="/admin/conversations" element={<ConversationsPage />} />
             <Route path="/admin/knowledge-base" element={<KnowledgeBasePage />} />
             <Route path="/admin/settings" element={<AdminSettingsPage />} />
-            <Route path="/admin/billing" element={<AdminBillingPage />} />
             <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
           </Route>
               </Routes>

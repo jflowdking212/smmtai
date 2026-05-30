@@ -18,7 +18,7 @@ export async function addMessage(sessionId: string, message: ChatMessage) {
 
   if (!conversation) {
     return prisma.chatConversation.create({
-      data: { sessionId, messages: [message] as unknown as Prisma.InputJsonValue, tags: [] },
+      data: { sessionId, messages: [message] as unknown as unknown, tags: [] },
     });
   }
 
@@ -27,7 +27,7 @@ export async function addMessage(sessionId: string, message: ChatMessage) {
 
   return prisma.chatConversation.update({
     where: { sessionId },
-    data: { messages: messages as unknown as Prisma.InputJsonValue, updatedAt: new Date() },
+    data: { messages: messages as unknown as unknown, updatedAt: new Date() },
   });
 }
 

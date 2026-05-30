@@ -43,7 +43,7 @@ const PLATFORM_HASHTAG_LIMITS: Partial<Record<PlatformType, number>> = {
 };
 
 type PlatformCaptionMap = Record<string, string>;
-type PlatformMetadataMap = Record<string, Prisma.InputJsonObject>;
+type PlatformMetadataMap = Record<string, Record<string, unknown>>;
 interface PublishPayloadMap {
   link?: string;
   hashtags?: string[];
@@ -105,7 +105,7 @@ function normalizePlatformMetadata(platformMetadata: unknown): PlatformMetadataM
 
   return Object.entries(platformMetadata as Record<string, unknown>).reduce<PlatformMetadataMap>((acc, [key, value]) => {
     if (value && typeof value === 'object' && !Array.isArray(value)) {
-      acc[key] = value as Prisma.InputJsonObject;
+      acc[key] = value as Record<string, unknown>;
     }
     return acc;
   }, {});
@@ -149,39 +149,39 @@ function extractPublishPayloadMap(designData: unknown): PublishPayloadMap {
 function mergeCaptionMapIntoDesignData(
   designData: unknown,
   captionMap: PlatformCaptionMap,
-): Prisma.InputJsonValue | undefined {
+): unknown | undefined {
   if (Object.keys(captionMap).length === 0) return undefined;
 
   const baseDesignData = designData && typeof designData === 'object' && !Array.isArray(designData)
-    ? designData as Record<string, Prisma.InputJsonValue>
+    ? designData as Record<string, unknown>
     : {};
 
   return {
     ...baseDesignData,
     [PLATFORM_CAPTION_MAP_KEY]: captionMap,
-  } as Prisma.InputJsonValue;
+  } as unknown;
 }
 
 function mergePublishPayloadIntoDesignData(
   designData: unknown,
   publishPayloadMap: PublishPayloadMap | undefined,
-): Prisma.InputJsonValue | undefined {
+): unknown | undefined {
   const baseDesignData = designData && typeof designData === 'object' && !Array.isArray(designData)
-    ? designData as Record<string, Prisma.InputJsonValue>
+    ? designData as Record<string, unknown>
     : {};
 
   if (!publishPayloadMap) {
     if (!(PUBLISH_PAYLOAD_MAP_KEY in baseDesignData)) {
-      return designData as Prisma.InputJsonValue | undefined;
+      return designData as unknown | undefined;
     }
 
     const nextDesignData = { ...baseDesignData };
     delete nextDesignData[PUBLISH_PAYLOAD_MAP_KEY];
     if (Object.keys(nextDesignData).length === 0) return undefined;
-    return nextDesignData as Prisma.InputJsonValue;
+    return nextDesignData as unknown;
   }
 
-  const publishPayloadJson: Prisma.InputJsonObject = {
+  const publishPayloadJson: Record<string, unknown> = {
     ...(publishPayloadMap.link ? { link: publishPayloadMap.link } : {}),
     ...(publishPayloadMap.hashtags ? { hashtags: publishPayloadMap.hashtags } : {}),
     ...(publishPayloadMap.platformMetadata ? { platformMetadata: publishPayloadMap.platformMetadata } : {}),
@@ -190,7 +190,7 @@ function mergePublishPayloadIntoDesignData(
   return {
     ...baseDesignData,
     [PUBLISH_PAYLOAD_MAP_KEY]: publishPayloadJson,
-  } as Prisma.InputJsonValue;
+  } as unknown;
 }
 
 function resolvePostText(

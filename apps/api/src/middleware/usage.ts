@@ -88,7 +88,7 @@ export function checkUsage(metric: UsageMetric) {
         currentPeriodEnd: subscription.currentPeriodEnd,
       });
       if (!access.allowed) {
-        throw new AppError(access.message, 402, access.code);
+        throw new AppError((access as any).message, 402, (access as any).code);
       }
 
       const limits = await getEffectiveLimits(tier);
