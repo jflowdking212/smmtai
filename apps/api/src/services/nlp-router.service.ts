@@ -165,84 +165,331 @@ interface Pattern {
 }
 
 // Ordered from specific → general to avoid broad patterns shadowing narrow ones.
+// Ordered from specific to general to avoid broad patterns shadowing narrow ones.
 const hardcodedPatterns: Pattern[] = [
   // Admin-only
-  {
-    intent: 'get_system_analytics',
-    regex: /\b(system|platform)\s*(analytics|stats|status|overview)\b/i
-  },
-  {
-    intent: 'get_active_users',
-    regex: /\bactive\s*users\b/i
-  },
-  {
-    intent: 'get_subscribed_users',
-    regex: /\b(subscribed|subscriptions|paid)\s*(users|accounts|plans)\b/i
-  },
-  {
-    intent: 'get_inactive_users',
-    regex: /\binactive\s*users\b/i
-  },
-  // User-level
-  {
-    intent: 'get_dashboard_stats',
-    regex: /\b(show|get|view|list|display|my|workspace)\s*(stats|statistics|analytics|performance|engagement|dashboard)\b/i,
-    negative: /\b(how|where|what|why|who|when|can|could|should|are|explain|tell|do|sure)\b/i
-  },
-  {
-    intent: 'get_calendar',
-    regex: /\b(calendar|upcoming)\b/i,
-    negative: /\b(create|write|make|new|add|compose|generate|draft\s+a|write\s+a|new\s+post|new\s+draft|how|where|what|why|who|when|can|could|should|are|explain|tell|do)\b/i
-  },
-  {
-    intent: 'get_user_posts',
-    regex: /\b(posts|drafts|scheduled|published)\b/i,
-    negative: /\b(create|write|make|new|add|compose|generate|draft\s+a|write\s+a|new\s+post|new\s+draft|how|where|what|why|who|when|can|could|should|are|explain|tell|do)\b/i,
-  },
-  {
-    intent: 'connect_social_platform',
-    regex: /\b(connect|link|add|auth|setup|integrate)\s*(facebook|instagram|twitter|linkedin|youtube|pinterest|tiktok|telegram|bluesky|mastodon)\b/i,
-  },
-  {
-    intent: 'publish_post',
-    regex: /\b(publish|send|post\s+now|go\s+live)\b/i,
-  },
-  {
-    intent: 'schedule_post',
-    regex: /\bschedule\b/i,
-    negative: /\b(how|where|what|why|who|when|can|could|should|are|explain|tell|do)\b/i
-  },
-  {
-    intent: 'create_designed_ad_draft',
-    regex: /\b(design|create|generate|make)\s+.*(ad|banner|square|designed|story|luxurious|premium|landscape|classic|theme|palette|font)\b/i,
-    negative: /\b(how|where|what|why|who|when|can|could|should|are|explain|tell|do)\b/i
-  },
-  // EXPANDED PATTERNS
-  { intent: 'get_dashboard_stats', regex: /^(stats|analytics|numbers|metrics|insights|overview|summary|performance)$/i },
-  { intent: 'get_dashboard_stats', regex: /whats?(\s+the)?\s+analytics/i },
+  { intent: 'get_system_analytics', regex: /\b(system|platform)\s*(analytics|stats|status|overview)\b/i },
+  { intent: 'get_active_users', regex: /\bactive\s*users\b/i },
+  { intent: 'get_subscribed_users', regex: /\b(subscribed|subscriptions|paid)\s*(users|accounts|plans)\b/i },
+  { intent: 'get_inactive_users', regex: /\binactive\s*users\b/i },
+
+  // User-level anchors
+  { intent: 'get_dashboard_stats', regex: /\b(show|get|view|list|display|my|workspace)\s*(stats|statistics|analytics|performance|engagement|dashboard)\b/i, negative: /\b(how|where|what|why|who|when|can|could|should|are|explain|tell|do)\b/i },
+  { intent: 'get_calendar', regex: /\b(calendar|upcoming)\b/i, negative: /\b(create|write|make|new|add|compose|generate|draft\s+a|write\s+a|new\s+post|new\s+draft|how|where|what|why|who|when|can|could|should|are|explain|tell|do)\b/i },
+  { intent: 'get_user_posts', regex: /\b(posts|drafts|scheduled|published)\b/i, negative: /\b(create|write|make|new|add|compose|generate|draft\s+a|write\s+a|new\s+post|new\s+draft|how|where|what|why|who|when|can|could|should|are|explain|tell|do)\b/i },
+  { intent: 'connect_social_platform', regex: /\b(connect|link|add|auth|setup|integrate)\s*(facebook|instagram|twitter|linkedin|youtube|pinterest|tiktok|telegram|bluesky|mastodon)\b/i },
+  { intent: 'publish_post', regex: /\b(publish|send|post\s+now|go\s+live)\b/i },
+  { intent: 'schedule_post', regex: /\bschedule\b/i, negative: /\b(how|where|what|why|who|when|can|could|should|are|explain|tell|do)\b/i },
+  { intent: 'create_designed_ad_draft', regex: /\b(design|create|generate|make)\s+.*(ad|banner|square|designed|story|luxurious|premium|landscape|classic|theme|palette|font)\b/i, negative: /\b(how|where|what|why|who|when|can|could|should|are|explain|tell|do)\b/i },
+
+  // DASHBOARD STATS
+  { intent: 'get_dashboard_stats', regex: /^(stats|analytics|numbers|metrics|insights|overview|summary|performance|dashboard)$/i },
+  { intent: 'get_dashboard_stats', regex: /whats?\s+(the\s+)?analytics/i },
   { intent: 'get_dashboard_stats', regex: /whats?\s+my\s+stats/i },
-  { intent: 'get_dashboard_stats', regex: /show\s+me\s+(analytics|stats)/i },
+  { intent: 'get_dashboard_stats', regex: /show\s+me\s+(analytics|stats|metrics|numbers|overview|summary|performance|insights)/i },
+  { intent: 'get_dashboard_stats', regex: /my\s+(analytics|stats|metrics|numbers|overview|summary|performance|insights)/i },
+  { intent: 'get_dashboard_stats', regex: /how\s+(am\s+i|are\s+we|is\s+my\s+account|is\s+my\s+workspace)\s+(doing|performing)/i },
+  { intent: 'get_dashboard_stats', regex: /how\s+is\s+(the\s+)?account\s+performing/i },
+  { intent: 'get_dashboard_stats', regex: /give\s+me\s+(my\s+)?(stats|analytics|metrics|overview|numbers|summary)/i },
+  { intent: 'get_dashboard_stats', regex: /workspace\s+(stats|analytics|metrics|overview|performance|numbers)/i },
+  { intent: 'get_dashboard_stats', regex: /total\s+(posts|likes|impressions|comments|shares|clicks|engagements)/i },
+  { intent: 'get_dashboard_stats', regex: /how\s+many\s+(posts|likes|impressions|comments|shares|clicks)\s+do\s+i\s+have/i },
+  { intent: 'get_dashboard_stats', regex: /engagement\s+(stats|data|metrics|numbers|overview)/i },
+  { intent: 'get_dashboard_stats', regex: /impressions\s+(stats|data|metrics|numbers|total)/i },
+  { intent: 'get_dashboard_stats', regex: /post\s+(performance|stats|analytics|metrics|overview)/i },
+  { intent: 'get_dashboard_stats', regex: /account\s+(stats|analytics|metrics|overview|performance|summary)/i },
+  { intent: 'get_dashboard_stats', regex: /see\s+(my\s+)?(stats|analytics|metrics|overview|performance|numbers|dashboard)/i },
+  { intent: 'get_dashboard_stats', regex: /pull\s+(up\s+)?(my\s+)?(stats|analytics|metrics|dashboard|overview)/i },
+  { intent: 'get_dashboard_stats', regex: /open\s+(my\s+)?(dashboard|stats|analytics|overview)/i },
+  { intent: 'get_dashboard_stats', regex: /quick\s+(stats|overview|summary|numbers|snapshot)/i },
+  { intent: 'get_dashboard_stats', regex: /snapshot\s+of\s+(my\s+)?(account|workspace|performance)/i },
+  { intent: 'get_dashboard_stats', regex: /(clicks|shares|comments|likes|impressions)\s+(count|total|number|data)/i },
+  { intent: 'get_dashboard_stats', regex: /what\s+(has\s+been\s+)?my\s+(overall\s+)?(performance|reach|engagement)/i },
+  { intent: 'get_dashboard_stats', regex: /overall\s+(performance|reach|engagement|stats|numbers)/i },
+  { intent: 'get_dashboard_stats', regex: /check\s+(my\s+)?(stats|analytics|performance|numbers|metrics|overview)/i },
+  { intent: 'get_dashboard_stats', regex: /(this\s+week|this\s+month|today|yesterday|last\s+week|last\s+month)\s+(stats|analytics|numbers|performance|overview)/i },
+  { intent: 'get_dashboard_stats', regex: /report\s+(for\s+)?(my\s+)?(workspace|account|social\s+media)/i },
+  { intent: 'get_dashboard_stats', regex: /social\s+media\s+(stats|analytics|metrics|performance|numbers)/i },
+  { intent: 'get_dashboard_stats', regex: /content\s+(performance|stats|analytics|overview|summary)/i },
+  { intent: 'get_dashboard_stats', regex: /how\s+is\s+(everything|it|the\s+account|my\s+page)\s+(going|doing|looking)/i },
+  { intent: 'get_dashboard_stats', regex: /numbers?\s+(for\s+)?(this\s+week|this\s+month|today|the\s+account)/i },
+  { intent: 'get_dashboard_stats', regex: /my\s+reach\s+(this\s+(week|month)|so\s+far|today)/i },
+  { intent: 'get_dashboard_stats', regex: /reach\s+(data|stats|numbers|metrics|total)/i },
+  { intent: 'get_dashboard_stats', regex: /how\s+is\s+my\s+(social\s+media\s+)?(performance|engagement|reach)/i },
+  { intent: 'get_dashboard_stats', regex: /growth\s+(metrics|stats|numbers|report|overview)/i },
 
-  { intent: 'get_calendar', regex: /any\s+schedule/i },
-  { intent: 'get_calendar', regex: /^(calendar|schedule|cal)$/i },
-  { intent: 'get_calendar', regex: /do\s+i\s+have\s+(any\s+)?schedule/i },
+  // POSTS
+  { intent: 'get_user_posts', regex: /post\s+history/i },
+  { intent: 'get_user_posts', regex: /show\s+(my\s+)?posts/i },
+  { intent: 'get_user_posts', regex: /list\s+(my\s+)?posts/i },
+  { intent: 'get_user_posts', regex: /do\s+i\s+have\s+(any\s+)?(posts?|drafts?|content)/i },
+  { intent: 'get_user_posts', regex: /my\s+recent\s+posts/i },
+  { intent: 'get_user_posts', regex: /recent\s+(posts|content|updates)/i },
+  { intent: 'get_user_posts', regex: /latest\s+(posts|content|updates|drafts)/i },
+  { intent: 'get_user_posts', regex: /all\s+(my\s+)?(posts|drafts|content)/i },
+  { intent: 'get_user_posts', regex: /see\s+(my\s+)?(posts|drafts|content)/i },
+  { intent: 'get_user_posts', regex: /view\s+(my\s+)?(posts|drafts|content)/i },
+  { intent: 'get_user_posts', regex: /fetch\s+(my\s+)?(posts|drafts|content)/i },
+  { intent: 'get_user_posts', regex: /get\s+(my\s+)?(posts|drafts|content)/i },
+  { intent: 'get_user_posts', regex: /what\s+(posts|drafts|content)\s+do\s+i\s+have/i },
+  { intent: 'get_user_posts', regex: /any\s+(posts?|drafts?|content)\s+(saved|ready|pending|waiting)/i },
+  { intent: 'get_user_posts', regex: /draft\s+posts?/i, negative: /\b(create|write|make|new|add|compose|generate)\b/i },
+  { intent: 'get_user_posts', regex: /show\s+(my\s+)?drafts/i },
+  { intent: 'get_user_posts', regex: /list\s+(my\s+)?drafts/i },
+  { intent: 'get_user_posts', regex: /any\s+drafts?\s+saved/i },
+  { intent: 'get_user_posts', regex: /drafts?\s+(i\s+have|available|saved|pending)/i },
+  { intent: 'get_user_posts', regex: /show\s+(my\s+)?scheduled\s+posts?/i },
+  { intent: 'get_user_posts', regex: /list\s+(my\s+)?scheduled\s+posts?/i },
+  { intent: 'get_user_posts', regex: /what\s+(is|are)\s+(my\s+)?scheduled\s+posts?/i },
+  { intent: 'get_user_posts', regex: /show\s+(my\s+)?published\s+posts?/i },
+  { intent: 'get_user_posts', regex: /list\s+(my\s+)?published\s+posts?/i },
+  { intent: 'get_user_posts', regex: /published\s+(posts?|content|updates)\s+(list|history|log)/i },
+  { intent: 'get_user_posts', regex: /failed\s+posts?/i },
+  { intent: 'get_user_posts', regex: /posts?\s+that\s+failed/i },
+  { intent: 'get_user_posts', regex: /posts?\s+(with\s+)?errors?/i },
+  { intent: 'get_user_posts', regex: /content\s+(queue|backlog|list|feed|log|history)/i },
+  { intent: 'get_user_posts', regex: /(last|recent|latest)\s+\d+\s+posts/i },
+  { intent: 'get_user_posts', regex: /show\s+(me\s+)?\d+\s+posts/i },
+  { intent: 'get_user_posts', regex: /\d+\s+(recent|latest|last|scheduled|published|draft)\s+posts?/i },
+  { intent: 'get_user_posts', regex: /anything\s+(in\s+)?(draft|queue|pending|scheduled)/i },
+  { intent: 'get_user_posts', regex: /pending\s+(posts?|content)/i },
+  { intent: 'get_user_posts', regex: /what\s+did\s+i\s+(post|publish|write)\s+(recently|today|this\s+week|last)/i },
+  { intent: 'get_user_posts', regex: /my\s+(post|content|draft)\s+list/i },
+  { intent: 'get_user_posts', regex: /any\s+(content|posts?)\s+(ready|in\s+progress|waiting)/i },
+
+  // CALENDAR
+  { intent: 'get_calendar', regex: /any\s+(scheduled\s+)?posts?\s+(coming|this\s+week|this\s+month|today|upcoming)/i },
+  { intent: 'get_calendar', regex: /^(calendar|schedule|cal|upcoming\s+posts?)$/i },
+  { intent: 'get_calendar', regex: /do\s+i\s+have\s+(any\s+)?(scheduled|upcoming|planned)\s+posts?/i },
   { intent: 'get_calendar', regex: /check\s+(the\s+)?calendar/i },
+  { intent: 'get_calendar', regex: /whats?\s+(on\s+)?(my\s+)?(calendar|schedule)/i },
+  { intent: 'get_calendar', regex: /content\s+calendar/i },
+  { intent: 'get_calendar', regex: /posting\s+schedule/i },
+  { intent: 'get_calendar', regex: /publication\s+schedule/i },
+  { intent: 'get_calendar', regex: /upcoming\s+(posts?|content|publications)/i },
+  { intent: 'get_calendar', regex: /planned\s+(posts?|content|publications)/i },
+  { intent: 'get_calendar', regex: /queued\s+(posts?|content)/i },
+  { intent: 'get_calendar', regex: /what\s+is\s+(coming\s+up|next)\s+(on\s+(my\s+)?(schedule|calendar))?/i },
+  { intent: 'get_calendar', regex: /when\s+(is|are)\s+(my\s+)?(next\s+)?posts?\s+(going\s+)?live/i },
+  { intent: 'get_calendar', regex: /next\s+(scheduled\s+)?post/i },
+  { intent: 'get_calendar', regex: /posts?\s+scheduled\s+(for\s+)?(today|this\s+week|this\s+month)/i },
+  { intent: 'get_calendar', regex: /schedule\s+(for\s+)?(today|this\s+week|this\s+month|tomorrow)/i },
+  { intent: 'get_calendar', regex: /what\s+(am\s+i|are\s+we)\s+posting\s+(today|this\s+week|soon)/i },
+  { intent: 'get_calendar', regex: /anything\s+(scheduled|planned|queued|coming\s+up)/i },
+  { intent: 'get_calendar', regex: /show\s+(me\s+)?(my\s+)?(schedule|calendar|upcoming)/i },
+  { intent: 'get_calendar', regex: /view\s+(my\s+)?(schedule|calendar|upcoming)/i },
+  { intent: 'get_calendar', regex: /do\s+i\s+have\s+any\s+schedule/i },
+  { intent: 'get_calendar', regex: /any\s+schedule/i },
+  { intent: 'get_calendar', regex: /whats?\s+scheduled\s+(for\s+)?(next\s+(week|month)|tomorrow|today)/i },
+  { intent: 'get_calendar', regex: /my\s+content\s+(plan|lineup|schedule|queue)/i },
+  { intent: 'get_calendar', regex: /when\s+is\s+(my\s+)?next\s+(post|publication|content)/i },
 
-  { intent: 'get_user_posts', regex: /post\s+history|show\s+post|list\s+(my\s+)?post/i },
-  { intent: 'get_user_posts', regex: /do\s+i\s+have\s+(any\s+)?(posts?|drafts?)/i },
-
-  { intent: 'get_workspace_members', regex: /any\s+(team\s+)?member/i },
-  { intent: 'get_workspace_members', regex: /member\s+on\s+my\s+team/i },
-  { intent: 'get_workspace_members', regex: /^team$/i },
-
-  { intent: 'get_connected_platforms', regex: /show\s+my\s+connections/i },
+  // CONNECTED PLATFORMS
+  { intent: 'get_connected_platforms', regex: /show\s+(my\s+)?connections/i },
   { intent: 'get_connected_platforms', regex: /how\s+many\s+platform.*am\s+i/i },
   { intent: 'get_connected_platforms', regex: /how\s+many.*connected/i },
+  { intent: 'get_connected_platforms', regex: /show\s+(my\s+)?(connected|linked|active)\s+(platforms?|accounts?|channels?|socials?)/i },
+  { intent: 'get_connected_platforms', regex: /list\s+(my\s+)?(connected|linked)\s+(platforms?|accounts?|channels?)/i },
+  { intent: 'get_connected_platforms', regex: /what\s+(platforms?|accounts?|channels?|socials?)\s+(am\s+i|are)\s+connected/i },
+  { intent: 'get_connected_platforms', regex: /which\s+(platforms?|accounts?|channels?|socials?)\s+(am\s+i|are)\s+(connected|linked|active)/i },
+  { intent: 'get_connected_platforms', regex: /my\s+(connected|linked|active)\s+(platforms?|accounts?|channels?|socials?)/i },
+  { intent: 'get_connected_platforms', regex: /social\s+(accounts?|platforms?|media\s+accounts?)\s+(connected|linked|active)/i },
+  { intent: 'get_connected_platforms', regex: /my\s+social\s+(media\s+)?(accounts?|platforms?|connections?)/i },
+  { intent: 'get_connected_platforms', regex: /connections?\s+(page|list|overview|status)/i },
+  { intent: 'get_connected_platforms', regex: /^(connections?|connected\s+accounts?|my\s+accounts?)$/i },
+  { intent: 'get_connected_platforms', regex: /what\s+(social\s+)?(accounts?|platforms?)\s+do\s+i\s+have/i },
+  { intent: 'get_connected_platforms', regex: /are\s+my\s+(accounts?|platforms?)\s+(connected|active|linked)/i },
+  { intent: 'get_connected_platforms', regex: /view\s+(my\s+)?(connected\s+)?(platforms?|accounts?|channels?)/i },
+  { intent: 'get_connected_platforms', regex: /see\s+(my\s+)?(connected\s+)?(platforms?|accounts?|channels?)/i },
+  { intent: 'get_connected_platforms', regex: /check\s+(my\s+)?(connected\s+)?(platforms?|accounts?|channels?)/i },
+  { intent: 'get_connected_platforms', regex: /which\s+platforms?\s+(have\s+i|did\s+i)\s+(connected|linked|added)/i },
+  { intent: 'get_connected_platforms', regex: /is\s+(facebook|instagram|twitter|tiktok|linkedin|youtube|pinterest)\s+connected/i },
+  { intent: 'get_connected_platforms', regex: /linked\s+(accounts?|platforms?|channels?)/i },
+  { intent: 'get_connected_platforms', regex: /active\s+(accounts?|platforms?|channels?|connections?)/i },
+  { intent: 'get_connected_platforms', regex: /(facebook|instagram|twitter|tiktok|linkedin|youtube|pinterest|bluesky|mastodon|telegram)\s+(connected|active|linked|status)/i },
+  { intent: 'get_connected_platforms', regex: /my\s+(facebook|instagram|twitter|tiktok|linkedin|youtube)\s+(account|page|profile|channel)/i },
+  { intent: 'get_connected_platforms', regex: /how\s+many\s+social\s+(media\s+)?(accounts?|platforms?)\s+(do\s+i\s+have|are\s+connected)/i },
+  { intent: 'get_connected_platforms', regex: /what\s+social\s+media\s+(am\s+i|are\s+we)\s+(on|connected\s+to|using)/i },
 
-  { intent: 'get_billing_info', regex: /^(billing|plan|subscription)$/i },
-  { intent: 'get_billing_info', regex: /billing\s+info/i },
+  // PER-PLATFORM ANALYTICS
+  { intent: 'get_platform_analytics', regex: /platform\s+(analytics|stats|breakdown|performance|metrics)/i },
+  { intent: 'get_platform_analytics', regex: /analytics\s+(by\s+platform|per\s+platform|breakdown)/i },
+  { intent: 'get_platform_analytics', regex: /breakdown\s+(by\s+platform|per\s+platform)/i },
+  { intent: 'get_platform_analytics', regex: /per.platform\s+(analytics|stats|breakdown|metrics)/i },
+  { intent: 'get_platform_analytics', regex: /each\s+platform\s+(analytics|stats|performance|metrics)/i },
+  { intent: 'get_platform_analytics', regex: /(facebook|instagram|twitter|tiktok|linkedin|youtube|pinterest)\s+(analytics|stats|performance|metrics|impressions|likes)/i },
+  { intent: 'get_platform_analytics', regex: /how\s+(is|are)\s+(facebook|instagram|twitter|tiktok|linkedin|youtube)\s+(performing|doing)/i },
+  { intent: 'get_platform_analytics', regex: /best\s+performing\s+platform/i },
+  { intent: 'get_platform_analytics', regex: /which\s+platform\s+(is\s+)?(performing\s+)?(best|worst|better|highest)/i },
+  { intent: 'get_platform_analytics', regex: /platform\s+wise\s+(stats|analytics|breakdown|performance)/i },
+  { intent: 'get_platform_analytics', regex: /compare\s+(my\s+)?platforms?/i },
+  { intent: 'get_platform_analytics', regex: /social\s+media\s+(breakdown|performance\s+by|analytics\s+by)/i },
+  { intent: 'get_platform_analytics', regex: /impressions\s+(by\s+|per\s+|on\s+each\s+)?platform/i },
+  { intent: 'get_platform_analytics', regex: /likes\s+(by\s+|per\s+|on\s+each\s+)?platform/i },
+  { intent: 'get_platform_analytics', regex: /(reach|engagement)\s+(by\s+|per\s+|on\s+each\s+)?platform/i },
+  { intent: 'get_platform_analytics', regex: /show\s+(me\s+)?platform\s+(stats|analytics|breakdown)/i },
+  { intent: 'get_platform_analytics', regex: /analytics\s+for\s+(facebook|instagram|twitter|tiktok|linkedin|youtube)/i },
 
+  // AI USAGE
+  { intent: 'get_ai_usage', regex: /^(ai\s+usage|ai\s+credits?|ai\s+limit|ai\s+quota|ai\s+generations?)$/i },
+  { intent: 'get_ai_usage', regex: /ai\s+(usage|credits?|generations?|allowance|limit|quota)/i },
+  { intent: 'get_ai_usage', regex: /how\s+many\s+ai\s+(credits?|generations?|uses?)\s+(do\s+i|have\s+i|left|remaining)/i },
+  { intent: 'get_ai_usage', regex: /ai\s+(credits?|generations?)\s+(left|remaining|used|available)/i },
+  { intent: 'get_ai_usage', regex: /how\s+many\s+(more\s+)?ai\s+(generations?|uses?|credits?)\s+(can\s+i|do\s+i\s+have)/i },
+  { intent: 'get_ai_usage', regex: /remaining\s+ai\s+(credits?|generations?|limit|quota|uses?)/i },
+  { intent: 'get_ai_usage', regex: /(ai|content)\s+generation\s+(usage|limit|quota|count|stats)/i },
+  { intent: 'get_ai_usage', regex: /how\s+much\s+ai\s+(have\s+i\s+)?(used|consumed|left|remaining)/i },
+  { intent: 'get_ai_usage', regex: /ai\s+limit\s+(remaining|left|status|used)/i },
+  { intent: 'get_ai_usage', regex: /content\s+generation\s+(limit|quota|remaining|used)/i },
+  { intent: 'get_ai_usage', regex: /how\s+many\s+(posts?|content)\s+can\s+ai\s+(still\s+)?(generate|create|write)/i },
+  { intent: 'get_ai_usage', regex: /ai\s+(is|has)\s+(running\s+out|low|almost\s+used)/i },
+  { intent: 'get_ai_usage', regex: /check\s+(my\s+)?ai\s+(usage|credits?|limit|quota)/i },
+  { intent: 'get_ai_usage', regex: /used\s+(up\s+)?(my\s+)?ai\s+(credits?|generations?|limit)/i },
+  { intent: 'get_ai_usage', regex: /ai\s+(post|caption|content)\s+(allowance|limit|quota|left|remaining)/i },
+  { intent: 'get_ai_usage', regex: /how\s+many\s+(more\s+)?(posts?|captions?)\s+can\s+(the\s+)?ai\s+(write|generate|create)/i },
 
+  // TEMPLATES
+  { intent: 'get_templates', regex: /^(templates?|my\s+templates?)$/i },
+  { intent: 'get_templates', regex: /show\s+(my\s+)?templates?/i },
+  { intent: 'get_templates', regex: /list\s+(my\s+)?templates?/i },
+  { intent: 'get_templates', regex: /what\s+templates?\s+do\s+i\s+have/i },
+  { intent: 'get_templates', regex: /any\s+(saved\s+)?templates?\s+(available|saved|i\s+have)/i },
+  { intent: 'get_templates', regex: /view\s+(my\s+)?templates?/i },
+  { intent: 'get_templates', regex: /see\s+(my\s+)?templates?/i },
+  { intent: 'get_templates', regex: /get\s+(my\s+)?templates?/i },
+  { intent: 'get_templates', regex: /template\s+(library|collection|list|gallery|saved)/i },
+  { intent: 'get_templates', regex: /saved\s+(post\s+)?templates?/i },
+  { intent: 'get_templates', regex: /post\s+templates?\s+(list|saved|i\s+have)/i },
+  { intent: 'get_templates', regex: /do\s+i\s+have\s+(any\s+)?templates?/i },
+  { intent: 'get_templates', regex: /how\s+many\s+templates?\s+do\s+i\s+have/i },
+  { intent: 'get_templates', regex: /my\s+content\s+templates?/i },
+  { intent: 'get_templates', regex: /available\s+templates?/i },
+  { intent: 'get_templates', regex: /templates?\s+(available|i\s+can\s+use|created|ready)/i },
+
+  // BILLING / SUBSCRIPTION / PLAN
+  { intent: 'get_billing_info', regex: /^(billing|plan|subscription|my\s+plan|my\s+subscription|account\s+plan)$/i },
+  { intent: 'get_billing_info', regex: /billing\s+(info|information|details|status|overview|summary)/i },
+  { intent: 'get_billing_info', regex: /what\s+(plan|subscription|tier)\s+(am\s+i|are\s+we)\s+on/i },
+  { intent: 'get_billing_info', regex: /my\s+(current\s+)?(plan|subscription|tier|package)/i },
+  { intent: 'get_billing_info', regex: /subscription\s+(info|details|status|plan|overview|type)/i },
+  { intent: 'get_billing_info', regex: /what\s+(is\s+)?my\s+(plan|subscription|tier|package)/i },
+  { intent: 'get_billing_info', regex: /current\s+(plan|subscription|tier|package|billing)/i },
+  { intent: 'get_billing_info', regex: /(plan|subscription)\s+(status|active|details|info)/i },
+  { intent: 'get_billing_info', regex: /am\s+i\s+(subscribed|on\s+a\s+paid\s+plan|on\s+pro|on\s+business|on\s+enterprise)/i },
+  { intent: 'get_billing_info', regex: /how\s+much\s+(am\s+i|are\s+we)\s+paying/i },
+  { intent: 'get_billing_info', regex: /(account|workspace)\s+(limits?|allowance|capacity|tier)/i },
+  { intent: 'get_billing_info', regex: /what\s+(are\s+)?my\s+(limits?|allowance|capacity|quota|restrictions)/i },
+  { intent: 'get_billing_info', regex: /plan\s+(limits?|features?|allowance|details|info)/i },
+  { intent: 'get_billing_info', regex: /how\s+many\s+(posts?|connections?|seats?)\s+(can\s+i|are\s+)?(have|use|allowed|included)/i },
+  { intent: 'get_billing_info', regex: /what\s+(do\s+i\s+get|is\s+included)\s+(with|in)\s+my\s+(plan|subscription)/i },
+  { intent: 'get_billing_info', regex: /check\s+(my\s+)?(plan|subscription|billing|account\s+type)/i },
+  { intent: 'get_billing_info', regex: /see\s+(my\s+)?(plan|subscription|billing|account\s+type)/i },
+  { intent: 'get_billing_info', regex: /is\s+my\s+(account|subscription|plan)\s+(active|paid|valid|current)/i },
+  { intent: 'get_billing_info', regex: /renewal\s+(date|status|info)/i },
+  { intent: 'get_billing_info', regex: /when\s+does\s+my\s+(subscription|plan|billing)\s+(renew|expire|end)/i },
+  { intent: 'get_billing_info', regex: /what\s+tier\s+(am\s+i|are\s+we)\s+(on|in)/i },
+  { intent: 'get_billing_info', regex: /my\s+(account\s+)?(type|level|tier)/i },
+  { intent: 'get_billing_info', regex: /trial\s+(status|period|days?\s+left|remaining)/i },
+  { intent: 'get_billing_info', regex: /how\s+long\s+(is\s+)?my\s+trial/i },
+
+  // WORKSPACE / TEAM MEMBERS
+  { intent: 'get_workspace_members', regex: /any\s+(team\s+)?members?/i },
+  { intent: 'get_workspace_members', regex: /member\s+on\s+my\s+team/i },
+  { intent: 'get_workspace_members', regex: /^(team|members?|teammates?|colleagues?)$/i },
+  { intent: 'get_workspace_members', regex: /show\s+(my\s+)?(team|workspace\s+members?|teammates?)/i },
+  { intent: 'get_workspace_members', regex: /list\s+(my\s+)?(team|workspace\s+members?|teammates?)/i },
+  { intent: 'get_workspace_members', regex: /who\s+is\s+(on\s+)?(my\s+)?(team|workspace|in\s+my\s+workspace)/i },
+  { intent: 'get_workspace_members', regex: /who\s+(are\s+)?(my\s+)?(team\s+members?|teammates?|colleagues?)/i },
+  { intent: 'get_workspace_members', regex: /workspace\s+(members?|team|users?|people)/i },
+  { intent: 'get_workspace_members', regex: /team\s+(members?|users?|list|roster|people)/i },
+  { intent: 'get_workspace_members', regex: /how\s+many\s+(people|members?|users?|teammates?)\s+(are\s+in|on)\s+(my\s+)?(team|workspace)/i },
+  { intent: 'get_workspace_members', regex: /(members?|users?)\s+(in\s+)?my\s+workspace/i },
+  { intent: 'get_workspace_members', regex: /what\s+(are\s+the\s+)?roles?\s+(of\s+)?(my\s+)?(team\s+members?|teammates?)/i },
+  { intent: 'get_workspace_members', regex: /get\s+(my\s+)?(team|workspace\s+members?|teammates?)/i },
+  { intent: 'get_workspace_members', regex: /collaborators?\s+(list|in\s+my\s+workspace|on\s+my\s+team)/i },
+  { intent: 'get_workspace_members', regex: /team\s+(roles?|structure|setup|overview)/i },
+  { intent: 'get_workspace_members', regex: /who\s+(else\s+)?has\s+access\s+to\s+(my\s+)?workspace/i },
+  { intent: 'get_workspace_members', regex: /who\s+can\s+(access|use|edit|see)\s+my\s+workspace/i },
+  { intent: 'get_workspace_members', regex: /team\s+members?\s+(and\s+)?roles?/i },
+
+  // PUBLISH POST
+  { intent: 'publish_post', regex: /publish\s+(post|draft|content|this|it)/i },
+  { intent: 'publish_post', regex: /post\s+(this|it|now|immediately|right\s+now)/i },
+  { intent: 'publish_post', regex: /send\s+(this|it)\s+(out|live|now)/i },
+  { intent: 'publish_post', regex: /go\s+live\s+(with|now)/i },
+  { intent: 'publish_post', regex: /push\s+(the|this|my)\s+(post|draft|content)\s+(live|now|out)/i },
+  { intent: 'publish_post', regex: /make\s+(it|this|the\s+post)\s+(live|public|go\s+live)/i },
+  { intent: 'publish_post', regex: /release\s+(the|this|my)\s+(post|draft|content)/i },
+  { intent: 'publish_post', regex: /yes\s+(publish|post|confirm|go\s+ahead|do\s+it)/i },
+  { intent: 'publish_post', regex: /confirm\s+(publish|posting|the\s+post)/i },
+  { intent: 'publish_post', regex: /post\s+(this\s+)?(content|draft)\s+(now|immediately|live)/i },
+
+  // SCHEDULE POST
+  { intent: 'schedule_post', regex: /schedule\s+(this|the|my|a)\s+(post|draft|content)/i, negative: /\b(how|what|when|can|should|explain)\b/i },
+  { intent: 'schedule_post', regex: /post\s+(this|it)\s+(later|at|on|for|tomorrow|next)/i },
+  { intent: 'schedule_post', regex: /set\s+(a\s+)?schedule\s+for\s+(this|the)\s+(post|draft)/i },
+  { intent: 'schedule_post', regex: /queue\s+(this|the|my|a)\s+(post|draft|content)/i },
+  { intent: 'schedule_post', regex: /plan\s+(this|the|my|a)\s+(post|draft|content)\s+(for|to\s+go\s+live)/i },
+  { intent: 'schedule_post', regex: /yes\s+schedule/i },
+  { intent: 'schedule_post', regex: /confirm\s+(schedule|scheduling|the\s+schedule)/i },
+  { intent: 'schedule_post', regex: /set\s+(it|this)\s+to\s+(post|go\s+live|publish)\s+(at|on|for)/i },
+
+  // CREATE DESIGNED AD
+  { intent: 'create_designed_ad_draft', regex: /create\s+(a\s+)?(designed|premium|beautiful|visual|branded|professional)\s+(post|ad|banner|content)/i, negative: /\b(how|what|when|can|should|explain)\b/i },
+  { intent: 'create_designed_ad_draft', regex: /design\s+(a\s+)?(post|ad|banner|visual|graphic|flyer|creative)/i, negative: /\b(how|what|when|can|should|explain)\b/i },
+  { intent: 'create_designed_ad_draft', regex: /generate\s+(a\s+)?(designed|premium|beautiful|visual|branded)\s+(post|ad|banner|content)/i, negative: /\b(how|what|when|can|should|explain)\b/i },
+  { intent: 'create_designed_ad_draft', regex: /make\s+(a\s+)?(designed|premium|beautiful|visual|graphic|branded)\s+(post|ad|banner|content|creative)/i, negative: /\b(how|what|when|can|should|explain)\b/i },
+  { intent: 'create_designed_ad_draft', regex: /visual\s+(ad|post|content|banner|creative|design)/i, negative: /\b(how|what|when|can|should|explain)\b/i },
+  { intent: 'create_designed_ad_draft', regex: /branded\s+(post|content|ad|banner|visual|creative)/i, negative: /\b(how|what|when|can|should|explain)\b/i },
+  { intent: 'create_designed_ad_draft', regex: /social\s+media\s+(graphic|visual|creative|banner|ad)/i, negative: /\b(how|what|when|can|should|explain)\b/i },
+  { intent: 'create_designed_ad_draft', regex: /(story|square|landscape|banner)\s+(ad|post|design|graphic|template|creative)/i, negative: /\b(how|what|when|can|should|explain)\b/i },
+  { intent: 'create_designed_ad_draft', regex: /instagram\s+(story|ad|creative|graphic|visual|banner)/i, negative: /\b(how|what|when|can|should|explain)\b/i },
+  { intent: 'create_designed_ad_draft', regex: /facebook\s+(ad|banner|creative|graphic|visual|post)/i, negative: /\b(how|what|when|can|should|explain)\b/i },
+  { intent: 'create_designed_ad_draft', regex: /(make|create|build)\s+(me\s+)?a\s+(flyer|graphic|visual|ad|banner)/i, negative: /\b(how|what|when|can|should|explain)\b/i },
+
+  // CONNECT SOCIAL PLATFORM (extra)
+  { intent: 'connect_social_platform', regex: /how\s+do\s+i\s+(connect|link|add|integrate)\s+(facebook|instagram|twitter|linkedin|youtube|tiktok|pinterest|telegram|bluesky|mastodon)/i },
+  { intent: 'connect_social_platform', regex: /connect\s+my\s+(facebook|instagram|twitter|linkedin|youtube|tiktok|pinterest|telegram|bluesky|mastodon)\s+(account|page|profile|channel)/i },
+  { intent: 'connect_social_platform', regex: /add\s+(facebook|instagram|twitter|linkedin|youtube|tiktok|pinterest|telegram|bluesky|mastodon)\s+(account|page|profile|channel)/i },
+  { intent: 'connect_social_platform', regex: /link\s+(my\s+)?(facebook|instagram|twitter|linkedin|youtube|tiktok|pinterest|telegram|bluesky|mastodon)/i },
+  { intent: 'connect_social_platform', regex: /integrate\s+(facebook|instagram|twitter|linkedin|youtube|tiktok|pinterest|telegram|bluesky|mastodon)/i },
+  { intent: 'connect_social_platform', regex: /setup\s+(my\s+)?(facebook|instagram|twitter|linkedin|youtube|tiktok|pinterest)\s+(account|page|profile)/i },
+
+  // ADMIN: ACTIVE USERS (extra)
+  { intent: 'get_active_users', regex: /how\s+many\s+(users|people|accounts)\s+are\s+(active|online|using)/i },
+  { intent: 'get_active_users', regex: /users?\s+(online|active|logged\s+in)\s+(now|today|currently|right\s+now)/i },
+  { intent: 'get_active_users', regex: /who\s+is\s+(online|active|logged\s+in)\s+(now|currently)/i },
+  { intent: 'get_active_users', regex: /current\s+active\s+users?/i },
+  { intent: 'get_active_users', regex: /users?\s+currently\s+(online|active|using\s+the\s+platform)/i },
+  { intent: 'get_active_users', regex: /daily\s+active\s+users?/i },
+  { intent: 'get_active_users', regex: /monthly\s+active\s+users?/i },
+
+  // ADMIN: SYSTEM ANALYTICS (extra)
+  { intent: 'get_system_analytics', regex: /total\s+(platform\s+)?(users?|workspaces?|accounts?|subscribers?)/i },
+  { intent: 'get_system_analytics', regex: /how\s+many\s+(users?|workspaces?|accounts?|subscribers?)\s+(do\s+we\s+have|are\s+there|signed\s+up)/i },
+  { intent: 'get_system_analytics', regex: /platform\s+(overview|health|status|numbers?|growth)/i },
+  { intent: 'get_system_analytics', regex: /site\s+(stats|analytics|numbers?|overview|summary)/i },
+  { intent: 'get_system_analytics', regex: /admin\s+(stats|analytics|overview|dashboard)/i },
+  { intent: 'get_system_analytics', regex: /growth\s+(stats|analytics|numbers?|overview|metrics)/i },
+  { intent: 'get_system_analytics', regex: /new\s+(users?|signups?|registrations?)\s+(this\s+month|this\s+week|today|recently)/i },
+  { intent: 'get_system_analytics', regex: /platform\s+wide\s+(stats|analytics|data|metrics)/i },
+  { intent: 'get_system_analytics', regex: /all\s+users?\s+(stats|count|overview|total)/i },
+
+  // ADMIN: SUBSCRIBED USERS (extra)
+  { intent: 'get_subscribed_users', regex: /how\s+many\s+(users?|people|accounts?)\s+(are\s+)?(subscribed|paying|on\s+paid\s+plan)/i },
+  { intent: 'get_subscribed_users', regex: /paying\s+(users?|customers?|subscribers?)/i },
+  { intent: 'get_subscribed_users', regex: /paid\s+(users?|customers?|subscribers?|accounts?)/i },
+  { intent: 'get_subscribed_users', regex: /revenue|mrr|monthly\s+recurring/i },
+  { intent: 'get_subscribed_users', regex: /subscription\s+(breakdown|count|total|stats|numbers?)/i },
+  { intent: 'get_subscribed_users', regex: /how\s+many\s+(pro|business|enterprise)\s+(users?|subscribers?|accounts?)/i },
+
+  // ADMIN: INACTIVE USERS (extra)
+  { intent: 'get_inactive_users', regex: /users?\s+(who\s+(are|have\s+been)\s+)?inactive/i },
+  { intent: 'get_inactive_users', regex: /how\s+many\s+users?\s+(have\s+)?(not\s+)?(logged\s+in|been\s+active|used\s+the\s+platform)/i },
+  { intent: 'get_inactive_users', regex: /churned?\s+(users?|customers?|accounts?)/i },
+  { intent: 'get_inactive_users', regex: /dormant\s+(users?|accounts?)/i },
+  { intent: 'get_inactive_users', regex: /users?\s+not\s+(logging|using|active\s+in)\s+(30|the\s+last)/i },
+  { intent: 'get_inactive_users', regex: /lapsed\s+(users?|accounts?|customers?)/i },
 ];
 
 // ─── Argument Extraction (Token-Free) ────────────────────────────────────────
@@ -604,10 +851,11 @@ export async function tryRouteLocally(
 
   const cleanMessage = message.trim();
 
-  // Guard: if the message has fewer than 2 meaningful tokens after stop-word
-  // stripping, it's too ambiguous to route locally (e.g., "hi", "ok thanks").
+  // Guard: if the message is empty after trimming, bail out early.
+  // Single-word queries like "billing", "calendar", "analytics" are intentional
+  // and will be caught by the hardcoded regex patterns below.
   const meaningfulTokens = tokenize(cleanMessage);
-  if (meaningfulTokens.length < 2) {
+  if (meaningfulTokens.length < 1) {
     return null;
   }
 
