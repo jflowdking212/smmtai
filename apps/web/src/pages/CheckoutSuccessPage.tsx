@@ -20,7 +20,8 @@ export function CheckoutSuccessPage() {
   useEffect(() => {
     const rawPixelId = settings.fb_pixel_id;
     if (!rawPixelId) return;
-    const pixelIdMatch = rawPixelId.match(/\d{10,18}/);
+    const pixelIdStr = String(rawPixelId);
+    const pixelIdMatch = pixelIdStr.match(/\d{10,18}/);
     if (!pixelIdMatch) {
       console.warn("Invalid Facebook Pixel ID format:", rawPixelId);
       return;
