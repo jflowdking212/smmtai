@@ -1140,20 +1140,23 @@ export const userTools: Record<string, { definition: ToolDefinition; handler: To
       },
     },
     handler: async (args, context) => {
-      const [sub, usageRecords] = await Promise.all([
-        prisma.subscription.findUnique({ where: { workspaceId: context.workspaceId } }),
-        prisma.usageRecord.findMany({
-          where: {
-            workspaceId: context.workspaceId,
-            type: 'ai_generation',
-            createdAt: { gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1) }
+      const sub = await prisma.subscription.findUnique({
+        where: { workspaceId: context.workspaceId },
+        include: {
+          usageRecords: {
+            where: {
+              metric: 'ai_generations',
+              periodStart: { gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1) }
+            },
+            orderBy: { periodStart: 'desc' },
+            take: 1
           }
-        })
-      ]);
-      const used = usageRecords.length;
+        }
+      });
       const tier = sub?.tier?.toLowerCase() || 'basic';
       const limits: Record<string, number> = { basic: 25, pro: 100, business: 500, enterprise: -1 };
       const limit = limits[tier] ?? 25;
+      const used = sub?.usageRecords?.[0]?.count ?? 0;
       const limitStr = limit === -1 ? 'Unlimited' : `${limit}`;
       const remaining = limit === -1 ? 'Unlimited' : Math.max(0, limit - used);
       return `🤖 **AI Generation Usage This Month**\n\n**Plan:** ${tier.toUpperCase()}\n**Used:** ${used} generations\n**Limit:** ${limitStr}\n**Remaining:** ${remaining}\n\n${used >= limit && limit !== -1 ? '⚠️ You have reached your monthly AI limit. Upgrade your plan for more.' : '✅ You have AI generations available.'}`;
