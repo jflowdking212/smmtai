@@ -1106,6 +1106,8 @@ export const userTools: Record<string, { definition: ToolDefinition; handler: To
         return `Failed to create designed post draft: ${err?.message || err}`;
       }
     }
+  },
+
   get_connected_platforms: {
     definition: {
       type: 'function',
@@ -1232,4 +1234,3 @@ export const userTools: Record<string, { definition: ToolDefinition; handler: To
     }
   },
 };
-
