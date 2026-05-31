@@ -18,9 +18,14 @@ export function CheckoutSuccessPage() {
   const { settings } = useSiteSettings();
 
   useEffect(() => {
-    if (!settings.fb_pixel_id) return;
-
-    const pixelId = settings.fb_pixel_id;
+    const rawPixelId = settings.fb_pixel_id;
+    if (!rawPixelId) return;
+    const pixelIdMatch = rawPixelId.match(/\d{10,18}/);
+    if (!pixelIdMatch) {
+      console.warn("Invalid Facebook Pixel ID format:", rawPixelId);
+      return;
+    }
+    const pixelId = pixelIdMatch[0];
 
     if (!window.fbq) {
       (function (f: any, b, e, v, n?: any, t?: any, s?: any) {
