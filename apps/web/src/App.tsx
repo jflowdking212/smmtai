@@ -22,6 +22,7 @@ import { BillingPage } from '@/pages/BillingPage';
 import { HelpPage } from '@/pages/HelpPage';
 import { TrendPage } from '@/pages/TrendPage';
 import { EntrepreneursPage } from '@/pages/EntrepreneursPage';
+import { EntrepreneursPromoPage } from '@/pages/EntrepreneursPromoPage';
 import { InboxPage } from '@/pages/InboxPage';
 import { CommentsPage } from '@/pages/CommentsPage';
 import { ConversationsPage } from '@/pages/ConversationsPage';
@@ -108,6 +109,8 @@ export default function App() {
            <Route path="/cookies" element={<CookiePolicyPage />} />
            <Route path="/checkout" element={<CheckoutPage />} />
            <Route path="/checkout/success" element={<CheckoutSuccessPage />} />
+           <Route path="/promo/entrepreneurs" element={<EntrepreneursPromoPage />} />
+           <Route path="/promo/entrepreneurs-day" element={<EntrepreneursPromoPage />} />
 
            {/* Public auth routes */}
           <Route path="/auth/login" element={<LoginPage />} />
