@@ -110,9 +110,18 @@ export function AdminSettingsPage() {
 
   async function saveSiteSettings() {
     setSaving('site');
+    // Sanitize fb_pixel_id — extract digits only before saving
+    const pixelRaw = siteConfig.fb_pixel_id || '';
+    const pixelDigits = pixelRaw.replace(/\D/g, '');
+    if (pixelRaw && !pixelDigits.match(/^\d{10,18}$/)) {
+      toast.error('Invalid Pixel ID', 'Facebook Pixel ID must be a 10–18 digit number only. Do not paste the full script code.');
+      setSaving(null);
+      return;
+    }
+    const cleanConfig = { ...siteConfig, fb_pixel_id: pixelDigits };
     try {
-      const res = await api.admin.saveSiteSettings(siteConfig);
-      setSiteConfig((prev) => ({ ...prev, ...res.data }));
+      const res = await api.admin.saveSiteSettings(cleanConfig);
+      setSiteConfig((prev) => ({ ...prev, ...res.data, fb_pixel_id: pixelDigits }));
       toast.success('Saved', 'Site settings saved.');
       invalidateSiteSettings();
     } catch (err: any) { toast.error('Error', err.message || 'Failed'); }
@@ -196,13 +205,47 @@ export function AdminSettingsPage() {
                   { key: 'site_tagline', label: 'Tagline' },
                   { key: 'seo_meta_title', label: 'SEO Title' },
                   { key: 'seo_meta_description', label: 'SEO Description' },
-                  { key: 'fb_pixel_id', label: 'Facebook Pixel ID' },
                 ].map(({ key, label }) => (
                   <div key={key}>
                     <label className="block text-xs text-neutral-400 mb-1">{label}</label>
                     <input value={(siteConfig as any)[key]} onChange={(e) => setSiteConfig((prev) => ({ ...prev, [key]: e.target.value }))} className={inputClass} />
                   </div>
                 ))}
+
+                {/* Facebook Pixel ID — digits only */}
+                <div className="sm:col-span-2">
+                  <label className="block text-xs text-neutral-400 mb-1">Facebook Pixel ID</label>
+                  <input
+                    value={siteConfig.fb_pixel_id}
+                    onChange={(e) => {
+                      // Strip all non-digit characters on every keystroke
+                      const digitsOnly = e.target.value.replace(/\D/g, '');
+                      setSiteConfig((prev) => ({ ...prev, fb_pixel_id: digitsOnly }));
+                    }}
+                    onPaste={(e) => {
+                      // On paste, extract only the digits from whatever is pasted (handles full script tags)
+                      e.preventDefault();
+                      const pasted = e.clipboardData.getData('text');
+                      const match = pasted.match(/\d{10,18}/);
+                      if (match) {
+                        setSiteConfig((prev) => ({ ...prev, fb_pixel_id: match[0] }));
+                      } else {
+                        const digitsOnly = pasted.replace(/\D/g, '');
+                        setSiteConfig((prev) => ({ ...prev, fb_pixel_id: digitsOnly }));
+                      }
+                    }}
+                    className={inputClass}
+                    placeholder="e.g. 4091896597776182"
+                    inputMode="numeric"
+                    maxLength={18}
+                  />
+                  <p className="text-[10px] text-neutral-500 mt-1">
+                    Enter the numeric ID only (10–18 digits). Pasting the full &lt;script&gt; code will automatically extract the ID.
+                  </p>
+                  {siteConfig.fb_pixel_id && !/^\d{10,18}$/.test(siteConfig.fb_pixel_id) && (
+                    <p className="text-[10px] text-red-400 mt-1">⚠ Invalid — must be 10 to 18 digits with no spaces or letters.</p>
+                  )}
+                </div>
               </div>
               <div className="flex gap-4">
                 <div>
