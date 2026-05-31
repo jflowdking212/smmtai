@@ -9,7 +9,7 @@ import { tryRouteLocally, logSuccessfulRoute, logRoutingOutcome } from './nlp-ro
 // Set to true to disable the OpenAI fallback and test ONLY the local NLP router.
 // When a query cannot be matched locally, a diagnostic message is returned instead
 // of calling OpenAI. Flip back to false when testing is complete.
-const LOCAL_ONLY_MODE = true; // ← OpenAI disabled for local router testing.
+const LOCAL_ONLY_MODE = false; // ← OpenAI enabled. Set to true only for local router testing.
 // ──────────────────────────────────────────────────────────────────────────────
 
 // In-memory cache
@@ -227,12 +227,14 @@ ${contextInfo}`;
     const isAgentMode = tools.length > 0;
     const agentRoleContext = isAgentMode
       ? `\n\nAGENT CONTEXT:
+- Today's date and time: ${new Date().toUTCString()}
 - You are operating as a full AI agent with real-time access to the SmmtAI database.
 - Authenticated user: ${userName || 'Unknown'} (role: ${role}, workspaceId: ${workspaceId})
-- You CAN and SHOULD use your tools to answer data-related questions.
+- You CAN and SHOULD use your tools to answer data-related questions. Use multiple tools in sequence if needed.
+- Tools available: get_dashboard_stats, get_user_posts, get_connected_platforms, get_platform_analytics, get_ai_usage, get_templates, get_calendar, get_billing_info, get_workspace_members, create_post_draft, publish_post, schedule_post, delete_post, connect_social_platform, create_designed_ad_draft${role === 'admin' || role === 'owner' ? ', get_active_users, get_subscribed_users, get_inactive_users, get_system_analytics, ban_user' : ''}.
 - For destructive actions (delete_post, ban_user) you MUST confirm with the user before executing (set confirm=false first to get their consent).
 - Do NOT make up data. Always use tools to retrieve live information.
-- Format lists and data clearly for the user.`
+- Format lists and data clearly for the user. Use bullet points, bold, and emojis for readability.`
       : '';
 
     const agentSystemPrompt = isAgentMode

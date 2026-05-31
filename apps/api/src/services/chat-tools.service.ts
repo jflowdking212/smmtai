@@ -1106,5 +1106,130 @@ export const userTools: Record<string, { definition: ToolDefinition; handler: To
         return `Failed to create designed post draft: ${err?.message || err}`;
       }
     }
-  }
+  get_connected_platforms: {
+    definition: {
+      type: 'function',
+      function: {
+        name: 'get_connected_platforms',
+        description: "Get a list of all social media accounts currently connected to the user's workspace, including platform name, account name, and connection status.",
+        parameters: { type: 'object', properties: {}, required: [] },
+      },
+    },
+    handler: async (args, context) => {
+      const connections = await prisma.socialConnection.findMany({
+        where: { workspaceId: context.workspaceId },
+        select: { platform: true, accountName: true, isActive: true, createdAt: true }
+      });
+      if (!connections.length) return 'You have no social accounts connected yet. Use the Connections page to link your accounts.';
+      const lines = connections.map(c =>
+        `  • **${c.platform.toUpperCase()}** — @${c.accountName || 'unknown'} (${c.isActive ? '✅ Active' : '❌ Inactive'})`
+      );
+      return `🔗 **Connected Social Accounts (${connections.length} total):**\n\n${lines.join('\n')}`;
+    }
+  },
+
+  get_ai_usage: {
+    definition: {
+      type: 'function',
+      function: {
+        name: 'get_ai_usage',
+        description: "Get the current user's AI content generation usage this billing period — how many generations have been used vs their plan limit.",
+        parameters: { type: 'object', properties: {}, required: [] },
+      },
+    },
+    handler: async (args, context) => {
+      const [sub, usageRecords] = await Promise.all([
+        prisma.subscription.findUnique({ where: { workspaceId: context.workspaceId } }),
+        prisma.usageRecord.findMany({
+          where: {
+            workspaceId: context.workspaceId,
+            type: 'ai_generation',
+            createdAt: { gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1) }
+          }
+        })
+      ]);
+      const used = usageRecords.length;
+      const tier = sub?.tier?.toLowerCase() || 'basic';
+      const limits: Record<string, number> = { basic: 25, pro: 100, business: 500, enterprise: -1 };
+      const limit = limits[tier] ?? 25;
+      const limitStr = limit === -1 ? 'Unlimited' : `${limit}`;
+      const remaining = limit === -1 ? 'Unlimited' : Math.max(0, limit - used);
+      return `🤖 **AI Generation Usage This Month**\n\n**Plan:** ${tier.toUpperCase()}\n**Used:** ${used} generations\n**Limit:** ${limitStr}\n**Remaining:** ${remaining}\n\n${used >= limit && limit !== -1 ? '⚠️ You have reached your monthly AI limit. Upgrade your plan for more.' : '✅ You have AI generations available.'}`;
+    }
+  },
+
+  get_templates: {
+    definition: {
+      type: 'function',
+      function: {
+        name: 'get_templates',
+        description: "Get the user's saved post templates in their workspace.",
+        parameters: {
+          type: 'object',
+          properties: {
+            limit: { type: 'number', description: 'Number of templates to return (default 10, max 20).' }
+          },
+          required: []
+        },
+      },
+    },
+    handler: async (args, context) => {
+      const limit = Math.min(args.limit || 10, 20);
+      const templates = await prisma.template.findMany({
+        where: { workspaceId: context.workspaceId },
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        select: { id: true, name: true, category: true, platforms: true, createdAt: true }
+      });
+      if (!templates.length) return 'You have no saved templates yet. Create one from the Templates section.';
+      const lines = templates.map((t, i) =>
+        `${i + 1}. **${t.name}** (${t.category || 'Uncategorized'}) — Platforms: ${(t.platforms as string[]).join(', ') || 'any'}`
+      );
+      return `📋 **Your Saved Templates (${templates.length} shown):**\n\n${lines.join('\n')}`;
+    }
+  },
+
+  get_platform_analytics: {
+    definition: {
+      type: 'function',
+      function: {
+        name: 'get_platform_analytics',
+        description: "Get a per-platform breakdown of engagement (impressions, likes, comments, shares) for the user's workspace.",
+        parameters: { type: 'object', properties: {}, required: [] },
+      },
+    },
+    handler: async (args, context) => {
+      const platformPosts = await prisma.platformPost.findMany({
+        where: {
+          post: { workspaceId: context.workspaceId, status: 'published' },
+          status: 'published',
+        },
+        include: {
+          analytics: { orderBy: { capturedAt: 'desc' }, take: 1 }
+        }
+      });
+
+      const byPlatform: Record<string, { impressions: number; likes: number; comments: number; shares: number; posts: number }> = {};
+      for (const pp of platformPosts) {
+        const p = pp.platform;
+        if (!byPlatform[p]) byPlatform[p] = { impressions: 0, likes: 0, comments: 0, shares: 0, posts: 0 };
+        byPlatform[p].posts++;
+        const latest = pp.analytics[0];
+        if (latest) {
+          byPlatform[p].impressions += latest.impressions || 0;
+          byPlatform[p].likes += latest.likes || 0;
+          byPlatform[p].comments += latest.comments || 0;
+          byPlatform[p].shares += latest.shares || 0;
+        }
+      }
+
+      if (!Object.keys(byPlatform).length) return 'No published post analytics available yet. Publish some posts to see per-platform data.';
+
+      const lines = Object.entries(byPlatform).map(([platform, stats]) =>
+        `  • **${platform.toUpperCase()}** — ${stats.posts} posts | 👁️ ${stats.impressions.toLocaleString()} impressions | ❤️ ${stats.likes.toLocaleString()} likes | 💬 ${stats.comments.toLocaleString()} comments | 🔁 ${stats.shares.toLocaleString()} shares`
+      );
+      return `📊 **Per-Platform Analytics Breakdown:**\n\n${lines.join('\n')}`;
+    }
+  },
 };
+
