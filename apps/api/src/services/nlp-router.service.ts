@@ -1,6 +1,112 @@
 import { prisma } from '../config/database.js';
 import { adminTools, userTools } from './chat-tools.service.js';
 
+// ????????? Verified Static Facts (NEVER hallucinate these) ???????????????????????????????????????????????????????????????????????????
+// These are the ground-truth facts about the platform. Any query that touches
+// these topics is answered directly from here ??? no OpenAI, no KB lookup, no guessing.
+
+const VERIFIED_PLATFORM_LIST = `SmmtAI supports **25 social media platforms**:
+
+???? **OAuth Connect (7 platforms):**
+Facebook, Instagram, Twitter/X, LinkedIn, TikTok, YouTube, Pinterest
+
+???? **Community Platforms (3 platforms):**
+Entreprenrs, Chrxstians, Iohah
+
+???? **Fediverse & Alternative (6 platforms):**
+Bluesky, Mastodon, Telegram, Truth Social, Lemmy, Pleroma
+
+???? **Social & Discussion (3 platforms):**
+Threads, Reddit, Tumblr
+
+?????? **Publishing & Business (4 platforms):**
+WordPress, Medium, Blogger, Google Business Profile
+
+???? **Collaboration (2 platforms):**
+Discord, Slack`;
+
+const VERIFIED_FEATURES_LIST = `**SmmtAI Core Features:**
+
+???? **Post Scheduling** ??? Schedule posts across all 25 platforms from one place
+???? **Analytics** ??? Track engagement, impressions, likes, comments, shares per platform
+???? **AI Content Creation** ??? Generate posts, captions, and designed ad banners with AI
+???? **Visual Ad Designer** ??? Create professional ads (square, story, landscape, banner) with custom themes
+???? **Post Templates** ??? Save and reuse content templates for faster publishing
+???? **Team Workspace** ??? Invite team members with role-based permissions (owner, admin, member)
+??????? **Content Calendar** ??? Visual calendar of all scheduled and published posts
+???? **25 Platform Connections** ??? Connect and manage all your social accounts in one dashboard
+???? **Subscription Management** ??? View your plan, limits, and billing in one place
+???? **AI Chat Assistant** ??? This bot! Ask anything about your account or the platform`;
+
+const VERIFIED_SITE_OVERVIEW = `**SmmtAI** is an all-in-one social media management platform that lets you:
+
+??? **Connect** all your social media accounts in one place (25 platforms supported)
+??? **Schedule & publish** posts across multiple platforms simultaneously
+??? **Analyze performance** with detailed engagement analytics per platform
+??? **Create content** using AI-powered post and ad generation tools
+??? **Collaborate** with your team using shared workspaces and role-based access
+??? **Stay organized** with a content calendar and post templates
+
+Whether you're a solo creator or a large team, SmmtAI simplifies your entire social media workflow.`;
+
+const VERIFIED_BOT_CAPABILITIES = `**Here's what I can help you with:**
+
+???? **Your Data** (requires login):
+??? Show your dashboard stats, engagement metrics, and post analytics
+??? List your posts (drafts, scheduled, published, failed)
+??? Show per-platform engagement breakdown and analytics
+??? Show your content calendar and all scheduled posts
+??? Check your AI usage credits vs plan limit
+??? View your billing info, current plan, and subscription limits
+??? List your saved post templates
+??? Show your team members and their roles (Pro+ plans)
+??? Show all your connected social media accounts
+??? Show your profile and account info
+
+?????? **Actions** (requires login):
+??? Create post drafts and designed ad banners
+??? Schedule or publish posts (with confirmation)
+??? Delete posts (with confirmation to prevent accidents)
+??? Connect new social media platforms to your workspace
+
+???? **General Knowledge** (always available):
+??? Explain what SmmtAI is and how it works
+??? List all 25 supported platforms and connection methods
+??? Explain plan tiers and what each includes
+??? Guide you through using any dashboard feature
+
+?????? **Plan-Gated Features:**
+??? Analytics ??? requires **Pro** plan or higher
+??? Team Members ??? requires **Pro** plan or higher
+??? AI Conversations (chat history) ??? requires **Pro** plan or higher
+??? Knowledge Base ??? requires **Pro** plan or higher
+
+Just ask naturally ??? I understand questions like "show my stats", "list my drafts", "what platforms do you support", "what plan am I on", etc.`;
+
+const VERIFIED_PRICING_INFO = `**SmmtAI Subscription Plans:**
+
+| Feature | Basic | Pro | Business | Enterprise |
+|---------|-------|-----|----------|------------|
+| Social Accounts | 5 | 8 | 15 | Unlimited |
+| Posts/Month | 35 | 200 | Unlimited | Unlimited |
+| AI Generations | 25 | 100 | 500 | Unlimited |
+| Templates | 20 | 50 | Unlimited | Unlimited |
+| Team Members | 1 | 5 | 10 | 20 |
+| Analytics History | 15 days | 30 days | 90 days | Unlimited |
+
+???? **Plan-Gated Features:**
+??? **Basic+**: Dashboard, Compose, Calendar, Connections, Templates, AI Assistant, Editor, Billing
+??? **Pro+**: Analytics, Team Workspace, Chat Conversations, Knowledge Base
+
+???? **Platforms by Plan:**
+??? **Basic (5 platforms)**: Entreprenrs, Chrxstians, Iohah, Facebook, Instagram
+??? **Pro (10 platforms)**: Basic + Twitter/X, YouTube, Pinterest, Threads, Reddit
+??? **Business (22 platforms)**: Pro + TikTok, LinkedIn, Bluesky, Mastodon, Telegram, Tumblr, Google Business Profile, Discord, Slack, WordPress, Medium, Blogger
+??? **Enterprise (25 platforms)**: Business + Truth Social, Lemmy, Pleroma
+
+???? To see your current plan and limits, say **"show my billing info"** or check the **Billing** section in your dashboard.
+To upgrade your plan, visit the **Billing ??? Upgrade** section.`;
+
 // Maximum number of training records to store. When exceeded, low-count records
 // are pruned to prevent the DB value from growing unbounded.
 const MAX_TRAINING_RECORDS = 500;
@@ -25,7 +131,7 @@ interface TelemetryData {
   totalLatencyMs: number;
 }
 
-// ─── Persistence (DB-backed, thread-safe) ────────────────────────────────────
+// ????????? Persistence (DB-backed, thread-safe) ????????????????????????????????????????????????????????????????????????????????????????????????????????????
 
 async function loadTrainingData(): Promise<TrainingRecord[]> {
   try {
@@ -69,7 +175,7 @@ async function saveTrainingData(data: TrainingRecord[]) {
   }
 }
 
-// ─── Telemetry Outcome Logging ───────────────────────────────────────────────
+// ????????? Telemetry Outcome Logging ?????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????
 
 export async function logRoutingOutcome(
   outcome: 'local_active_learning' | 'local_regex_pattern' | 'openai_fallback' | 'execution_failure',
@@ -111,9 +217,9 @@ export async function logRoutingOutcome(
   }
 }
 
-// ─── Similarity (Stop-Word Filtered Jaccard) ─────────────────────────────────
+// ????????? Similarity (Stop-Word Filtered Jaccard) ???????????????????????????????????????????????????????????????????????????????????????????????????
 
-// Filler/stop words that add no intent signal — strip before comparing
+// Filler/stop words that add no intent signal ??? strip before comparing
 const STOP_WORDS = new Set([
   'please', 'me', 'my', 'the', 'a', 'an', 'to', 'for', 'i', 'want', 'can',
   'you', 'help', 'do', 'would', 'like', 'how', 'any', 'show', 'get', 'view',
@@ -146,7 +252,7 @@ function calculateSimilarity(str1: string, str2: string): number {
 }
 
 // Derive a similarity threshold from a phrase's historical success count.
-// High-count phrases (well-proven) get a lower threshold — we trust them sooner.
+// High-count phrases (well-proven) get a lower threshold ??? we trust them sooner.
 // Low-count phrases (new/unproven) demand tighter similarity before we route.
 function getThresholdForRecord(record: TrainingRecord): number {
   if (record.count >= 20) return 0.65;
@@ -155,7 +261,7 @@ function getThresholdForRecord(record: TrainingRecord): number {
   return BASE_THRESHOLD;      // new phrase needs 80% similarity
 }
 
-// ─── Hardcoded Pattern Fallbacks ─────────────────────────────────────────────
+// ????????? Hardcoded Pattern Fallbacks ???????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????
 
 interface Pattern {
   intent: string;
@@ -164,7 +270,7 @@ interface Pattern {
   negative?: RegExp;
 }
 
-// Ordered from specific → general to avoid broad patterns shadowing narrow ones.
+// Ordered from specific ??? general to avoid broad patterns shadowing narrow ones.
 // Ordered from specific to general to avoid broad patterns shadowing narrow ones.
 const hardcodedPatterns: Pattern[] = [
   // Admin-only
@@ -490,9 +596,185 @@ const hardcodedPatterns: Pattern[] = [
   { intent: 'get_inactive_users', regex: /dormant\s+(users?|accounts?)/i },
   { intent: 'get_inactive_users', regex: /users?\s+not\s+(logging|using|active\s+in)\s+(30|the\s+last)/i },
   { intent: 'get_inactive_users', regex: /lapsed\s+(users?|accounts?|customers?)/i },
+
+  // USER INFO / PROFILE
+  { intent: 'get_user_info', regex: /^(my\s+(profile|account|info)|who\s+am\s+i)$/i },
+  { intent: 'get_user_info', regex: /my\s+(profile|account\s+info|user\s+info|account\s+details)/i },
+  { intent: 'get_user_info', regex: /who\s+am\s+i\s+(logged\s+in\s+as)?/i },
+  { intent: 'get_user_info', regex: /what\s+(is|are)\s+my\s+(name|email|role|account|username|profile)/i },
+  { intent: 'get_user_info', regex: /show\s+(me\s+)?my\s+(profile|account|info|details)/i },
+  { intent: 'get_user_info', regex: /view\s+my\s+(profile|account|info|user\s+details)/i },
+  { intent: 'get_user_info', regex: /get\s+my\s+(profile|account|info|user\s+details)/i },
+  { intent: 'get_user_info', regex: /what\s+(email|name|role|workspace)\s+(do\s+i\s+have|am\s+i\s+using)/i },
+  { intent: 'get_user_info', regex: /check\s+my\s+(profile|account|user\s+info)/i },
+  { intent: 'get_user_info', regex: /my\s+(user\s+)?role\s+(in\s+this\s+workspace|on\s+this\s+account)?/i },
+  { intent: 'get_user_info', regex: /what\s+role\s+do\s+i\s+have/i },
+  { intent: 'get_user_info', regex: /am\s+i\s+(an?\s+)?(admin|owner|member)/i },
+  { intent: 'get_user_info', regex: /my\s+workspace\s+(id|info|details)/i },
+  { intent: 'get_user_info', regex: /what\s+is\s+my\s+workspace/i },
+
+  // CREATE POST DRAFT
+  { intent: 'create_post_draft', regex: /^(new\s+post|create\s+post|draft\s+post|write\s+post)$/i },
+  { intent: 'create_post_draft', regex: /create\s+(a\s+)?(new\s+)?(post|draft|content)/i, negative: /\b(design|banner|ad|visual|graphic|flyer|luxury|premium|branded)\b/i },
+  { intent: 'create_post_draft', regex: /write\s+(a\s+)?(new\s+)?(post|caption|content|update)/i, negative: /\b(design|banner|ad|visual|graphic)\b/i },
+  { intent: 'create_post_draft', regex: /draft\s+(a\s+)?(new\s+)?(post|caption|content)/i, negative: /\b(design|banner|ad|visual|graphic)\b/i },
+  { intent: 'create_post_draft', regex: /compose\s+(a\s+)?(new\s+)?(post|caption|content|update)/i, negative: /\b(design|banner|ad|visual|graphic)\b/i },
+  { intent: 'create_post_draft', regex: /make\s+(a\s+)?(new\s+)?(post|caption|content|draft)/i, negative: /\b(design|banner|ad|visual|graphic|beautiful|premium|branded)\b/i },
+  { intent: 'create_post_draft', regex: /generate\s+(a\s+)?(post|caption|content|update)/i, negative: /\b(design|banner|ad|visual|graphic|flyer|ad\s+banner)\b/i },
+  { intent: 'create_post_draft', regex: /add\s+(a\s+)?new\s+(post|draft|content)/i },
+  { intent: 'create_post_draft', regex: /save\s+(a\s+)?(post|draft|content)\s+(as\s+)?draft/i },
+  { intent: 'create_post_draft', regex: /new\s+(social\s+media\s+)?(post|content|update)\s+for/i },
+  { intent: 'create_post_draft', regex: /post\s+(about|for|on)\s+.{3,}/i, negative: /\b(show|list|get|fetch|my|published|scheduled|draft|failed|design|banner)\b/i },
+
+  // DELETE POST
+  { intent: 'delete_post', regex: /delete\s+(this|the|my|a)?\s*(post|draft|content)/i },
+  { intent: 'delete_post', regex: /remove\s+(this|the|my|a)?\s*(post|draft|content)/i },
+  { intent: 'delete_post', regex: /trash\s+(this|the|my|a)?\s*(post|draft|content)/i },
+  { intent: 'delete_post', regex: /discard\s+(this|the|my|a)?\s*(post|draft|content)/i },
+  { intent: 'delete_post', regex: /get\s+rid\s+of\s+(this|the|my)?\s*(post|draft|content)/i },
+  { intent: 'delete_post', regex: /erase\s+(this|the|my|a)?\s*(post|draft|content)/i },
+  { intent: 'delete_post', regex: /yes\s+(delete|remove|confirm\s+delete)/i },
+  { intent: 'delete_post', regex: /confirm\s+(delete|deletion|removing)\s+(the|this|my)?\s*(post|draft)/i },
+
+  // BAN USER (admin-only, always confirm=false first)
+  { intent: 'ban_user', regex: /ban\s+(user|account|this\s+user)/i },
+  { intent: 'ban_user', regex: /suspend\s+(user|account|this\s+user)/i },
+  { intent: 'ban_user', regex: /block\s+(user|account|this\s+user)/i },
+  { intent: 'ban_user', regex: /disable\s+(user|account|this\s+account)/i },
+  { intent: 'ban_user', regex: /(ban|suspend|block|disable)\s+[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/i },
+  { intent: 'ban_user', regex: /yes\s+(ban|suspend|confirm\s+ban|confirm\s+suspend)/i },
+  { intent: 'ban_user', regex: /confirm\s+(ban|suspension|suspending)/i },
+
+  // CONNECT SOCIAL PLATFORM ??? ALL 25 platforms
+  { intent: 'connect_social_platform', regex: /connect\s+(my\s+)?(facebook|instagram|twitter|linkedin|youtube|tiktok|pinterest|telegram|bluesky|mastodon|discord|slack|wordpress|medium|blogger|reddit|threads|tumblr|truth\s*social|lemmy|pleroma|google\s*business|google_business|entreprenrs|chrxstians|iohah)\s*(account|page|profile|channel|blog)?/i },
+  { intent: 'connect_social_platform', regex: /add\s+(my\s+)?(facebook|instagram|twitter|linkedin|youtube|tiktok|pinterest|telegram|bluesky|mastodon|discord|slack|wordpress|medium|blogger|reddit|threads|tumblr|truth\s*social|lemmy|pleroma|google\s*business|entreprenrs|chrxstians|iohah)\s*(account|page|profile|channel|blog)?/i },
+  { intent: 'connect_social_platform', regex: /link\s+(my\s+)?(facebook|instagram|twitter|linkedin|youtube|tiktok|pinterest|telegram|bluesky|mastodon|discord|slack|wordpress|medium|blogger|reddit|threads|tumblr|truth\s*social|lemmy|pleroma|google\s*business|entreprenrs|chrxstians|iohah)/i },
+  { intent: 'connect_social_platform', regex: /integrate\s+(facebook|instagram|twitter|linkedin|youtube|tiktok|pinterest|telegram|bluesky|mastodon|discord|slack|wordpress|medium|blogger|reddit|threads|tumblr|truth\s*social|lemmy|pleroma)/i },
+  { intent: 'connect_social_platform', regex: /setup\s+(my\s+)?(facebook|instagram|twitter|linkedin|youtube|tiktok|pinterest|discord|slack|wordpress|medium|blogger|reddit)\s*(account|page|profile|server|site|blog)?/i },
+  { intent: 'connect_social_platform', regex: /how\s+do\s+i\s+(connect|link|add|integrate)\s+(facebook|instagram|twitter|linkedin|youtube|tiktok|pinterest|telegram|bluesky|mastodon|discord|slack|wordpress|medium|blogger|reddit|threads|tumblr)/i },
 ];
 
-// ─── Argument Extraction (Token-Free) ────────────────────────────────────────
+// ????????? Static Route (Zero-Auth, Zero-Hallucination) ???????????????????????????????????????????????????????????????????????????????????????
+// Handles factual questions about the platform itself ??? platforms supported,
+// features, pricing, site overview ??? with VERIFIED hardcoded text.
+// Called BEFORE any KB search or OpenAI call. Works for guests AND authenticated users.
+// Returns a response string or null (fall through to normal routing).
+
+export function tryStaticRoute(message: string): string | null {
+  const m = message.toLowerCase().trim();
+
+  // ??? Greetings ???????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????
+  // Handle simple salutations locally ??? saves OpenAI cost and latency.
+  if (/^(hello|hi|hey|greetings|howdy|good\s+(morning|afternoon|evening))(\s+(there|bot|assistant|chatbot|agent))?([\ \s!?,.]*)$/i.test(m)) {
+    return `Hello! ???? I\'m the SmmtAI assistant.\n\nI can help you with:\n??? **Platform & pricing info** ??? just ask\n??? **Your dashboard** ??? log in to manage posts, analytics, billing, and more\n??? **Connecting social accounts** ??? I can guide you through it\n\nHow can I help you today?`;
+  }
+
+
+  // ?????? Platform list questions ??????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????
+  if (
+    /how\s+many\s+(social\s+)?(media\s+)?platforms?/i.test(m) ||
+    /what\s+(social\s+)?(media\s+)?platforms?\s+(do\s+you|does\s+smmtai|are|you)\s+(support|offer|have|connect|integrate)/i.test(m) ||
+    /which\s+(social\s+)?(media\s+)?platforms?\s+(do\s+you|are|does\s+smmtai)\s+(support|offer|have|available)/i.test(m) ||
+    /list\s+(all\s+)?(the\s+)?(social\s+)?(media\s+)?platforms?/i.test(m) ||
+    /what\s+platforms?\s+(can\s+i|do\s+you|are\s+supported|are\s+available|are\s+there)/i.test(m) ||
+    /supported?\s+platforms?/i.test(m) ||
+    /platforms?\s+(you\s+)?(support|offer|integrate|connect)/i.test(m) ||
+    /which\s+platforms?\s+(are|you)\s+(available|support|offer)/i.test(m) ||
+    /what\s+social\s+(networks?|media)\s+(do\s+you|are|does)/i.test(m) ||
+    /do\s+you\s+support\s+(facebook|instagram|twitter|tiktok|youtube|linkedin|pinterest|bluesky|mastodon|telegram|reddit|discord|slack|wordpress|medium|threads|tumblr)/i.test(m) ||
+    /is\s+(facebook|instagram|twitter|tiktok|youtube|linkedin|pinterest|bluesky|mastodon|telegram|reddit|discord|slack|wordpress|medium|threads|tumblr)\s+(supported|available|connected)/i.test(m) ||
+    (/\b(25|thirteen|13)\s+(platforms?|social)/i.test(m)) ||
+    (/\bplatforms?\b/i.test(m) && /\b(list|all|every|complete|full|available|supported?|what|which|how\s+many)\b/i.test(m))
+  ) {
+    return VERIFIED_PLATFORM_LIST;
+  }
+
+  // ?????? Site overview / what is SmmtAI ??????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????
+  if (
+    /what\s+is\s+(smmtai|this\s+(site|platform|app|tool|service))/i.test(m) ||
+    /what\s+does\s+(smmtai|this\s+(site|platform|app|tool))\s+do/i.test(m) ||
+    /tell\s+me\s+about\s+(smmtai|this\s+(site|platform|app|tool|service))/i.test(m) ||
+    /what('s|\s+is)\s+(this\s+(site|platform|app|tool)|smmtai)\s+(about|for)/i.test(m) ||
+    /how\s+does\s+(smmtai|this\s+(site|platform))\s+work/i.test(m) ||
+    /what\s+can\s+(smmtai|this\s+(site|platform|app|tool))\s+do/i.test(m) ||
+    /describe\s+(smmtai|this\s+(site|platform|app|tool))/i.test(m) ||
+    /about\s+(smmtai|this\s+(site|platform|service))/i.test(m) ||
+    /what\s+type\s+of\s+(site|platform|service|app|tool)\s+is\s+(this|smmtai)/i.test(m) ||
+    (/\b(smmtai|this\s+site|this\s+platform)\b/i.test(m) && /\b(overview|summary|explain|purpose|mission)\b/i.test(m))
+  ) {
+    return VERIFIED_SITE_OVERVIEW;
+  }
+
+  // ?????? Features / what do you offer ????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????
+  if (
+    /what\s+(features?|functions?|capabilities?|tools?)\s+(do\s+you|does\s+smmtai|are\s+(there|available))/i.test(m) ||
+    /what\s+can\s+i\s+(do|use|get)\s+(here|with\s+(smmtai|this))/i.test(m) ||
+    /what\s+do\s+you\s+offer/i.test(m) ||
+    /what\s+are\s+(your|the)\s+(features?|functions?|capabilities?|services?|tools?)/i.test(m) ||
+    /list\s+(all\s+)?(the\s+)?(features?|functions?|capabilities?)/i.test(m) ||
+    /show\s+(me\s+)?(all\s+)?(the\s+)?(features?|functions?|capabilities?)/i.test(m) ||
+    /what\s+is\s+(available|offered|included)\s+(in\s+(smmtai|this)|on\s+(smmtai|this))/i.test(m) ||
+    (/\b(features?|functions?|capabilities?|offering)\b/i.test(m) && /\b(list|all|every|complete|what|which)\b/i.test(m))
+  ) {
+    return VERIFIED_FEATURES_LIST;
+  }
+
+  // ?????? Bot capabilities / what can you do ??????????????????????????????????????????????????????????????????????????????????????????????????????????????????
+  if (
+    /what\s+can\s+(you|the\s+(bot|ai|assistant|chatbot))\s+do/i.test(m) ||
+    /what\s+(can|does)\s+(you|the\s+(bot|ai|assistant|chatbot))\s+(help|assist|do|offer)/i.test(m) ||
+    /how\s+(smart|capable|powerful)\s+(is|are)\s+(you|the\s+(bot|ai|assistant))/i.test(m) ||
+    /what\s+(questions?\s+can|topics?\s+can|things?\s+can)\s+(you|the\s+(bot|ai))\s+(answer|handle|help\s+with)/i.test(m) ||
+    /what\s+(are\s+your|do\s+you\s+have)\s+(capabilities?|functions?|skills?|abilities?)/i.test(m) ||
+    /\b(ai\s+agent|chatbot|bot|assistant)\s+(capabilities?|functions?|features?|skills?)/i.test(m) ||
+    /help\s+me\s+understand\s+what\s+(you|the\s+bot|the\s+ai)\s+can\s+do/i.test(m) ||
+    /what\s+commands?\s+(do\s+you|can\s+i\s+use|are\s+available)/i.test(m)
+  ) {
+    return VERIFIED_BOT_CAPABILITIES;
+  }
+
+  // ?????? Pricing / cost / subscription plans ??????????????????????????????????????????????????????????????????????????????????????????????????????????????????
+  if (
+    /how\s+much\s+(does\s+(smmtai|it|this)\s+cost|is\s+(smmtai|it|the\s+subscription)|do\s+(you|they)\s+charge)/i.test(m) ||
+    /what\s+(is|are)\s+(the\s+)?(price|pricing|cost|plans?|subscription|tiers?)/i.test(m) ||
+    /how\s+much\s+(for|is)\s+(a\s+)?(subscription|plan|membership|account)/i.test(m) ||
+    /\b(pricing|price|cost|tariff)\s*(plan|tier|info|details?|page)?\b/i.test(m) ||
+    /what\s+(do|does)\s+(smmtai|it|this|you)\s+(cost|charge|price)/i.test(m) ||
+    /is\s+(smmtai|it|this)\s+free/i.test(m) ||
+    /free\s+(trial|plan|tier|version)/i.test(m) ||
+    /subscription\s+(plans?|tiers?|options?|pricing)/i.test(m) ||
+    /paid\s+(plan|version|tier|subscription)/i.test(m)
+  ) {
+    return VERIFIED_PRICING_INFO;
+  }
+
+  // ?????? Plan-tier platform queries ????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????
+  if (
+    /what\\s+platforms?\\s+(can\\s+i|do\\s+i\\s+get|are\\s+included|are\\s+available)\\s+(with|on|for)\\s+(basic|pro|business|enterprise)\\s*(plan)?/i.test(m) ||
+    /(basic|pro|business|enterprise)\\s+(plan\\s+)?(platforms?|social\\s+accounts?)/i.test(m) ||
+    /how\\s+many\\s+platforms?\\s+(do\\s+i\\s+get|are\\s+included)\\s+(with|on|in)\\s+(basic|pro|business|enterprise)/i.test(m) ||
+    /platforms?\\s+on\\s+(the\\s+)?(basic|pro|business|enterprise)\\s+plan/i.test(m)
+  ) {
+    return VERIFIED_PRICING_INFO;
+  }
+
+  // ?????? Plan-gated feature queries ????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????
+  if (
+    /do\\s+i\\s+need\\s+(a\\s+)?(pro|paid|business|enterprise)\\s+plan\\s+(for|to\\s+use)/i.test(m) ||
+    /is\\s+(analytics|team|conversations?|knowledge\\s+base)\\s+(available|included)\\s+(on\\s+)?(basic|pro|business|enterprise)/i.test(m) ||
+    /can\\s+i\\s+(use|access|get)\\s+(analytics|team|conversations?|knowledge\\s+base)\\s+(on|with)\\s+(basic|free|my\\s+current)/i.test(m) ||
+    /what\\s+(features?|functions?)\\s+(are\\s+)?(included|available)\\s+(on|with|in)\\s+(basic|pro|business|enterprise)/i.test(m) ||
+    /what\\s+(do\\s+i\\s+get|is\\s+included)\\s+(with|on)\\s+(basic|pro|business|enterprise)\\s*(plan)?/i.test(m)
+  ) {
+    return VERIFIED_PRICING_INFO;
+  }
+
+  return null; // no static match ??? proceed to normal routing
+
+}
+
+// ????????? Argument Extraction (Token-Free) ????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????
+
 
 function extractArgs(message: string, intent: string): Record<string, unknown> {
   const args: Record<string, unknown> = {};
@@ -573,10 +855,22 @@ function extractArgs(message: string, intent: string): Record<string, unknown> {
   }
 
   if (intent === 'connect_social_platform') {
-    const platforms = ['facebook', 'instagram', 'twitter', 'linkedin', 'youtube', 'pinterest', 'tiktok', 'telegram', 'bluesky', 'mastodon'];
-    for (const p of platforms) {
-      if (msgLower.includes(p)) {
-        args.platform = p;
+    // Map all 25 supported platforms including aliases
+    const platformMap: Record<string, string> = {
+      facebook: 'facebook', instagram: 'instagram', twitter: 'twitter', 'twitter/x': 'twitter',
+      linkedin: 'linkedin', youtube: 'youtube', tiktok: 'tiktok', pinterest: 'pinterest',
+      telegram: 'telegram', bluesky: 'bluesky', mastodon: 'mastodon',
+      discord: 'discord', slack: 'slack',
+      wordpress: 'wordpress', medium: 'medium', blogger: 'blogger',
+      reddit: 'reddit', threads: 'threads', tumblr: 'tumblr',
+      'truth social': 'truth_social', 'truthsocial': 'truth_social', 'truth_social': 'truth_social',
+      lemmy: 'lemmy', pleroma: 'pleroma',
+      'google business': 'google_business', 'google_business': 'google_business', 'google business profile': 'google_business',
+      entreprenrs: 'entreprenrs', chrxstians: 'chrxstians', iohah: 'iohah',
+    };
+    for (const [keyword, platform] of Object.entries(platformMap)) {
+      if (msgLower.includes(keyword)) {
+        args.platform = platform;
         break;
       }
     }
@@ -589,41 +883,59 @@ function extractArgs(message: string, intent: string): Record<string, unknown> {
   }
 
   if (intent === 'publish_post') {
-    const idMatch = msgLower.match(/\b(cmp[a-z0-9]{20,}|c[a-z0-9]{20,})\b/i);
-    if (idMatch) {
-      args.postId = idMatch[1];
-    }
-    const isConfirm = /\b(yes|confirm|approve|authorize|go\s+ahead|do\s+it)\b/i.test(msgLower);
-    args.confirm = isConfirm;
+    const idMatch = message.match(/\b(c[a-z0-9]{20,})\b/i);
+    if (idMatch) args.postId = idMatch[1];
+    args.confirm = /\b(yes|confirm|approve|authorize|go\s+ahead|do\s+it)\b/i.test(msgLower);
   }
 
   if (intent === 'schedule_post') {
-    const idMatch = msgLower.match(/\b(cmp[a-z0-9]{20,}|c[a-z0-9]{20,})\b/i);
-    if (idMatch) {
-      args.postId = idMatch[1];
-    }
-    const isConfirm = /\b(yes|confirm|approve|authorize|go\s+ahead|do\s+it)\b/i.test(msgLower);
-    args.confirm = isConfirm;
+    const idMatch = message.match(/\b(c[a-z0-9]{20,})\b/i);
+    if (idMatch) args.postId = idMatch[1];
+    args.confirm = /\b(yes|confirm|approve|authorize|go\s+ahead|do\s+it)\b/i.test(msgLower);
+    const timeMatch = message.match(/\b(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z?)\b/);
+    args.scheduledAt = timeMatch ? timeMatch[1] : new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+  }
 
-    // Look for date/time (simple regex)
-    const timeMatch = message.match(/\b(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)\b/);
-    if (timeMatch) {
-      args.scheduledAt = timeMatch[1];
-    } else {
-      args.scheduledAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-    }
+  // get_user_info ??? no arguments needed; tool uses auth context
+  // (intentionally empty ??? handler uses userId from context)
+
+  if (intent === 'create_post_draft') {
+    // Extract content from the message (anything after "post about", "write about", "create a post about" etc.)
+    const contentMatch = message.match(/(?:post|write|draft|compose|create|make|generate)\s+(?:a\s+)?(?:new\s+)?(?:post|caption|content|update)?\s*(?:about|for|on|that\s+says|saying)?\s+(.{10,})/i);
+    if (contentMatch) args.content = contentMatch[1].trim();
+    // Extract platform targets if mentioned
+    const allPlatforms = ['facebook', 'instagram', 'twitter', 'linkedin', 'youtube', 'tiktok', 'pinterest',
+                          'telegram', 'bluesky', 'mastodon', 'discord', 'slack', 'wordpress', 'medium',
+                          'blogger', 'reddit', 'threads', 'tumblr'];
+    const mentioned = allPlatforms.filter(p => msgLower.includes(p));
+    if (mentioned.length > 0) args.platforms = mentioned;
+  }
+
+  if (intent === 'delete_post') {
+    const idMatch = message.match(/\b(c[a-z0-9]{20,})\b/i);
+    if (idMatch) args.postId = idMatch[1];
+    // Always start with confirm=false for safety ??? only set true if user explicitly confirmed
+    args.confirm = /\b(yes|confirm|approve|go\s+ahead|do\s+it|proceed|delete\s+it|remove\s+it)\b/i.test(msgLower);
+  }
+
+  if (intent === 'ban_user') {
+    // Extract email address if provided
+    const emailMatch = message.match(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/);
+    if (emailMatch) args.userEmail = emailMatch[0];
+    // Always start with confirm=false ??? only true if user says "yes confirm ban"
+    args.confirm = /\b(yes|confirm|approve|go\s+ahead|do\s+it|proceed|yes\s+ban|confirm\s+ban)\b/i.test(msgLower);
   }
 
   if (intent === 'create_designed_ad_draft') {
     // 1. Extract brand name
     let brandName = '';
     const brandRegexes = [
-      /called\s+['"“‘]([^'"”’]+)['"”’]/i,
-      /named\s+['"“‘]([^'"”’]+)['"”’]/i,
-      /for\s+['"“‘]([^'"”’]+)['"”’]/i,
-      /brand(?:ed)?\s+['"“‘]([^'"”’]+)['"”’]/i,
-      /company\s+['"“‘]([^'"”’]+)['"”’]/i,
-      /agency\s+['"“‘]([^'"”’]+)['"”’]/i,
+      /called\s+['"??????]([^'"??????]+)['"??????]/i,
+      /named\s+['"??????]([^'"??????]+)['"??????]/i,
+      /for\s+['"??????]([^'"??????]+)['"??????]/i,
+      /brand(?:ed)?\s+['"??????]([^'"??????]+)['"??????]/i,
+      /company\s+['"??????]([^'"??????]+)['"??????]/i,
+      /agency\s+['"??????]([^'"??????]+)['"??????]/i,
     ];
     for (const regex of brandRegexes) {
       const match = message.match(regex);
@@ -651,11 +963,11 @@ function extractArgs(message: string, intent: string): Record<string, unknown> {
     // 2. Extract headline
     let headline = '';
     const headlineRegexes = [
-      /headline\s+['"“‘]([^'"”’]+)['"”’]/i,
-      /saying\s+['"“‘]([^'"”’]+)['"”’]/i,
-      /says\s+['"“‘]([^'"”’]+)['"”’]/i,
-      /with\s+['"“‘]([^'"”’]+)['"”’]/i,
-      /title\s+['"“‘]([^'"”’]+)['"”’]/i,
+      /headline\s+['"??????]([^'"??????]+)['"??????]/i,
+      /saying\s+['"??????]([^'"??????]+)['"??????]/i,
+      /says\s+['"??????]([^'"??????]+)['"??????]/i,
+      /with\s+['"??????]([^'"??????]+)['"??????]/i,
+      /title\s+['"??????]([^'"??????]+)['"??????]/i,
     ];
     for (const regex of headlineRegexes) {
       const match = message.match(regex);
@@ -667,7 +979,7 @@ function extractArgs(message: string, intent: string): Record<string, unknown> {
 
     // 3. Fallback to generic quoted strings if one is not matched
     const quotes = [];
-    const quoteRegex = /['"“‘]([^'"”’]+)['"”’]/g;
+    const quoteRegex = /['"??????]([^'"??????]+)['"??????]/g;
     let quoteMatch;
     while ((quoteMatch = quoteRegex.exec(message)) !== null) {
       quotes.push(quoteMatch[1]);
@@ -684,9 +996,9 @@ function extractArgs(message: string, intent: string): Record<string, unknown> {
     // 4. Extract body description or set industry-specific beautiful body copy!
     let body = '';
     const bodyRegexes = [
-      /body\s+['"“‘]([^'"”’]+)['"”’]/i,
-      /description\s+['"“‘]([^'"”’]+)['"”’]/i,
-      /subheadline\s+['"“‘]([^'"”’]+)['"”’]/i,
+      /body\s+['"??????]([^'"??????]+)['"??????]/i,
+      /description\s+['"??????]([^'"??????]+)['"??????]/i,
+      /subheadline\s+['"??????]([^'"??????]+)['"??????]/i,
     ];
     for (const regex of bodyRegexes) {
       const match = message.match(regex);
@@ -802,10 +1114,10 @@ function extractArgs(message: string, intent: string): Record<string, unknown> {
   return args;
 }
 
-// ─── Public API ───────────────────────────────────────────────────────────────
+// ????????? Public API ?????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????
 
 /**
- * Called after a successful OpenAI tool call. Persists the phrase → intent
+ * Called after a successful OpenAI tool call. Persists the phrase ??? intent
  * mapping for future local routing. Only non-destructive intents are logged.
  *
  * NOTE: This must be called AFTER the tool has successfully executed, not before,
@@ -859,7 +1171,7 @@ export async function tryRouteLocally(
     return null;
   }
 
-  // ── Layer 1: Active Learning DB ─────────────────────────────────────────
+  // ?????? Layer 1: Active Learning DB ???????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????
   const trainingData = await loadTrainingData();
   let bestMatch: TrainingRecord | null = null;
   let highestScore = 0;
@@ -884,7 +1196,7 @@ export async function tryRouteLocally(
     matchType = 'local_active_learning';
     console.log(`[NLP Router] Active-learning match: score=${highestScore.toFixed(2)}, threshold=${getThresholdForRecord(bestMatch).toFixed(2)} -> ${finalIntent}`);
   } else {
-    // ── Layer 2: Hardcoded Pattern Matching ──────────────────────────────
+    // ?????? Layer 2: Hardcoded Pattern Matching ??????????????????????????????????????????????????????????????????????????????????????????
     for (const p of hardcodedPatterns) {
       if (!allTools[p.intent]) continue; // role guard
 
@@ -900,7 +1212,7 @@ export async function tryRouteLocally(
     }
   }
 
-  // ── Execute Locally ──────────────────────────────────────────────────────
+  // ?????? Execute Locally ??????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????
   if (finalIntent && matchType) {
     const handler = allTools[finalIntent].handler;
     const args = extractArgs(cleanMessage, finalIntent);
@@ -919,5 +1231,6 @@ export async function tryRouteLocally(
     }
   }
 
-  return null; // no local match — fall through to OpenAI
+  return null; // no local match ??? fall through to OpenAI
 }
+
