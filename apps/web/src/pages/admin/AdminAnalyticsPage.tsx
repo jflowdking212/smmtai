@@ -48,7 +48,7 @@ export function AdminAnalyticsPage() {
     <div className="space-y-8">
       <div>
         <h1 className="text-2xl font-heading font-bold text-white">System Analytics</h1>
-        <p className="text-sm text-neutral-400 mt-1">User growth, engagement, and platform health metrics.</p>
+        <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">User growth, engagement, and platform health metrics.</p>
       </div>
 
       {error && (
@@ -58,7 +58,7 @@ export function AdminAnalyticsPage() {
       )}
 
       {/* User Growth */}
-      <Card className="p-6 bg-neutral-900 border-neutral-800">
+      <Card className="p-6 bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800">
         <h2 className="text-lg font-heading font-semibold text-white mb-4">
           <Users className="w-5 h-5 inline-block mr-2 text-blue-400" />
           User Growth
@@ -71,7 +71,7 @@ export function AdminAnalyticsPage() {
       </Card>
 
       {/* Engagement */}
-      <Card className="p-6 bg-neutral-900 border-neutral-800">
+      <Card className="p-6 bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800">
         <h2 className="text-lg font-heading font-semibold text-white mb-4">
           <FileText className="w-5 h-5 inline-block mr-2 text-amber-400" />
           Content & Engagement
@@ -84,27 +84,27 @@ export function AdminAnalyticsPage() {
       </Card>
 
       {/* Conversations */}
-      <Card className="p-6 bg-neutral-900 border-neutral-800">
+      <Card className="p-6 bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800">
         <h2 className="text-lg font-heading font-semibold text-white mb-4">
           <MessageCircle className="w-5 h-5 inline-block mr-2 text-green-400" />
           Conversations
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <StatBlock label="Active Conversations" value={data.conversations.active} color="text-green-400" />
-          <StatBlock label="Total Conversations" value={data.conversations.total} color="text-neutral-300" />
+          <StatBlock label="Total Conversations" value={data.conversations.total} color="text-neutral-600 dark:text-neutral-300" />
         </div>
       </Card>
 
       {/* Plan Distribution */}
-      <Card className="p-6 bg-neutral-900 border-neutral-800">
+      <Card className="p-6 bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800">
         <h2 className="text-lg font-heading font-semibold text-white mb-4">
           <TrendingUp className="w-5 h-5 inline-block mr-2 text-purple-400" />
           Plan Distribution
         </h2>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           {['basic', 'pro', 'business', 'enterprise'].map((tier) => (
-            <div key={tier} className="p-4 rounded-xl bg-neutral-800/50 border border-neutral-700/50 text-center">
-              <p className="text-xs text-neutral-400 capitalize mb-1">{tier}</p>
+            <div key={tier} className="p-4 rounded-xl bg-neutral-50 dark:bg-neutral-50 dark:bg-neutral-800/50 border border-neutral-300 dark:border-neutral-700/50 text-center">
+              <p className="text-xs text-neutral-500 dark:text-neutral-400 capitalize mb-1">{tier}</p>
               <p className="text-2xl font-bold text-white">{data.planDistribution[tier] || 0}</p>
             </div>
           ))}
@@ -116,8 +116,8 @@ export function AdminAnalyticsPage() {
 
 function StatBlock({ label, value, color, icon }: { label: string; value: number; color: string; icon?: React.ReactNode }) {
   return (
-    <div className="p-4 rounded-xl bg-neutral-800/50 border border-neutral-700/50">
-      <p className="text-xs text-neutral-400 mb-1">{label}</p>
+    <div className="p-4 rounded-xl bg-neutral-50 dark:bg-neutral-50 dark:bg-neutral-800/50 border border-neutral-300 dark:border-neutral-700/50">
+      <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">{label}</p>
       <div className="flex items-center gap-2">
         <p className={`text-2xl font-bold ${color}`}>{value.toLocaleString()}</p>
         {icon && <span className={color}>{icon}</span>}

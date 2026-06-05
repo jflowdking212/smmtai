@@ -163,19 +163,19 @@ export function AdminPlansPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-heading font-bold text-white">Plan Management</h1>
-          <p className="text-sm text-neutral-400 mt-1">Configure subscription plans, limits, and pricing. All 25 platforms available.</p>
+          <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">Configure subscription plans, limits, and pricing. All 25 platforms available.</p>
         </div>
         <Button size="sm" onClick={handleSave} loading={saving} className="bg-red-600 hover:bg-red-700 text-white">
           <Save className="w-4 h-4" /> Save All Changes
         </Button>
       </div>
 
-      <Card className="p-6 bg-neutral-900 border-neutral-800">
+      <Card className="p-6 bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800">
         <h2 className="text-lg font-heading font-semibold text-white mb-4">
           <Percent className="w-5 h-5 inline-block mr-2 text-amber-400" />
           Billing Period Discounts
         </h2>
-        <p className="text-sm text-neutral-400 mb-6">Set discount percentages for each billing period. Changes apply immediately to both the billing page and landing page.</p>
+        <p className="text-sm text-neutral-500 dark:text-neutral-400 mb-6">Set discount percentages for each billing period. Changes apply immediately to both the billing page and landing page.</p>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
           {[
             { key: 'quarterlyDiscount', label: 'Quarterly', sublabel: '3-month billing', default: 5 },
@@ -195,18 +195,18 @@ export function AdminPlansPage() {
                     const val = Math.min(100, Math.max(0, parseInt(e.target.value, 10) || 0));
                     setPlanConfig((prev) => ({ ...prev, [key]: val }));
                   }}
-                  className="w-24 px-3 py-2.5 rounded-xl border border-neutral-700 bg-neutral-800 text-white text-sm focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500"
+                  className="w-24 px-3 py-2.5 rounded-xl border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-white text-sm focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500"
                 />
-                <span className="text-neutral-400 text-sm">% off</span>
+                <span className="text-neutral-500 dark:text-neutral-400 text-sm">% off</span>
               </div>
             </div>
           ))}
         </div>
-        <div className="mt-6 pt-4 border-t border-neutral-800">
+        <div className="mt-6 pt-4 border-t border-neutral-200 dark:border-neutral-800">
           <Button
             size="sm"
             variant="secondary"
-            className="border-neutral-700 text-neutral-300 hover:bg-neutral-800"
+            className="border-neutral-300 dark:border-neutral-700 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-50 dark:bg-neutral-800"
             onClick={async () => {
               setSaving(true);
               try {
@@ -231,7 +231,7 @@ export function AdminPlansPage() {
           const assignedPlatforms: string[] = config.platforms ?? DEFAULT_TIER_PLATFORMS[tier] ?? [];
           const allCount = ALL_PLATFORMS.length;
           return (
-            <Card key={tier} className="p-6 bg-neutral-900 border-neutral-800">
+            <Card key={tier} className="p-6 bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800">
               <div className="flex items-center justify-between mb-5">
                 <div>
                   <h3 className="text-lg font-semibold text-white capitalize">{tier}</h3>
@@ -243,35 +243,35 @@ export function AdminPlansPage() {
               </div>
               <div className="space-y-3">
                 <div>
-                  <label className="block text-xs text-neutral-400 mb-1">💰 Monthly Price ($)</label>
+                  <label className="block text-xs text-neutral-500 dark:text-neutral-400 mb-1">💰 Monthly Price ($)</label>
                   <input
                     type="number"
                     min={0}
                     step={0.01}
                     value={config.monthlyPrice ?? (tier === 'basic' ? 4.99 : tier === 'pro' ? 24.99 : tier === 'business' ? 49.99 : 99.99)}
                     onChange={(e) => updatePlan(tier, 'monthlyPrice', parseFloat(e.target.value) || 0)}
-                    className="w-full px-3 py-2 rounded-lg border border-neutral-700 bg-neutral-800 text-white text-sm focus:outline-none focus:ring-1 focus:ring-red-500"
+                    className="w-full px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-white text-sm focus:outline-none focus:ring-1 focus:ring-red-500"
                   />
                 </div>
 
                 {LIMIT_FIELDS.map(({ key, label, icon }) => (
                   <div key={key}>
-                    <label className="block text-xs text-neutral-400 mb-1">{icon} {label}</label>
+                    <label className="block text-xs text-neutral-500 dark:text-neutral-400 mb-1">{icon} {label}</label>
                     <input
                       type="text"
                       value={formatValue(config[key] ?? defaults[key])}
                       onChange={(e) => updatePlan(tier, key, parseValue(e.target.value))}
                       placeholder={formatValue(defaults[key])}
-                      className="w-full px-3 py-2 rounded-lg border border-neutral-700 bg-neutral-800 text-white text-sm focus:outline-none focus:ring-1 focus:ring-red-500"
+                      className="w-full px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-white text-sm focus:outline-none focus:ring-1 focus:ring-red-500"
                     />
                     <p className="text-[10px] text-neutral-600 mt-0.5">Default: {formatValue(defaults[key])}</p>
                   </div>
                 ))}
 
                 {/* Trend Discovery Features */}
-                <div className="pt-3 border-t border-neutral-800">
-                  <label className="block text-xs text-neutral-400 mb-2">🔥 Trend Discovery Features</label>
-                  <div className="space-y-3 bg-neutral-950/40 p-3 rounded-lg border border-neutral-800/60 max-h-60 overflow-y-auto custom-scrollbar">
+                <div className="pt-3 border-t border-neutral-200 dark:border-neutral-800">
+                  <label className="block text-xs text-neutral-500 dark:text-neutral-400 mb-2">🔥 Trend Discovery Features</label>
+                  <div className="space-y-3 bg-neutral-950/40 p-3 rounded-lg border border-neutral-200 dark:border-neutral-200 dark:border-neutral-800/60 max-h-60 overflow-y-auto custom-scrollbar">
                     {[
                       { id: 'trendEngineAccess', name: 'Enable Trend Discovery System', description: 'Basic access to the Trend Intelligence Engine' },
                       { id: 'trendSavedTrends', name: 'Saved Trends & Bookmarks', description: 'Ability to bookmark and save active trends' },
@@ -307,7 +307,7 @@ export function AdminPlansPage() {
                             className="w-4 h-4 rounded accent-red-500 mt-0.5 cursor-pointer disabled:cursor-not-allowed"
                           />
                           <div className="text-left">
-                            <p className="text-xs font-semibold text-neutral-300 group-hover:text-white transition-colors">
+                            <p className="text-xs font-semibold text-neutral-600 dark:text-neutral-300 group-hover:text-white transition-colors">
                               {f.name}
                             </p>
                             <p className="text-[10px] text-neutral-500 leading-normal">
@@ -321,16 +321,16 @@ export function AdminPlansPage() {
                 </div>
 
                 {/* Platform Assignment */}
-                <div className="pt-3 border-t border-neutral-800">
+                <div className="pt-3 border-t border-neutral-200 dark:border-neutral-800">
                   <div className="flex items-center justify-between mb-2">
-                    <label className="block text-xs text-neutral-400">📡 Platforms Available</label>
+                    <label className="block text-xs text-neutral-500 dark:text-neutral-400">📡 Platforms Available</label>
                     <div className="flex gap-2">
                       <button
                         onClick={() => {
                           const all = ALL_PLATFORMS.map(p => p.id);
                           setPlanConfig(prev => ({ ...prev, [tier]: { ...prev[tier], platforms: all, socialAccounts: Infinity } }));
                         }}
-                        className="text-[10px] px-2 py-0.5 rounded bg-neutral-700 text-neutral-300 hover:bg-neutral-600 transition-colors"
+                        className="text-[10px] px-2 py-0.5 rounded bg-neutral-700 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-600 transition-colors"
                       >
                         All
                       </button>
@@ -338,7 +338,7 @@ export function AdminPlansPage() {
                         onClick={() => {
                           setPlanConfig(prev => ({ ...prev, [tier]: { ...prev[tier], platforms: [], socialAccounts: 0 } }));
                         }}
-                        className="text-[10px] px-2 py-0.5 rounded bg-neutral-700 text-neutral-300 hover:bg-neutral-600 transition-colors"
+                        className="text-[10px] px-2 py-0.5 rounded bg-neutral-700 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-600 transition-colors"
                       >
                         None
                       </button>
@@ -357,7 +357,7 @@ export function AdminPlansPage() {
                             onChange={() => togglePlatform(tier, id)}
                             className="w-3.5 h-3.5 rounded accent-red-500 cursor-pointer"
                           />
-                          <span className="flex items-center gap-1.5 text-xs text-neutral-300 group-hover:text-white transition-colors">
+                          <span className="flex items-center gap-1.5 text-xs text-neutral-600 dark:text-neutral-300 group-hover:text-white transition-colors">
                             <span
                               className="w-2 h-2 rounded-full inline-block shrink-0"
                               style={{ backgroundColor: color }}
@@ -379,7 +379,7 @@ export function AdminPlansPage() {
                             onChange={() => togglePlatform(tier, id)}
                             className="w-3.5 h-3.5 rounded accent-red-500 cursor-pointer"
                           />
-                          <span className="flex items-center gap-1.5 text-xs text-neutral-300 group-hover:text-white transition-colors">
+                          <span className="flex items-center gap-1.5 text-xs text-neutral-600 dark:text-neutral-300 group-hover:text-white transition-colors">
                             <span
                               className="w-2 h-2 rounded-full inline-block shrink-0"
                               style={{ backgroundColor: color }}

@@ -75,10 +75,10 @@ function toNullableInt(value: string): number | null {
 function FieldLabel({ text, help }: { text: string; help: string }) {
   return (
     <div className="mb-1 flex items-center gap-1.5">
-      <span className="block text-xs text-neutral-400">{text}</span>
+      <span className="block text-xs text-neutral-500 dark:text-neutral-400">{text}</span>
       <span className="group relative inline-flex items-center">
         <CircleHelp className="h-3.5 w-3.5 text-neutral-500 cursor-help" />
-        <span className="pointer-events-none absolute bottom-full left-1/2 z-30 mb-2 hidden w-56 -translate-x-1/2 rounded-md border border-neutral-700 bg-neutral-900 px-2 py-1.5 text-[11px] leading-4 text-neutral-200 shadow-lg group-hover:block">
+        <span className="pointer-events-none absolute bottom-full left-1/2 z-30 mb-2 hidden w-56 -translate-x-1/2 rounded-md border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2 py-1.5 text-[11px] leading-4 text-neutral-800 dark:text-neutral-200 shadow-lg group-hover:block">
           {help}
         </span>
       </span>
@@ -179,10 +179,10 @@ export function AdminCouponsPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-heading font-bold text-white">Coupon Manager</h1>
-        <p className="text-sm text-neutral-400 mt-1">Create checkout coupons with limits by total uses, unique users, and per user.</p>
+        <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">Create checkout coupons with limits by total uses, unique users, and per user.</p>
       </div>
 
-      <Card className="p-6 bg-neutral-900 border-neutral-800 space-y-4">
+      <Card className="p-6 bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 space-y-4">
         <h2 className="text-lg font-heading font-semibold text-white">
           <Ticket className="w-5 h-5 inline-block mr-2 text-emerald-400" />
           Create Coupon
@@ -196,7 +196,7 @@ export function AdminCouponsPage() {
               value={couponForm.code}
               onChange={(e) => setCouponForm((prev) => ({ ...prev, code: e.target.value.toUpperCase() }))}
               placeholder="LAUNCH50"
-              className="w-full px-3 py-2 rounded-lg border border-neutral-700 bg-neutral-800 text-white text-sm"
+              className="w-full px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-white text-sm"
             />
           </div>
           <div>
@@ -206,7 +206,7 @@ export function AdminCouponsPage() {
               value={couponForm.name}
               onChange={(e) => setCouponForm((prev) => ({ ...prev, name: e.target.value }))}
               placeholder="Launch Promo"
-              className="w-full px-3 py-2 rounded-lg border border-neutral-700 bg-neutral-800 text-white text-sm"
+              className="w-full px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-white text-sm"
             />
           </div>
           <div className="md:col-span-2">
@@ -216,7 +216,7 @@ export function AdminCouponsPage() {
               value={couponForm.description}
               onChange={(e) => setCouponForm((prev) => ({ ...prev, description: e.target.value }))}
               placeholder="First 100 users"
-              className="w-full px-3 py-2 rounded-lg border border-neutral-700 bg-neutral-800 text-white text-sm"
+              className="w-full px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-white text-sm"
             />
           </div>
           <div>
@@ -227,7 +227,7 @@ export function AdminCouponsPage() {
               max={100}
               value={couponForm.discountPercent}
               onChange={(e) => setCouponForm((prev) => ({ ...prev, discountPercent: e.target.value }))}
-              className="w-full px-3 py-2 rounded-lg border border-neutral-700 bg-neutral-800 text-white text-sm"
+              className="w-full px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-white text-sm"
             />
           </div>
           <div>
@@ -238,7 +238,7 @@ export function AdminCouponsPage() {
               max={730}
               value={couponForm.freeDurationDays}
               onChange={(e) => setCouponForm((prev) => ({ ...prev, freeDurationDays: e.target.value }))}
-              className="w-full px-3 py-2 rounded-lg border border-neutral-700 bg-neutral-800 text-white text-sm"
+              className="w-full px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-white text-sm"
             />
           </div>
           <div>
@@ -249,7 +249,7 @@ export function AdminCouponsPage() {
               max={36}
               value={couponForm.discountDurationMonths}
               onChange={(e) => setCouponForm((prev) => ({ ...prev, discountDurationMonths: e.target.value }))}
-              className="w-full px-3 py-2 rounded-lg border border-neutral-700 bg-neutral-800 text-white text-sm"
+              className="w-full px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-white text-sm"
             />
           </div>
           <div>
@@ -259,7 +259,7 @@ export function AdminCouponsPage() {
               min={1}
               value={couponForm.maxTotalUses}
               onChange={(e) => setCouponForm((prev) => ({ ...prev, maxTotalUses: e.target.value }))}
-              className="w-full px-3 py-2 rounded-lg border border-neutral-700 bg-neutral-800 text-white text-sm"
+              className="w-full px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-white text-sm"
             />
           </div>
           <div>
@@ -269,7 +269,7 @@ export function AdminCouponsPage() {
               min={1}
               value={couponForm.maxUniqueUsers}
               onChange={(e) => setCouponForm((prev) => ({ ...prev, maxUniqueUsers: e.target.value }))}
-              className="w-full px-3 py-2 rounded-lg border border-neutral-700 bg-neutral-800 text-white text-sm"
+              className="w-full px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-white text-sm"
             />
           </div>
           <div>
@@ -279,7 +279,7 @@ export function AdminCouponsPage() {
               min={1}
               value={couponForm.maxUsesPerUser}
               onChange={(e) => setCouponForm((prev) => ({ ...prev, maxUsesPerUser: e.target.value }))}
-              className="w-full px-3 py-2 rounded-lg border border-neutral-700 bg-neutral-800 text-white text-sm"
+              className="w-full px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-white text-sm"
             />
           </div>
           <div>
@@ -290,7 +290,7 @@ export function AdminCouponsPage() {
                 ...prev,
                 requireCardForFreeCheckout: (e.target.value === 'no' ? 'no' : 'yes'),
               }))}
-              className="w-full px-3 py-2 rounded-lg border border-neutral-700 bg-neutral-800 text-white text-sm"
+              className="w-full px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-white text-sm"
             >
               <option value="yes">Yes, require card details</option>
               <option value="no">No, allow without card</option>
@@ -302,7 +302,7 @@ export function AdminCouponsPage() {
               type="datetime-local"
               value={couponForm.startsAt}
               onChange={(e) => setCouponForm((prev) => ({ ...prev, startsAt: e.target.value }))}
-              className="w-full px-3 py-2 rounded-lg border border-neutral-700 bg-neutral-800 text-white text-sm"
+              className="w-full px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-white text-sm"
             />
           </div>
           <div>
@@ -311,7 +311,7 @@ export function AdminCouponsPage() {
               type="datetime-local"
               value={couponForm.endsAt}
               onChange={(e) => setCouponForm((prev) => ({ ...prev, endsAt: e.target.value }))}
-              className="w-full px-3 py-2 rounded-lg border border-neutral-700 bg-neutral-800 text-white text-sm"
+              className="w-full px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-white text-sm"
             />
           </div>
         </div>
@@ -322,7 +322,7 @@ export function AdminCouponsPage() {
             {PRICE_OPTIONS.map((option) => {
               const checked = couponForm.allowedPriceKeys.includes(option.value);
               return (
-                <label key={option.value} className="flex items-center gap-2 text-sm text-neutral-300">
+                <label key={option.value} className="flex items-center gap-2 text-sm text-neutral-600 dark:text-neutral-300">
                   <input
                     type="checkbox"
                     checked={checked}
@@ -348,7 +348,7 @@ export function AdminCouponsPage() {
             <select
               value={couponForm.defaultPriceKey}
               onChange={(e) => setCouponForm((prev) => ({ ...prev, defaultPriceKey: e.target.value }))}
-              className="w-full px-3 py-2 rounded-lg border border-neutral-700 bg-neutral-800 text-white text-sm"
+              className="w-full px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-white text-sm"
             >
               <option value="">No default package</option>
               {(couponForm.allowedPriceKeys.length > 0
@@ -360,7 +360,7 @@ export function AdminCouponsPage() {
             </select>
           </div>
           <div className="flex items-end">
-            <label className="inline-flex items-center gap-2 text-sm text-neutral-300">
+            <label className="inline-flex items-center gap-2 text-sm text-neutral-600 dark:text-neutral-300">
               <input
                 type="checkbox"
                 checked={couponForm.isActive}
@@ -369,7 +369,7 @@ export function AdminCouponsPage() {
               Active immediately
               <span className="group relative inline-flex items-center">
                 <CircleHelp className="h-3.5 w-3.5 text-neutral-500 cursor-help" />
-                <span className="pointer-events-none absolute bottom-full left-1/2 z-30 mb-2 hidden w-56 -translate-x-1/2 rounded-md border border-neutral-700 bg-neutral-900 px-2 py-1.5 text-[11px] leading-4 text-neutral-200 shadow-lg group-hover:block">
+                <span className="pointer-events-none absolute bottom-full left-1/2 z-30 mb-2 hidden w-56 -translate-x-1/2 rounded-md border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2 py-1.5 text-[11px] leading-4 text-neutral-800 dark:text-neutral-200 shadow-lg group-hover:block">
                   Turn this on to allow immediate use after saving. Turn it off to keep the coupon inactive.
                 </span>
               </span>
@@ -384,7 +384,7 @@ export function AdminCouponsPage() {
         </div>
       </Card>
 
-      <Card className="p-6 bg-neutral-900 border-neutral-800 space-y-4">
+      <Card className="p-6 bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-heading font-semibold text-white">Existing Coupons</h2>
           <Button size="sm" variant="secondary" onClick={() => void refreshCoupons()}>Refresh</Button>
@@ -397,29 +397,29 @@ export function AdminCouponsPage() {
         ) : (
           <div className="space-y-3">
             {couponList.map((coupon) => (
-              <div key={coupon.id} className="rounded-xl border border-neutral-800 bg-neutral-950 p-4">
+              <div key={coupon.id} className="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-950 p-4">
                 <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="font-semibold text-white">{coupon.code}</span>
                       <Badge variant={coupon.isActive ? 'success' : 'default'}>{coupon.isActive ? 'Active' : 'Inactive'}</Badge>
                     </div>
-                    <p className="text-sm text-neutral-300 mt-1">{coupon.name}</p>
+                    <p className="text-sm text-neutral-600 dark:text-neutral-300 mt-1">{coupon.name}</p>
                     {coupon.description && <p className="text-xs text-neutral-500 mt-1">{coupon.description}</p>}
-                    <p className="text-xs text-neutral-400 mt-2">
+                    <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-2">
                       {coupon.discountPercent ? `${coupon.discountPercent}% discount` : 'No % discount'}
                       {coupon.freeDurationDays ? ` • ${coupon.freeDurationDays} free day(s)` : ''}
                       {coupon.maxTotalUses ? ` • ${coupon.redemptionCount}/${coupon.maxTotalUses} used` : ` • ${coupon.redemptionCount} redeemed`}
                       {` • per user: ${coupon.maxUsesPerUser}`}
                     </p>
-                    <p className="text-xs text-neutral-400 mt-1 inline-flex items-center gap-1">
+                    <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1 inline-flex items-center gap-1">
                       <Users className="w-3 h-3" />
                       {coupon.maxUniqueUsers
                         ? `${coupon.uniqueUserCount}/${coupon.maxUniqueUsers} users used`
                         : `${coupon.uniqueUserCount} users used`}
                       {coupon.remainingUserSlots !== null ? ` • ${coupon.remainingUserSlots} user slots left` : ''}
                     </p>
-                    <p className="text-xs text-neutral-400 mt-1">
+                    <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
                       Free checkout card: {coupon.requireCardForFreeCheckout ? 'Required' : 'Not required'}
                     </p>
                   </div>

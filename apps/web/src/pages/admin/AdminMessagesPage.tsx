@@ -64,7 +64,7 @@ export function AdminMessagesPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-heading font-bold text-white">Messages</h1>
-        <p className="text-sm text-neutral-400 mt-1">Monitor all user conversations and support inquiries.</p>
+        <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">Monitor all user conversations and support inquiries.</p>
       </div>
 
       {/* Filters */}
@@ -76,20 +76,20 @@ export function AdminMessagesPage() {
             placeholder="Search by name or email..."
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-            className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-neutral-700 bg-neutral-800 text-neutral-200 placeholder:text-neutral-500 text-sm focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500"
+            className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 placeholder:text-neutral-500 text-sm focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500"
           />
         </div>
         <select
           value={statusFilter}
           onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
-          className="px-3 py-2.5 rounded-xl border border-neutral-700 bg-neutral-800 text-neutral-300 text-sm focus:outline-none focus:ring-1 focus:ring-red-500"
+          className="px-3 py-2.5 rounded-xl border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 text-sm focus:outline-none focus:ring-1 focus:ring-red-500"
         >
           <option value="">All Status</option>
           <option value="ACTIVE">Active</option>
           <option value="ENDED">Ended</option>
           <option value="TRANSFERRED">Transferred</option>
         </select>
-        <Badge variant="default" className="bg-neutral-800 text-neutral-300 self-center">
+        <Badge variant="default" className="bg-neutral-50 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 self-center">
           {total} conversations
         </Badge>
       </div>
@@ -97,8 +97,8 @@ export function AdminMessagesPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Conversation List */}
         <div className="lg:col-span-2">
-          <Card className="bg-neutral-900 border-neutral-800">
-            <div className="divide-y divide-neutral-800/50">
+          <Card className="bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800">
+            <div className="divide-y divide-neutral-200 dark:divide-neutral-200 dark:divide-neutral-800/50">
               {loading ? (
                 <div className="p-8 text-center text-neutral-500">Loading...</div>
               ) : conversations.length === 0 ? (
@@ -111,11 +111,11 @@ export function AdminMessagesPage() {
                   <button
                     key={convo.id}
                     onClick={() => setSelectedConversation(convo)}
-                    className={`w-full text-left px-4 py-3 hover:bg-neutral-800/50 transition-colors ${selectedConversation?.id === convo.id ? 'bg-neutral-800/70' : ''}`}
+                    className={`w-full text-left px-4 py-3 hover:bg-neutral-50 dark:bg-neutral-50 dark:bg-neutral-800/50 transition-colors ${selectedConversation?.id === convo.id ? 'bg-neutral-50 dark:bg-neutral-800/70' : ''}`}
                   >
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm font-medium text-neutral-200">
+                        <p className="text-sm font-medium text-neutral-800 dark:text-neutral-200">
                           {convo.customerName || convo.customerEmail || 'Anonymous'}
                         </p>
                         <p className="text-xs text-neutral-500">
@@ -132,7 +132,7 @@ export function AdminMessagesPage() {
                     {convo.tags.length > 0 && (
                       <div className="flex gap-1 mt-1">
                         {convo.tags.map((tag) => (
-                          <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded bg-neutral-700 text-neutral-400">{tag}</span>
+                          <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded bg-neutral-700 text-neutral-500 dark:text-neutral-400">{tag}</span>
                         ))}
                       </div>
                     )}
@@ -141,13 +141,13 @@ export function AdminMessagesPage() {
               )}
             </div>
             {totalPages > 1 && (
-              <div className="flex items-center justify-between px-4 py-3 border-t border-neutral-800">
+              <div className="flex items-center justify-between px-4 py-3 border-t border-neutral-200 dark:border-neutral-800">
                 <p className="text-xs text-neutral-500">Page {page} of {totalPages}</p>
                 <div className="flex gap-2">
-                  <Button variant="ghost" size="sm" onClick={() => setPage(page - 1)} disabled={page <= 1} className="text-neutral-400">
+                  <Button variant="ghost" size="sm" onClick={() => setPage(page - 1)} disabled={page <= 1} className="text-neutral-500 dark:text-neutral-400">
                     <ChevronLeft className="w-4 h-4" />
                   </Button>
-                  <Button variant="ghost" size="sm" onClick={() => setPage(page + 1)} disabled={page >= totalPages} className="text-neutral-400">
+                  <Button variant="ghost" size="sm" onClick={() => setPage(page + 1)} disabled={page >= totalPages} className="text-neutral-500 dark:text-neutral-400">
                     <ChevronRight className="w-4 h-4" />
                   </Button>
                 </div>
@@ -158,7 +158,7 @@ export function AdminMessagesPage() {
 
         {/* Conversation Detail */}
         <div className="lg:col-span-1">
-          <Card className="p-4 bg-neutral-900 border-neutral-800 sticky top-20">
+          <Card className="p-4 bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 sticky top-20">
             {selectedConversation ? (
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
@@ -166,16 +166,16 @@ export function AdminMessagesPage() {
                   <Badge variant={getStatusColor(selectedConversation.status)}>{selectedConversation.status}</Badge>
                 </div>
                 <div className="space-y-1 text-xs">
-                  <p className="text-neutral-400">Name: <span className="text-neutral-200">{selectedConversation.customerName || '—'}</span></p>
-                  <p className="text-neutral-400">Email: <span className="text-neutral-200">{selectedConversation.customerEmail || '—'}</span></p>
-                  <p className="text-neutral-400">Sentiment: <span className="text-neutral-200">{selectedConversation.sentiment || '—'}</span></p>
-                  <p className="text-neutral-400">Started: <span className="text-neutral-200">{new Date(selectedConversation.startedAt).toLocaleString()}</span></p>
+                  <p className="text-neutral-500 dark:text-neutral-400">Name: <span className="text-neutral-800 dark:text-neutral-200">{selectedConversation.customerName || '—'}</span></p>
+                  <p className="text-neutral-500 dark:text-neutral-400">Email: <span className="text-neutral-800 dark:text-neutral-200">{selectedConversation.customerEmail || '—'}</span></p>
+                  <p className="text-neutral-500 dark:text-neutral-400">Sentiment: <span className="text-neutral-800 dark:text-neutral-200">{selectedConversation.sentiment || '—'}</span></p>
+                  <p className="text-neutral-500 dark:text-neutral-400">Started: <span className="text-neutral-800 dark:text-neutral-200">{new Date(selectedConversation.startedAt).toLocaleString()}</span></p>
                 </div>
-                <div className="border-t border-neutral-800 pt-3">
-                  <p className="text-xs font-medium text-neutral-400 mb-2">Messages ({Array.isArray(selectedConversation.messages) ? selectedConversation.messages.length : 0})</p>
+                <div className="border-t border-neutral-200 dark:border-neutral-800 pt-3">
+                  <p className="text-xs font-medium text-neutral-500 dark:text-neutral-400 mb-2">Messages ({Array.isArray(selectedConversation.messages) ? selectedConversation.messages.length : 0})</p>
                   <div className="space-y-2 max-h-80 overflow-y-auto">
                     {(Array.isArray(selectedConversation.messages) ? selectedConversation.messages : []).map((msg: any, i: number) => (
-                      <div key={i} className={`p-2 rounded-lg text-xs ${msg.role === 'user' ? 'bg-blue-500/10 text-blue-200' : 'bg-neutral-800 text-neutral-300'}`}>
+                      <div key={i} className={`p-2 rounded-lg text-xs ${msg.role === 'user' ? 'bg-blue-500/10 text-blue-200' : 'bg-neutral-50 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300'}`}>
                         <span className="font-medium capitalize">{msg.role}: </span>
                         {msg.content}
                       </div>

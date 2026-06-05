@@ -188,13 +188,13 @@ export function AdminSettingsPage() {
     finally { setSaving(null); }
   }
 
-  const inputClass = 'w-full px-3 py-2 rounded-lg border border-neutral-700 bg-neutral-800 text-white text-sm focus:outline-none focus:ring-1 focus:ring-red-500 placeholder:text-neutral-500';
+  const inputClass = 'w-full px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-white text-sm focus:outline-none focus:ring-1 focus:ring-red-500 placeholder:text-neutral-500';
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-heading font-bold text-white">System Settings</h1>
-        <p className="text-sm text-neutral-400 mt-1">Configure SMTP, cloud storage, site settings, and platform credentials.</p>
+        <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">Configure SMTP, cloud storage, site settings, and platform credentials.</p>
       </div>
 
       <div className="flex gap-6">
@@ -206,7 +206,7 @@ export function AdminSettingsPage() {
                 key={s.id}
                 onClick={() => setSection(s.id)}
                 className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all
-                  ${section === s.id ? 'bg-red-600/10 text-red-400' : 'text-neutral-400 hover:bg-neutral-800 hover:text-neutral-200'}`}
+                  ${section === s.id ? 'bg-red-600/10 text-red-400' : 'text-neutral-500 dark:text-neutral-400 hover:bg-neutral-50 dark:bg-neutral-800 hover:text-neutral-800 dark:text-neutral-200'}`}
               >
                 {s.icon} {s.label}
               </button>
@@ -217,9 +217,9 @@ export function AdminSettingsPage() {
         {/* Content */}
         <div className="flex-1 space-y-6">
           {section === 'site' && (
-            <Card className="p-6 space-y-5 bg-neutral-900 border-neutral-800">
+            <Card className="p-6 space-y-5 bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800">
               <h2 className="text-lg font-semibold text-white">
-                <Globe className="w-5 h-5 inline-block mr-2 text-neutral-400" />Site Settings
+                <Globe className="w-5 h-5 inline-block mr-2 text-neutral-500 dark:text-neutral-400" />Site Settings
               </h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {[
@@ -229,14 +229,14 @@ export function AdminSettingsPage() {
                   { key: 'seo_meta_description', label: 'SEO Description' },
                 ].map(({ key, label }) => (
                   <div key={key}>
-                    <label className="block text-xs text-neutral-400 mb-1">{label}</label>
+                    <label className="block text-xs text-neutral-500 dark:text-neutral-400 mb-1">{label}</label>
                     <input value={(siteConfig as any)[key]} onChange={(e) => setSiteConfig((prev) => ({ ...prev, [key]: e.target.value }))} className={inputClass} />
                   </div>
                 ))}
 
                 {/* Facebook Pixel ID — digits only */}
                 <div className="sm:col-span-2">
-                  <label className="block text-xs text-neutral-400 mb-1">Facebook Pixel ID</label>
+                  <label className="block text-xs text-neutral-500 dark:text-neutral-400 mb-1">Facebook Pixel ID</label>
                   <input
                     value={siteConfig.fb_pixel_id}
                     onChange={(e) => {
@@ -271,14 +271,14 @@ export function AdminSettingsPage() {
               </div>
               <div className="flex gap-4">
                 <div>
-                  <label className="block text-xs text-neutral-400 mb-1">Logo</label>
-                  <input type="file" accept="image/*" onChange={handleLogoUpload} className="text-xs text-neutral-400" />
-                  {siteConfig.site_logo && <img src={siteConfig.site_logo} alt="Logo" className="w-12 h-12 mt-2 rounded-lg object-contain bg-neutral-800" />}
+                  <label className="block text-xs text-neutral-500 dark:text-neutral-400 mb-1">Logo</label>
+                  <input type="file" accept="image/*" onChange={handleLogoUpload} className="text-xs text-neutral-500 dark:text-neutral-400" />
+                  {siteConfig.site_logo && <img src={siteConfig.site_logo} alt="Logo" className="w-12 h-12 mt-2 rounded-lg object-contain bg-neutral-50 dark:bg-neutral-800" />}
                 </div>
                 <div>
-                  <label className="block text-xs text-neutral-400 mb-1">Favicon</label>
-                  <input type="file" accept="image/*" onChange={handleFaviconUpload} className="text-xs text-neutral-400" />
-                  {siteConfig.site_favicon && <img src={siteConfig.site_favicon} alt="Favicon" className="w-8 h-8 mt-2 rounded object-contain bg-neutral-800" />}
+                  <label className="block text-xs text-neutral-500 dark:text-neutral-400 mb-1">Favicon</label>
+                  <input type="file" accept="image/*" onChange={handleFaviconUpload} className="text-xs text-neutral-500 dark:text-neutral-400" />
+                  {siteConfig.site_favicon && <img src={siteConfig.site_favicon} alt="Favicon" className="w-8 h-8 mt-2 rounded object-contain bg-neutral-50 dark:bg-neutral-800" />}
                 </div>
               </div>
               <Button onClick={saveSiteSettings} loading={saving === 'site'} className="bg-red-600 hover:bg-red-700 text-white">
@@ -288,9 +288,9 @@ export function AdminSettingsPage() {
           )}
 
           {section === 'smtp' && (
-            <Card className="p-6 space-y-5 bg-neutral-900 border-neutral-800">
+            <Card className="p-6 space-y-5 bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800">
               <h2 className="text-lg font-semibold text-white">
-                <Mail className="w-5 h-5 inline-block mr-2 text-neutral-400" />SMTP Configuration
+                <Mail className="w-5 h-5 inline-block mr-2 text-neutral-500 dark:text-neutral-400" />SMTP Configuration
               </h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {[
@@ -301,12 +301,12 @@ export function AdminSettingsPage() {
                   { key: 'smtp_from', label: 'From Address' },
                 ].map(({ key, label, type }) => (
                   <div key={key}>
-                    <label className="block text-xs text-neutral-400 mb-1">{label}</label>
+                    <label className="block text-xs text-neutral-500 dark:text-neutral-400 mb-1">{label}</label>
                     <input type={type || 'text'} value={(smtpConfig as any)[key]} onChange={(e) => setSmtpConfig((prev) => ({ ...prev, [key]: e.target.value }))} className={inputClass} placeholder={label} />
                   </div>
                 ))}
                 <div>
-                  <label className="block text-xs text-neutral-400 mb-1">Secure (TLS)</label>
+                  <label className="block text-xs text-neutral-500 dark:text-neutral-400 mb-1">Secure (TLS)</label>
                   <select value={smtpConfig.smtp_secure} onChange={(e) => setSmtpConfig((prev) => ({ ...prev, smtp_secure: e.target.value }))} className={inputClass}>
                     <option value="true">Yes</option>
                     <option value="false">No</option>
@@ -315,19 +315,19 @@ export function AdminSettingsPage() {
               </div>
               <div className="flex gap-3">
                 <Button onClick={saveSmtp} loading={saving === 'smtp'} className="bg-red-600 hover:bg-red-700 text-white"><Save className="w-4 h-4" /> Save</Button>
-                <Button variant="secondary" onClick={testSmtp} loading={saving === 'smtp-test'} className="border-neutral-700 text-neutral-300"><CheckCircle className="w-4 h-4" /> Test Connection</Button>
+                <Button variant="secondary" onClick={testSmtp} loading={saving === 'smtp-test'} className="border-neutral-300 dark:border-neutral-700 text-neutral-600 dark:text-neutral-300"><CheckCircle className="w-4 h-4" /> Test Connection</Button>
               </div>
             </Card>
           )}
 
           {section === 'storage' && (
-            <Card className="p-6 space-y-5 bg-neutral-900 border-neutral-800">
+            <Card className="p-6 space-y-5 bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800">
               <h2 className="text-lg font-semibold text-white">
-                <Cloud className="w-5 h-5 inline-block mr-2 text-neutral-400" />Cloud Storage
+                <Cloud className="w-5 h-5 inline-block mr-2 text-neutral-500 dark:text-neutral-400" />Cloud Storage
               </h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs text-neutral-400 mb-1">Provider</label>
+                  <label className="block text-xs text-neutral-500 dark:text-neutral-400 mb-1">Provider</label>
                   <select value={storageConfig.storage_provider} onChange={(e) => setStorageConfig((prev) => ({ ...prev, storage_provider: e.target.value }))} className={inputClass}>
                     <option value="">Local</option>
                     <option value="s3">AWS S3</option>
@@ -337,24 +337,24 @@ export function AdminSettingsPage() {
                 </div>
                 {['storage_endpoint', 'storage_region', 'storage_bucket', 'storage_access_key', 'storage_secret_key'].map((key) => (
                   <div key={key}>
-                    <label className="block text-xs text-neutral-400 mb-1">{key.replace('storage_', '').replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}</label>
+                    <label className="block text-xs text-neutral-500 dark:text-neutral-400 mb-1">{key.replace('storage_', '').replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}</label>
                     <input type={key.includes('key') ? 'password' : 'text'} value={(storageConfig as any)[key]} onChange={(e) => setStorageConfig((prev) => ({ ...prev, [key]: e.target.value }))} className={inputClass} />
                   </div>
                 ))}
               </div>
               <div className="flex gap-3">
                 <Button onClick={saveStorage} loading={saving === 'storage'} className="bg-red-600 hover:bg-red-700 text-white"><Save className="w-4 h-4" /> Save</Button>
-                <Button variant="secondary" onClick={testStorage} loading={saving === 'storage-test'} className="border-neutral-700 text-neutral-300"><CheckCircle className="w-4 h-4" /> Test Connection</Button>
+                <Button variant="secondary" onClick={testStorage} loading={saving === 'storage-test'} className="border-neutral-300 dark:border-neutral-700 text-neutral-600 dark:text-neutral-300"><CheckCircle className="w-4 h-4" /> Test Connection</Button>
               </div>
             </Card>
           )}
 
           {section === 'platforms' && (
-            <Card className="p-6 space-y-5 bg-neutral-900 border-neutral-800">
+            <Card className="p-6 space-y-5 bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800">
               <h2 className="text-lg font-semibold text-white">
-                <Key className="w-5 h-5 inline-block mr-2 text-neutral-400" />Platform Credentials
+                <Key className="w-5 h-5 inline-block mr-2 text-neutral-500 dark:text-neutral-400" />Platform Credentials
               </h2>
-              <p className="text-sm text-neutral-400">Configure API/OAuth credentials for all platforms. Credentials are stored securely on the server.</p>
+              <p className="text-sm text-neutral-500 dark:text-neutral-400">Configure API/OAuth credentials for all platforms. Credentials are stored securely on the server.</p>
               <div className="space-y-4">
                 {GLOBAL_CREDENTIAL_PLATFORMS.map((platformKey) => {
                   const platform = PLATFORMS[platformKey as PlatformType] || { name: platformKey };
@@ -365,11 +365,11 @@ export function AdminSettingsPage() {
                   const isTelegram = platformKey === 'telegram';
                   const isOAuth = ['facebook', 'instagram', 'tiktok', 'linkedin', 'twitter', 'youtube', 'pinterest'].includes(platformKey);
                   return (
-                    <div key={platformKey} className="p-4 rounded-xl bg-neutral-800/50 border border-neutral-700/50 space-y-2">
+                    <div key={platformKey} className="p-4 rounded-xl bg-neutral-50 dark:bg-neutral-50 dark:bg-neutral-800/50 border border-neutral-300 dark:border-neutral-700/50 space-y-2">
                       <div className="flex items-center gap-2">
                         <div className="w-3 h-3 rounded-full" style={{ backgroundColor: platform.color }} />
-                        <h4 className="text-sm font-medium text-neutral-200">{platform.name}</h4>
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-neutral-700 text-neutral-400">{isWoWonder ? 'API Key' : isOAuth ? 'OAuth' : 'Token'}</span>
+                        <h4 className="text-sm font-medium text-neutral-800 dark:text-neutral-200">{platform.name}</h4>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-neutral-700 text-neutral-500 dark:text-neutral-400">{isWoWonder ? 'API Key' : isOAuth ? 'OAuth' : 'Token'}</span>
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         {isOAuth ? (
@@ -420,19 +420,19 @@ export function AdminSettingsPage() {
           )}
 
           {section === 'chatbot' && (
-            <Card className="p-6 space-y-5 bg-neutral-900 border-neutral-800">
+            <Card className="p-6 space-y-5 bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800">
               <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-                <MessageSquare className="w-5 h-5 text-neutral-400" />
+                <MessageSquare className="w-5 h-5 text-neutral-500 dark:text-neutral-400" />
                 AI & Chatbot Configuration
               </h2>
-              <p className="text-sm text-neutral-400">
+              <p className="text-sm text-neutral-500 dark:text-neutral-400">
                 Configure primary AI settings for the platform. SMMTAI supports OpenRouter as a cost-effective default or automatic fallback.
               </p>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* Enabled Toggle */}
                 <div>
-                  <label className="block text-xs text-neutral-400 mb-1">Chatbot Service Status</label>
+                  <label className="block text-xs text-neutral-500 dark:text-neutral-400 mb-1">Chatbot Service Status</label>
                   <select
                     value={chatbotConfig.isEnabled ? 'true' : 'false'}
                     onChange={(e) => setChatbotConfig((prev) => ({ ...prev, isEnabled: e.target.value === 'true' }))}
@@ -445,7 +445,7 @@ export function AdminSettingsPage() {
 
                 {/* OpenRouter Default Toggle */}
                 <div>
-                  <label className="block text-xs text-neutral-400 mb-1">Model Provider Priority</label>
+                  <label className="block text-xs text-neutral-500 dark:text-neutral-400 mb-1">Model Provider Priority</label>
                   <select
                     value={chatbotConfig.openrouterDefault ? 'true' : 'false'}
                     onChange={(e) => setChatbotConfig((prev) => ({ ...prev, openrouterDefault: e.target.value === 'true' }))}
@@ -456,15 +456,15 @@ export function AdminSettingsPage() {
                   </select>
                 </div>
 
-                <div className="border-t border-neutral-800/80 my-2 sm:col-span-2" />
+                <div className="border-t border-neutral-200 dark:border-neutral-800/80 my-2 sm:col-span-2" />
 
                 {/* OpenAI Section */}
                 <div className="sm:col-span-2">
-                  <h3 className="text-xs font-semibold text-neutral-300 uppercase tracking-wider mb-2">1. Standard OpenAI Config</h3>
+                  <h3 className="text-xs font-semibold text-neutral-600 dark:text-neutral-300 uppercase tracking-wider mb-2">1. Standard OpenAI Config</h3>
                 </div>
 
                 <div>
-                  <label className="block text-xs text-neutral-400 mb-1">OpenAI Model</label>
+                  <label className="block text-xs text-neutral-500 dark:text-neutral-400 mb-1">OpenAI Model</label>
                   <select
                     value={chatbotConfig.model}
                     onChange={(e) => setChatbotConfig((prev) => ({ ...prev, model: e.target.value }))}
@@ -477,7 +477,7 @@ export function AdminSettingsPage() {
                 </div>
 
                 <div>
-                  <label className="block text-xs text-neutral-400 mb-1">OpenAI API Key</label>
+                  <label className="block text-xs text-neutral-500 dark:text-neutral-400 mb-1">OpenAI API Key</label>
                   <input
                     type="password"
                     value={chatbotConfig.apiKey}
@@ -488,15 +488,15 @@ export function AdminSettingsPage() {
                   <p className="text-[10px] text-neutral-500 mt-0.5">Leave blank to use key from .env file.</p>
                 </div>
 
-                <div className="border-t border-neutral-800/80 my-2 sm:col-span-2" />
+                <div className="border-t border-neutral-200 dark:border-neutral-800/80 my-2 sm:col-span-2" />
 
                 {/* OpenRouter Section */}
                 <div className="sm:col-span-2">
-                  <h3 className="text-xs font-semibold text-neutral-300 uppercase tracking-wider mb-2">2. OpenRouter Fallback Config</h3>
+                  <h3 className="text-xs font-semibold text-neutral-600 dark:text-neutral-300 uppercase tracking-wider mb-2">2. OpenRouter Fallback Config</h3>
                 </div>
 
                 <div>
-                  <label className="block text-xs text-neutral-400 mb-1">OpenRouter Model</label>
+                  <label className="block text-xs text-neutral-500 dark:text-neutral-400 mb-1">OpenRouter Model</label>
                   <select
                     value={chatbotConfig.openrouterModel}
                     onChange={(e) => setChatbotConfig((prev) => ({ ...prev, openrouterModel: e.target.value }))}
@@ -512,7 +512,7 @@ export function AdminSettingsPage() {
                 </div>
 
                 <div>
-                  <label className="block text-xs text-neutral-400 mb-1">OpenRouter API Key</label>
+                  <label className="block text-xs text-neutral-500 dark:text-neutral-400 mb-1">OpenRouter API Key</label>
                   <input
                     type="password"
                     value={chatbotConfig.openrouterApiKey}
@@ -523,26 +523,26 @@ export function AdminSettingsPage() {
                   <p className="text-[10px] text-neutral-500 mt-0.5">API key from OpenRouter dashboard.</p>
                 </div>
 
-                <div className="border-t border-neutral-800/80 my-2 sm:col-span-2" />
+                <div className="border-t border-neutral-200 dark:border-neutral-800/80 my-2 sm:col-span-2" />
 
                 {/* Response Parameters */}
                 <div className="sm:col-span-2">
-                  <h3 className="text-xs font-semibold text-neutral-300 uppercase tracking-wider mb-2">3. Chatbot System Parameters</h3>
+                  <h3 className="text-xs font-semibold text-neutral-600 dark:text-neutral-300 uppercase tracking-wider mb-2">3. Chatbot System Parameters</h3>
                 </div>
 
                 <div className="sm:col-span-2">
-                  <label className="block text-xs text-neutral-400 mb-1">Custom System Prompt</label>
+                  <label className="block text-xs text-neutral-500 dark:text-neutral-400 mb-1">Custom System Prompt</label>
                   <textarea
                     rows={4}
                     value={chatbotConfig.systemPrompt}
                     onChange={(e) => setChatbotConfig((prev) => ({ ...prev, systemPrompt: e.target.value }))}
-                    className="w-full px-3 py-2 rounded-lg border border-neutral-700 bg-neutral-800 text-white text-sm focus:outline-none focus:ring-1 focus:ring-red-500 placeholder:text-neutral-500"
+                    className="w-full px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-white text-sm focus:outline-none focus:ring-1 focus:ring-red-500 placeholder:text-neutral-500"
                     placeholder="Instructions for the AI assistant chatbot..."
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs text-neutral-400 mb-1">Max Generation Length (Tokens)</label>
+                  <label className="block text-xs text-neutral-500 dark:text-neutral-400 mb-1">Max Generation Length (Tokens)</label>
                   <input
                     type="number"
                     value={chatbotConfig.maxTokens}
@@ -560,18 +560,18 @@ export function AdminSettingsPage() {
           )}
 
           {section === 'promo' && (
-            <Card className="p-6 space-y-5 bg-neutral-900 border-neutral-800">
+            <Card className="p-6 space-y-5 bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800">
               <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-                <Settings2 className="w-5 h-5 text-neutral-400" />
+                <Settings2 className="w-5 h-5 text-neutral-500 dark:text-neutral-400" />
                 Seasonal Campaign Page Settings
               </h2>
-              <p className="text-sm text-neutral-400">
+              <p className="text-sm text-neutral-500 dark:text-neutral-400">
                 Customize content, prices, coupons, and disclaimers for the Entrepreneur Campaign landing page dynamically.
               </p>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs text-neutral-400 mb-1">Campaign Enabled</label>
+                  <label className="block text-xs text-neutral-500 dark:text-neutral-400 mb-1">Campaign Enabled</label>
                   <select
                     value={siteConfig.promo_enabled}
                     onChange={(e) => setSiteConfig((prev) => ({ ...prev, promo_enabled: e.target.value }))}
@@ -582,7 +582,7 @@ export function AdminSettingsPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs text-neutral-400 mb-1">Urgency Badge Banner Text</label>
+                  <label className="block text-xs text-neutral-500 dark:text-neutral-400 mb-1">Urgency Badge Banner Text</label>
                   <input
                     value={siteConfig.promo_badge}
                     onChange={(e) => setSiteConfig((prev) => ({ ...prev, promo_badge: e.target.value }))}
@@ -592,7 +592,7 @@ export function AdminSettingsPage() {
                 </div>
 
                 <div className="sm:col-span-2">
-                  <label className="block text-xs text-neutral-400 mb-1">Main Headline</label>
+                  <label className="block text-xs text-neutral-500 dark:text-neutral-400 mb-1">Main Headline</label>
                   <input
                     value={siteConfig.promo_headline}
                     onChange={(e) => setSiteConfig((prev) => ({ ...prev, promo_headline: e.target.value }))}
@@ -601,17 +601,17 @@ export function AdminSettingsPage() {
                 </div>
 
                 <div className="sm:col-span-2">
-                  <label className="block text-xs text-neutral-400 mb-1">Subheadline</label>
+                  <label className="block text-xs text-neutral-500 dark:text-neutral-400 mb-1">Subheadline</label>
                   <textarea
                     rows={2}
                     value={siteConfig.promo_subheadline}
                     onChange={(e) => setSiteConfig((prev) => ({ ...prev, promo_subheadline: e.target.value }))}
-                    className="w-full px-3 py-2 rounded-lg border border-neutral-700 bg-neutral-800 text-white text-sm focus:outline-none focus:ring-1 focus:ring-red-500 placeholder:text-neutral-500"
+                    className="w-full px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-white text-sm focus:outline-none focus:ring-1 focus:ring-red-500 placeholder:text-neutral-500"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs text-neutral-400 mb-1">Pro Plan Discounted Price ($/month)</label>
+                  <label className="block text-xs text-neutral-500 dark:text-neutral-400 mb-1">Pro Plan Discounted Price ($/month)</label>
                   <input
                     type="number"
                     value={siteConfig.promo_pro_discounted_price}
@@ -620,7 +620,7 @@ export function AdminSettingsPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-neutral-400 mb-1">Pro Plan Original Price ($/month)</label>
+                  <label className="block text-xs text-neutral-500 dark:text-neutral-400 mb-1">Pro Plan Original Price ($/month)</label>
                   <input
                     type="number"
                     value={siteConfig.promo_pro_original_price}
@@ -630,7 +630,7 @@ export function AdminSettingsPage() {
                 </div>
 
                 <div>
-                  <label className="block text-xs text-neutral-400 mb-1">Business Plan Discounted Price ($/month)</label>
+                  <label className="block text-xs text-neutral-500 dark:text-neutral-400 mb-1">Business Plan Discounted Price ($/month)</label>
                   <input
                     type="number"
                     value={siteConfig.promo_biz_discounted_price}
@@ -639,7 +639,7 @@ export function AdminSettingsPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-neutral-400 mb-1">Business Plan Original Price ($/month)</label>
+                  <label className="block text-xs text-neutral-500 dark:text-neutral-400 mb-1">Business Plan Original Price ($/month)</label>
                   <input
                     type="number"
                     value={siteConfig.promo_biz_original_price}
@@ -649,7 +649,7 @@ export function AdminSettingsPage() {
                 </div>
 
                 <div>
-                  <label className="block text-xs text-neutral-400 mb-1">Enterprise Plan Discounted Price ($/month)</label>
+                  <label className="block text-xs text-neutral-500 dark:text-neutral-400 mb-1">Enterprise Plan Discounted Price ($/month)</label>
                   <input
                     type="number"
                     value={siteConfig.promo_enterprise_discounted_price}
@@ -658,7 +658,7 @@ export function AdminSettingsPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-neutral-400 mb-1">Enterprise Plan Original Price ($/month)</label>
+                  <label className="block text-xs text-neutral-500 dark:text-neutral-400 mb-1">Enterprise Plan Original Price ($/month)</label>
                   <input
                     type="number"
                     value={siteConfig.promo_enterprise_original_price}
@@ -668,7 +668,7 @@ export function AdminSettingsPage() {
                 </div>
 
                 <div>
-                  <label className="block text-xs text-neutral-400 mb-1">Pro Plan Promo Coupon</label>
+                  <label className="block text-xs text-neutral-500 dark:text-neutral-400 mb-1">Pro Plan Promo Coupon</label>
                   <input
                     value={siteConfig.promo_pro_coupon}
                     onChange={(e) => setSiteConfig((prev) => ({ ...prev, promo_pro_coupon: e.target.value }))}
@@ -676,7 +676,7 @@ export function AdminSettingsPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-neutral-400 mb-1">Business Plan Promo Coupon</label>
+                  <label className="block text-xs text-neutral-500 dark:text-neutral-400 mb-1">Business Plan Promo Coupon</label>
                   <input
                     value={siteConfig.promo_biz_coupon}
                     onChange={(e) => setSiteConfig((prev) => ({ ...prev, promo_biz_coupon: e.target.value }))}
@@ -685,7 +685,7 @@ export function AdminSettingsPage() {
                 </div>
 
                 <div>
-                  <label className="block text-xs text-neutral-400 mb-1">Enterprise Plan Promo Coupon</label>
+                  <label className="block text-xs text-neutral-500 dark:text-neutral-400 mb-1">Enterprise Plan Promo Coupon</label>
                   <input
                     value={siteConfig.promo_enterprise_coupon}
                     onChange={(e) => setSiteConfig((prev) => ({ ...prev, promo_enterprise_coupon: e.target.value }))}
@@ -694,7 +694,7 @@ export function AdminSettingsPage() {
                 </div>
 
                 <div>
-                  <label className="block text-xs text-neutral-400 mb-1">Minimum Billing Interval (Months)</label>
+                  <label className="block text-xs text-neutral-500 dark:text-neutral-400 mb-1">Minimum Billing Interval (Months)</label>
                   <input
                     type="number"
                     value={siteConfig.promo_min_months}
@@ -703,7 +703,7 @@ export function AdminSettingsPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-neutral-400 mb-1">Secondary CTA Trial Duration (Days)</label>
+                  <label className="block text-xs text-neutral-500 dark:text-neutral-400 mb-1">Secondary CTA Trial Duration (Days)</label>
                   <input
                     type="number"
                     value={siteConfig.promo_secondary_trial_days}
@@ -713,7 +713,7 @@ export function AdminSettingsPage() {
                 </div>
 
                 <div className="sm:col-span-2">
-                  <label className="block text-xs text-neutral-400 mb-1">Billing Limitation Disclaimer Text</label>
+                  <label className="block text-xs text-neutral-500 dark:text-neutral-400 mb-1">Billing Limitation Disclaimer Text</label>
                   <input
                     value={siteConfig.promo_disclaimer}
                     onChange={(e) => setSiteConfig((prev) => ({ ...prev, promo_disclaimer: e.target.value }))}
@@ -722,7 +722,7 @@ export function AdminSettingsPage() {
                 </div>
 
                 <div>
-                  <label className="block text-xs text-neutral-400 mb-1">Primary CTA Button Copy</label>
+                  <label className="block text-xs text-neutral-500 dark:text-neutral-400 mb-1">Primary CTA Button Copy</label>
                   <input
                     value={siteConfig.promo_primary_cta}
                     onChange={(e) => setSiteConfig((prev) => ({ ...prev, promo_primary_cta: e.target.value }))}
@@ -730,7 +730,7 @@ export function AdminSettingsPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-neutral-400 mb-1">Secondary CTA Button Copy</label>
+                  <label className="block text-xs text-neutral-500 dark:text-neutral-400 mb-1">Secondary CTA Button Copy</label>
                   <input
                     value={siteConfig.promo_secondary_cta}
                     onChange={(e) => setSiteConfig((prev) => ({ ...prev, promo_secondary_cta: e.target.value }))}
@@ -739,7 +739,7 @@ export function AdminSettingsPage() {
                 </div>
 
                 <div className="sm:col-span-2">
-                  <label className="block text-xs text-neutral-400 mb-1">Trust Bar Items (Comma Separated)</label>
+                  <label className="block text-xs text-neutral-500 dark:text-neutral-400 mb-1">Trust Bar Items (Comma Separated)</label>
                   <input
                     value={siteConfig.promo_trust_bar}
                     onChange={(e) => setSiteConfig((prev) => ({ ...prev, promo_trust_bar: e.target.value }))}
@@ -748,7 +748,7 @@ export function AdminSettingsPage() {
                 </div>
 
                 <div className="sm:col-span-2">
-                  <label className="block text-xs text-neutral-400 mb-1">Campaign Custom Footer text</label>
+                  <label className="block text-xs text-neutral-500 dark:text-neutral-400 mb-1">Campaign Custom Footer text</label>
                   <input
                     value={siteConfig.promo_footer}
                     onChange={(e) => setSiteConfig((prev) => ({ ...prev, promo_footer: e.target.value }))}
