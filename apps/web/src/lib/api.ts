@@ -618,8 +618,8 @@ export const api = {
       request<{ success: true; data: { users: any[]; total: number; page: number; limit: number } }>(`/admin/users${params ? '?' + new URLSearchParams(params as Record<string, string>) : ''}`),
     updateUserStatus: (id: string, action: 'suspend' | 'enable') =>
       request<{ success: true; data: { message: string } }>(`/admin/users/${id}/status`, { method: 'PUT', body: JSON.stringify({ action }) }),
-    updateUserPlan: (id: string, tier: string) =>
-      request<{ success: true; data: { message: string } }>(`/admin/users/${id}/plan`, { method: 'PUT', body: JSON.stringify({ tier }) }),
+    updateUserPlan: (id: string, tier: string, currentPeriodEnd?: string | null) =>
+      request<{ success: true; data: { message: string } }>(`/admin/users/${id}/plan`, { method: 'PUT', body: JSON.stringify({ tier, currentPeriodEnd }) }),
     updateUserRole: (id: string, role: string) =>
       request<{ success: true; data: { message: string } }>(`/admin/users/${id}/role`, { method: 'PUT', body: JSON.stringify({ role }) }),
     deleteUser: (id: string, password: string) =>

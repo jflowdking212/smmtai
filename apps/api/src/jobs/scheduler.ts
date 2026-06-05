@@ -653,7 +653,26 @@ export async function runTrialCheckJob(): Promise<void> {
       }
     }
 
-    console.log(`[TrialJob] Done. Expired: ${expired.length}`);
+    // 3. Expire overdue subscriptions
+    const expiredSubscriptions = await prisma.subscription.findMany({
+      where: { 
+        status: 'active', 
+        tier: { not: 'basic' }, 
+        currentPeriodEnd: { lt: now } 
+      },
+    });
+    for (const sub of expiredSubscriptions) {
+      await prisma.subscription.update({ where: { id: sub.id }, data: { tier: 'basic', currentPeriodEnd: null } });
+      const workspace = await prisma.workspace.findUnique({
+        where: { id: sub.workspaceId },
+        include: { owner: { select: { email: true, name: true } } }
+      }).catch(() => null);
+      const user = workspace?.owner;
+      // We could add an email notification here if desired
+      console.log(`[TrialJob] Expired subscription: workspace ${sub.workspaceId}`);
+    }
+
+    console.log(`[TrialJob] Done. Expired trials: ${expired.length}, Expired subscriptions: ${expiredSubscriptions.length}`);
   } catch (err) { console.error('[TrialJob] Error:', err); }
 }
 

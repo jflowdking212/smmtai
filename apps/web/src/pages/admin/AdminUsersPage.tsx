@@ -45,6 +45,9 @@ export function AdminUsersPage() {
   const [deleteTarget, setDeleteTarget] = useState<AdminUser | null>(null);
   const [deletePassword, setDeletePassword] = useState('');
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [planChangeTarget, setPlanChangeTarget] = useState<{ user: AdminUser, tier: string } | null>(null);
+  const [planEndDate, setPlanEndDate] = useState<string>(''); 
+  const [planIsUnlimited, setPlanIsUnlimited] = useState<boolean>(false);
   const toast = useToast();
 
   const loadUsers = useCallback(async () => {
@@ -77,12 +80,36 @@ export function AdminUsersPage() {
     }
   }
 
-  async function handlePlanChange(userId: string, tier: string) {
-    setActionLoading(userId);
+  function handlePlanSelection(user: AdminUser, tier: string) {
+    setPlanChangeTarget({ user, tier });
+    
+    // Default to existing end date, or 30 days from now if not basic
+    if (tier !== 'basic') {
+      if (user.currentPeriodEnd && tier === user.plan) {
+        setPlanEndDate(new Date(user.currentPeriodEnd).toISOString().split('T')[0]);
+        setPlanIsUnlimited(false);
+      } else {
+        const nextMonth = new Date();
+        nextMonth.setDate(nextMonth.getDate() + 30);
+        setPlanEndDate(nextMonth.toISOString().split('T')[0]);
+        setPlanIsUnlimited(false);
+      }
+    } else {
+      setPlanEndDate('');
+      setPlanIsUnlimited(true);
+    }
+  }
+
+  async function confirmPlanChange() {
+    if (!planChangeTarget) return;
+    const { user, tier } = planChangeTarget;
+    setActionLoading(user.id);
     try {
-      await api.admin.updateUserPlan(userId, tier);
+      const finalEndDate = planIsUnlimited ? 'unlimited' : new Date(planEndDate).toISOString();
+      await api.admin.updateUserPlan(user.id, tier, finalEndDate);
       toast.success('Success', `User plan updated to ${tier}`);
       await loadUsers();
+      setPlanChangeTarget(null);
     } catch (err) {
       toast.error('Error', err instanceof ApiError ? err.message : 'Plan change failed');
     } finally {
@@ -182,17 +209,21 @@ export function AdminUsersPage() {
                         <div className="flex flex-wrap gap-1 mt-1">
                           {user.trialEndsAt && new Date(user.trialEndsAt) > new Date() && (
                             <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                              ⚠️ Trial ends {new Date(user.trialEndsAt).toLocaleDateString()}
+                              ?? Trial ends {new Date(user.trialEndsAt).toLocaleDateString()}
                             </span>
                           )}
                           {user.currentPeriodEnd && user.plan !== 'basic' && (
-                            <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded border ${
-                              user.cancelAtPeriodEnd 
-                                ? 'bg-red-500/10 text-red-400 border-red-500/20' 
-                                : 'bg-neutral-800 text-neutral-400 border-neutral-700'
-                            }`}>
-                              {user.cancelAtPeriodEnd ? '🛑 Expires' : '📅 Renews'} {new Date(user.currentPeriodEnd).toLocaleDateString()}
-                            </span>
+                            <button
+                              onClick={() => handlePlanSelection(user, user.plan)}
+                              className={`text-[10px] font-medium px-1.5 py-0.5 rounded border hover:opacity-80 transition-opacity cursor-pointer ${
+                                user.cancelAtPeriodEnd 
+                                  ? 'bg-red-500/10 text-red-400 border-red-500/20' 
+                                  : 'bg-neutral-800 text-neutral-400 border-neutral-700'
+                              }`}
+                              title="Click to edit expiration date"
+                            >
+                              {user.cancelAtPeriodEnd ? '?? Expires' : '?? End Date:'} {new Date(user.currentPeriodEnd).toLocaleDateString()}
+                            </button>
                           )}
                         </div>
                       </div>
@@ -205,7 +236,7 @@ export function AdminUsersPage() {
                     <td className="px-4 py-3">
                       <select
                         value={user.plan}
-                        onChange={(e) => handlePlanChange(user.id, e.target.value)}
+                        onChange={(e) => handlePlanSelection(user, e.target.value)}
                         disabled={actionLoading === user.id}
                         className="text-xs px-2 py-1 rounded-lg bg-neutral-800 border border-neutral-700 text-neutral-300 focus:outline-none focus:ring-1 focus:ring-red-500"
                       >
@@ -318,7 +349,7 @@ export function AdminUsersPage() {
             </p>
             {deleteTarget.isSystemAdmin && (
               <p className="text-xs text-amber-400 bg-amber-500/10 rounded-lg px-3 py-2 mb-3 mt-2">
-                ⚠ This user is an admin. You can only delete them if at least one other admin exists.
+                ? This user is an admin. You can only delete them if at least one other admin exists.
               </p>
             )}
             <p className="text-sm text-neutral-400 mb-4 mt-2">Enter your admin password to confirm:</p>
@@ -343,6 +374,61 @@ export function AdminUsersPage() {
                 onClick={handleDeleteConfirm}
               >
                 <Trash2 className="w-4 h-4" /> Delete User
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Plan change modal */}
+      {planChangeTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="bg-neutral-900 border border-neutral-700 rounded-2xl p-6 w-full max-w-md shadow-2xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-white">Update Plan for {planChangeTarget.user.name}</h3>
+              <button onClick={() => setPlanChangeTarget(null)} className="text-neutral-500 hover:text-white transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <p className="text-sm text-neutral-400 mb-4">
+              You are changing the plan from <span className="font-bold text-white">{planChangeTarget.user.plan}</span> to <span className="font-bold text-white">{planChangeTarget.tier}</span>.
+            </p>
+            
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-neutral-300 mb-2">Subscription End Date</label>
+              <div className="flex items-center gap-3 mb-2">
+                <input
+                  type="checkbox"
+                  id="unlimitedPlan"
+                  checked={planIsUnlimited}
+                  onChange={(e) => setPlanIsUnlimited(e.target.checked)}
+                  className="w-4 h-4 bg-neutral-800 border-neutral-600 rounded text-red-500 focus:ring-red-500"
+                />
+                <label htmlFor="unlimitedPlan" className="text-sm text-neutral-400">Unlimited (No expiration)</label>
+              </div>
+              
+              {!planIsUnlimited && (
+                <input
+                  type="date"
+                  value={planEndDate}
+                  onChange={(e) => setPlanEndDate(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-neutral-700 bg-neutral-800 text-neutral-200 focus:outline-none focus:ring-2 focus:ring-red-500/40 focus:border-red-500 [color-scheme:dark]"
+                />
+              )}
+            </div>
+
+            <div className="flex gap-3">
+              <Button variant="ghost" className="flex-1 text-neutral-400" onClick={() => setPlanChangeTarget(null)}>
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+                loading={actionLoading === planChangeTarget.user.id}
+                disabled={!planIsUnlimited && !planEndDate}
+                onClick={confirmPlanChange}
+              >
+                Confirm Upgrade
               </Button>
             </div>
           </div>

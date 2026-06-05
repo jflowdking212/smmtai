@@ -55,7 +55,7 @@ const logoUpload = multer({
   },
 });
 
-// Public endpoint — no auth required
+// Public endpoint ? no auth required
 adminRouter.get('/settings/site/public', async (_req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const config = await getSiteSettings();
@@ -65,7 +65,7 @@ adminRouter.get('/settings/site/public', async (_req: AuthRequest, res: Response
   }
 });
 
-// Public endpoint — plan pricing (no auth required)
+// Public endpoint ? plan pricing (no auth required)
 adminRouter.get('/settings/plans/public', async (_req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const config = await getPlanConfig();
@@ -575,10 +575,15 @@ adminRouter.put('/users/:id/status', async (req: AuthRequest, res: Response, nex
 adminRouter.put('/users/:id/plan', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const id = req.params.id as string;
-    const { tier } = req.body; // 'basic' | 'pro' | 'business' | 'enterprise'
+    const { tier, currentPeriodEnd } = req.body; // 'basic' | 'pro' | 'business' | 'enterprise'
 
     if (!['basic', 'pro', 'business', 'enterprise'].includes(tier)) {
       return res.status(400).json({ success: false, error: { message: 'Invalid tier', code: 'VALIDATION_ERROR' } });
+    }
+
+    let parsedEndDate: Date | null = null;
+    if (currentPeriodEnd && currentPeriodEnd !== 'unlimited') {
+      parsedEndDate = new Date(currentPeriodEnd);
     }
 
     const user = await prisma.user.findUnique({
@@ -595,12 +600,12 @@ adminRouter.put('/users/:id/plan', async (req: AuthRequest, res: Response, next:
       const oldTier = workspace.subscription.tier;
       await prisma.subscription.update({
         where: { id: workspace.subscription.id },
-        data: { tier },
+        data: { tier, currentPeriodEnd: parsedEndDate },
       });
       await logAdminAction(req.userId!, 'user.plan_change', 'user', id, { oldTier, newTier: tier });
     } else if (workspace) {
       await prisma.subscription.create({
-        data: { workspaceId: workspace.id, tier, status: 'active' },
+        data: { workspaceId: workspace.id, tier, status: 'active', currentPeriodEnd: parsedEndDate },
       });
       await logAdminAction(req.userId!, 'user.plan_change', 'user', id, { oldTier: 'none', newTier: tier });
     }
@@ -661,7 +666,7 @@ adminRouter.put('/users/:id/role', async (req: AuthRequest, res: Response, next:
   }
 });
 
-// Delete a user — requires admin password confirmation; cannot delete last owner
+// Delete a user ? requires admin password confirmation; cannot delete last owner
 adminRouter.delete('/users/:id', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const id = req.params.id as string;
@@ -686,9 +691,20 @@ adminRouter.delete('/users/:id', async (req: AuthRequest, res: Response, next: N
       return res.status(403).json({ success: false, error: { message: 'Cannot delete your own account', code: 'FORBIDDEN' } });
     }
 
-    const user = await prisma.user.findUnique({ where: { id }, include: { workspaces: true } });
+    const user = await prisma.user.findUnique({ 
+      where: { id }, 
+      include: { workspaces: { include: { workspace: { include: { subscription: true } } } } } 
+    });
     if (!user) {
       return res.status(404).json({ success: false, error: { message: 'User not found', code: 'NOT_FOUND' } });
+    }
+
+    const primarySubscription = user.workspaces[0]?.workspace?.subscription;
+    if (primarySubscription && primarySubscription.currentPeriodEnd && primarySubscription.currentPeriodEnd > new Date()) {
+      return res.status(403).json({
+        success: false,
+        error: { message: 'Cannot delete a user with an active subscription. Suspend them instead, or wait until the subscription expires.', code: 'ACTIVE_SUBSCRIPTION' }
+      });
     }
 
     // Cannot delete the last owner
