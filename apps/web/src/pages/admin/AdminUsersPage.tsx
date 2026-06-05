@@ -172,10 +172,10 @@ export function AdminUsersPage() {
             placeholder="Search by name or email..."
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-            className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-neutral-100 dark:bg-neutral-800 text-neutral-200 placeholder:text-neutral-500 text-sm focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500"
+            className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 placeholder:text-neutral-500 text-sm focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500"
           />
         </div>
-        <Badge variant="default" className="bg-neutral-100 dark:bg-neutral-800 text-neutral-300 self-center">
+        <Badge variant="default" className="bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 self-center">
           {total} users
         </Badge>
       </div>
@@ -196,17 +196,17 @@ export function AdminUsersPage() {
                 <th className="text-right px-4 py-3 text-xs font-medium text-neutral-400 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-neutral-800/50">
+            <tbody className="divide-y divide-neutral-200 dark:divide-neutral-800/50">
               {loading ? (
                 <tr><td colSpan={8} className="px-4 py-8 text-center text-neutral-500">Loading...</td></tr>
               ) : users.length === 0 ? (
                 <tr><td colSpan={8} className="px-4 py-8 text-center text-neutral-500">No users found.</td></tr>
               ) : (
                 users.map((user) => (
-                  <tr key={user.id} className="hover:bg-neutral-100 dark:bg-neutral-800/30 transition-colors">
+                  <tr key={user.id} className="hover:bg-neutral-100 dark:hover:bg-neutral-800/30 transition-colors">
                     <td className="px-4 py-3">
                       <div>
-                        <p className="text-sm font-medium text-neutral-200">{user.name}</p>
+                        <p className="text-sm font-medium text-neutral-800 dark:text-neutral-200">{user.name}</p>
                         <p className="text-xs text-neutral-500">{user.email}</p>
                         <div className="flex flex-wrap gap-1 mt-1">
                           {user.trialEndsAt && new Date(user.trialEndsAt) > new Date() && (
@@ -228,7 +228,7 @@ export function AdminUsersPage() {
                           value={user.plan}
                           onChange={(e) => handlePlanSelection(user, e.target.value)}
                           disabled={actionLoading === user.id}
-                          className="text-xs px-2 py-1 rounded-lg bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-900 dark:text-neutral-300 focus:outline-none focus:ring-1 focus:ring-red-500"
+                          className="text-xs px-2 py-1 rounded-lg bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-900 dark:text-neutral-600 dark:text-neutral-300 focus:outline-none focus:ring-1 focus:ring-red-500"
                         >
                           {TIERS.map((t) => (
                             <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>
@@ -265,7 +265,7 @@ export function AdminUsersPage() {
                         ) : (
                           <button
                             onClick={() => handlePlanSelection(user, user.plan)}
-                            className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-300 border border-neutral-200 dark:border-neutral-700 hover:border-neutral-500 transition-colors cursor-pointer flex items-center gap-1"
+                            className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 border border-neutral-200 dark:border-neutral-700 hover:border-neutral-500 transition-colors cursor-pointer flex items-center gap-1"
                             title="Click to edit expiration date"
                           >
                             <Calendar className="w-3 h-3" />
@@ -366,7 +366,7 @@ export function AdminUsersPage() {
           <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-2xl p-6 w-full max-w-md shadow-2xl">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-bold text-neutral-900 dark:text-white">Delete User</h3>
-              <button onClick={() => setDeleteTarget(null)} className="text-neutral-500 hover:text-neutral-900 dark:text-white transition-colors">
+              <button onClick={() => setDeleteTarget(null)} className="text-neutral-500 hover:text-neutral-900 dark:hover:text-white transition-colors">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -386,7 +386,7 @@ export function AdminUsersPage() {
               onKeyDown={(e) => e.key === 'Enter' && handleDeleteConfirm()}
               placeholder="Your password"
               autoFocus
-              className="w-full px-4 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-neutral-100 dark:bg-neutral-800 text-neutral-200 placeholder:text-neutral-500 text-sm focus:outline-none focus:ring-2 focus:ring-red-500/40 focus:border-red-500 mb-4"
+              className="w-full px-4 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 placeholder:text-neutral-500 text-sm focus:outline-none focus:ring-2 focus:ring-red-500/40 focus:border-red-500 mb-4"
             />
             <div className="flex gap-3">
               <Button variant="ghost" className="flex-1 text-neutral-400" onClick={() => setDeleteTarget(null)}>
@@ -394,7 +394,7 @@ export function AdminUsersPage() {
               </Button>
               <Button
                 variant="primary"
-                className="flex-1 bg-red-600 hover:bg-red-700 text-neutral-900 dark:text-white"
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white"
                 loading={deleteLoading}
                 disabled={!deletePassword.trim()}
                 onClick={handleDeleteConfirm}
@@ -412,7 +412,7 @@ export function AdminUsersPage() {
           <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-2xl p-6 w-full max-w-md shadow-2xl">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-bold text-neutral-900 dark:text-white">Update Plan for {planChangeTarget.user.name}</h3>
-              <button onClick={() => setPlanChangeTarget(null)} className="text-neutral-500 hover:text-neutral-900 dark:text-white transition-colors">
+              <button onClick={() => setPlanChangeTarget(null)} className="text-neutral-500 hover:text-neutral-900 dark:hover:text-white transition-colors">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -421,7 +421,7 @@ export function AdminUsersPage() {
             </p>
             
             <div className="mb-4">
-              <label className="block text-sm font-medium text-neutral-300 mb-2">Subscription End Date</label>
+              <label className="block text-sm font-medium text-neutral-600 dark:text-neutral-300 mb-2">Subscription End Date</label>
               <div className="flex items-center gap-3 mb-2">
                 <input
                   type="checkbox"
@@ -439,7 +439,7 @@ export function AdminUsersPage() {
                   value={planEndDate}
                   min={new Date().toISOString().split('T')[0]}
                   onChange={(e) => setPlanEndDate(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-neutral-100 dark:bg-neutral-800 text-neutral-200 focus:outline-none focus:ring-2 focus:ring-red-500/40 focus:border-red-500 [color-scheme:dark]"
+                  className="w-full px-4 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 focus:outline-none focus:ring-2 focus:ring-red-500/40 focus:border-red-500 [color-scheme:light] dark:[color-scheme:dark]"
                 />
               )}
             </div>
@@ -450,7 +450,7 @@ export function AdminUsersPage() {
               </Button>
               <Button
                 variant="primary"
-                className="flex-1 bg-red-600 hover:bg-red-700 text-neutral-900 dark:text-white"
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white"
                 loading={actionLoading === planChangeTarget.user.id}
                 disabled={!planIsUnlimited && !planEndDate}
                 onClick={confirmPlanChange}

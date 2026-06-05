@@ -69,7 +69,7 @@ export function AdminDashboardPage() {
           <h1 className="text-2xl font-heading font-bold text-neutral-900 dark:text-white">Admin Dashboard</h1>
           <p className="text-sm text-neutral-400 mt-1">System overview and key metrics.</p>
         </div>
-        <Button variant="secondary" size="sm" loading={refreshing} onClick={handleRefresh} className="border-neutral-200 dark:border-neutral-700 text-neutral-300 hover:bg-neutral-100 dark:bg-neutral-800">
+        <Button variant="secondary" size="sm" loading={refreshing} onClick={handleRefresh} className="border-neutral-200 dark:border-neutral-700 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:bg-neutral-800">
           <RefreshCw className="w-4 h-4" /> Refresh
         </Button>
       </div>
@@ -88,7 +88,7 @@ export function AdminDashboardPage() {
               <div className={`w-10 h-10 rounded-xl ${stat.bg} flex items-center justify-center`}>
                 <stat.icon className={`w-5 h-5 ${stat.color}`} />
               </div>
-              <Badge variant="default" className="bg-neutral-100 dark:bg-neutral-800 text-neutral-300">Live</Badge>
+              <Badge variant="default" className="bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300">Live</Badge>
             </div>
             <div className="mt-4">
               <p className="text-2xl font-bold text-neutral-900 dark:text-white">{loading ? '—' : stat.value}</p>
@@ -145,7 +145,7 @@ function RecentAuditLog() {
       {logs.map((log) => (
         <div key={log.id} className="flex items-center justify-between p-3 rounded-xl bg-neutral-100 dark:bg-neutral-800/30 border border-neutral-200 dark:border-neutral-700/30">
           <div>
-            <p className="text-sm text-neutral-200">
+            <p className="text-sm text-neutral-800 dark:text-neutral-200">
               <span className="font-medium">{log.admin?.name || 'Admin'}</span>{' '}
               <span className="text-neutral-400">{log.action}</span>
               {log.targetId && <span className="text-neutral-500"> on {log.targetType} {log.targetId.slice(0, 8)}...</span>}
