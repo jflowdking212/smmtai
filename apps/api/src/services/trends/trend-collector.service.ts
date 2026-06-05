@@ -5,17 +5,43 @@ import http from 'http';
 function fetchJson(url: string): Promise<any> {
   return new Promise((resolve, reject) => {
     const client = url.startsWith('https') ? https : http;
-    const req = client.get(url, {
-      headers: { 'User-Agent': 'SmmtAI-TrendBot/2.0', 'Accept': 'application/json' }
-    }, (res) => {
+    const options: any = {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'application/json, text/plain, */*',
+      },
+    };
+    const req = client.get(url, options, (res) => {
+      // Follow redirects
+      if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        fetchJson(res.headers.location).then(resolve).catch(reject);
+        return;
+      }
       let data = '';
       res.on('data', (c: Buffer) => data += c);
       res.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { reject(e); } });
     });
     req.on('error', reject);
-    req.setTimeout(12000, () => { req.destroy(); reject(new Error('Timeout')); });
+    req.setTimeout(15000, () => { req.destroy(); reject(new Error('Timeout')); });
   });
 }
+
+function fetchText(url: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const mod = url.startsWith('https') ? https : http;
+    mod.get(url, { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; TrendBot/1.0)' } }, (res) => {
+      if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        fetchText(res.headers.location).then(resolve).catch(reject);
+        return;
+      }
+      let data = '';
+      res.on('data', (c: Buffer) => { data += c.toString(); });
+      res.on('end', () => resolve(data));
+      res.on('error', reject);
+    }).on('error', reject);
+  });
+}
+
 
 function normalizeTopic(raw: string): string {
   return raw.toLowerCase().replace(/^#+/, '').replace(/[^\w\s]/g, ' ').replace(/\s+/g, ' ').trim();
@@ -87,7 +113,7 @@ async function fetchRedditTrends() {
   const results: any[] = [];
   for (const sub of subs) {
     try {
-      const d = await fetchJson(`https://www.reddit.com/r/${sub}/hot.json?limit=8`);
+      const d = await fetchJson(`https://old.reddit.com/r/${sub}/hot.json?limit=8&raw_json=1`);
       for (const post of (d?.data?.children || [])) {
         const p = post.data;
         if (!p?.title || p.stickied) continue;
@@ -100,7 +126,7 @@ async function fetchRedditTrends() {
           sourceUrl: `https://reddit.com${p.permalink}`,
         });
       }
-      await sleep(700);
+      await sleep(1200);
     } catch (e: any) { console.warn(`[Reddit r/${sub}] ${e.message}`); }
   }
   return results;
@@ -219,6 +245,52 @@ async function fetchWikipediaCurrentEvents() {
   return results;
 }
 
+
+async function fetchGoogleTrends() {
+  const results: any[] = [];
+  const geos = ['US', 'GB', 'NG', 'IN', 'CA', 'AU']; // Multiple regions for diversity
+  for (const geo of geos) {
+    try {
+      const url = `https://trends.google.com/trending/rss?geo=${geo}`;
+      const xml = await fetchText(url);
+      // Parse items from RSS XML
+      const items = xml.split('<item>').slice(1);
+      for (const item of items.slice(0, 15)) {
+        const titleMatch = item.match(/<title>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?<\/title>/);
+        const trafficMatch = item.match(/<ht:approx_traffic>(.*?)<\/ht:approx_traffic>/);
+        const linkMatch = item.match(/<link>(.*?)<\/link>/);
+        const newsItems = item.match(/<ht:news_item_title>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?<\/ht:news_item_title>/g);
+
+        if (!titleMatch) continue;
+        const title = titleMatch[1].replace(/<!\[CDATA\[|\]\]>/g, '').trim();
+        const trafficStr = (trafficMatch?.[1] || '1,000').replace(/[^0-9]/g, '');
+        const traffic = parseInt(trafficStr) || 1000;
+        const link = linkMatch?.[1] || `https://trends.google.com/trends/explore?q=${encodeURIComponent(title)}&geo=${geo}`;
+
+        // Extract news context for richer topic description
+        let enrichedTopic = title;
+        if (newsItems && newsItems.length > 0) {
+          const firstNews = newsItems[0].replace(/<[^>]+>/g, '').replace(/<!\[CDATA\[|\]\]>/g, '').trim();
+          if (firstNews && firstNews !== title) {
+            enrichedTopic = `${title} — ${firstNews}`.slice(0, 200);
+          }
+        }
+
+        results.push({
+          topic: enrichedTopic,
+          platform: 'google_trends',
+          score: Math.min(Math.round(traffic / 5000), 100),
+          engagementCount: traffic,
+          growthRate: Math.min(traffic / 200, 500),
+          sourceUrl: link,
+        });
+      }
+      await sleep(300);
+    } catch (e: any) { console.warn(`[GoogleTrends ${geo}] ${e.message}`); }
+  }
+  return results;
+}
+
 export class TrendCollectorService {
   static async collectAllTrends(): Promise<number> {
     console.log('[TrendCollector] Starting collection cycle...');
@@ -230,6 +302,7 @@ export class TrendCollectorService {
       { name: 'GitHub',      fn: fetchGithubTrending },
       { name: 'Dev.to',      fn: fetchDevToTrends },
       { name: 'Wikipedia',   fn: fetchWikipediaCurrentEvents },
+      { name: 'GoogleTrends', fn: fetchGoogleTrends },
     ];
 
     for (const source of sources) {

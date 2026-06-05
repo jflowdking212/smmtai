@@ -1,5 +1,6 @@
 import express from 'express';
 import { scheduleTrialChecker } from './jobs/scheduler.js';
+import { TrendCollectorService } from './services/trends/trend-collector.service.js';
 import cors from 'cors';
 import helmet from 'helmet';
 import hpp from 'hpp';
@@ -102,6 +103,28 @@ app.use(errorHandler);
 
 app.listen(config.port, () => {
 scheduleTrialChecker();
+
+  // ── Trend Collection: run on startup + every 2 hours ──
+  void (async () => {
+    try {
+      console.log('   📊 Running initial trend collection...');
+      const count = await TrendCollectorService.collectAllTrends();
+      console.log(`   📊 Initial trend collection done: ${count} trends saved`);
+    } catch (e: any) {
+      console.error('   Failed initial trend collection:', e.message);
+    }
+  })();
+  setInterval(async () => {
+    try {
+      console.log('[TrendScheduler] Collecting trends...');
+      await TrendCollectorService.purgeOldTrends();
+      const count = await TrendCollectorService.collectAllTrends();
+      console.log(`[TrendScheduler] Done: ${count} trends saved`);
+    } catch (e: any) {
+      console.error('[TrendScheduler] Error:', e.message);
+    }
+  }, 2 * 60 * 60 * 1000); // Every 2 hours
+
   console.log(`🚀 SmmtAI API running on port ${config.port}`);
   console.log(`   Environment: ${config.nodeEnv}`);
   void scheduleAnalyticsIngestion()
