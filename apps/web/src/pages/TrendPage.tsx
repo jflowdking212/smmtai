@@ -26,6 +26,7 @@ interface Trend {
   country?: string;
   lifespanDays?: number;
   createdAt: string;
+  sourceUrl?: string;
 }
 
 const PLATFORMS = [
@@ -88,19 +89,33 @@ const PLATFORM_LIMITS: Record<string, number> = {
 };
 
 const STATUS_BADGE: Record<string, 'success' | 'warning' | 'danger' | 'default'> = {
+  Viral: 'danger',
   Hot: 'danger',
   Rising: 'warning',
   Emerging: 'default',
   Peak: 'success',
   Declining: 'default',
+  Saturated: 'default',
 };
 
 const STATUS_LABEL: Record<string, string> = {
+  Viral: '🚀 Viral',
   Hot: '🔥 Hot',
   Rising: '📈 Rising',
   Emerging: '🌱 Emerging',
   Peak: '⭐ Peak',
   Declining: '📉 Declining',
+  Saturated: '💤 Saturated',
+};
+
+
+const SOURCE_ICON: Record<string, string> = {
+  google_trends: '📊',
+  wikipedia: '📖',
+  reddit: '🟠',
+  hackernews: '🟧',
+  github: '⚡',
+  devto: '💻',
 };
 
 function formatNumber(n: number): string {
@@ -175,7 +190,7 @@ export function TrendPage() {
   const [platform, setPlatform] = useState('all');
   const [category, setCategory] = useState('All');
   const [timeframe, setTimeframe] = useState('7d');
-  const [sortBy, setSortBy] = useState<'score' | 'growthRate' | 'engagementCount' | 'viralProbability'>('score');
+  const [sortBy, setSortBy] = useState<'score' | 'growthRate' | 'engagementCount' | 'viralProbability' | 'createdAt'>('score');
   const [generating, setGenerating] = useState<string | null>(null);
   const [generatedPost, setGeneratedPost] = useState<{ topic: string; content: string } | null>(null);
   const [saved, setSaved] = useState<Set<string>>(new Set());
@@ -209,7 +224,7 @@ export function TrendPage() {
     setLoading(true);
     setError(null);
     try {
-      const data = await fetchTrendsApi({ platform, category, timeframe, limit: 60, scope });
+      const data = await fetchTrendsApi({ platform, category, timeframe, limit: 150, scope });
       setTrends(data.trends || []);
     } catch (e: any) {
       setError(e.message || 'Failed to load trends');
@@ -290,9 +305,10 @@ export function TrendPage() {
 
   const filtered = trends
     .filter(t => !search || t.topic.toLowerCase().includes(search.toLowerCase()) || (t.category || '').toLowerCase().includes(search.toLowerCase()))
-    .sort((a, b) => (b[sortBy] || 0) - (a[sortBy] || 0));
+    .sort((a, b) => sortBy === 'createdAt' ? new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime() : ((b as any)[sortBy] || 0) - ((a as any)[sortBy] || 0));
 
   const hotCount = trends.filter(t => t.score >= 80).length;
+  const viralCount = trends.filter(t => t.trendStatus === 'Viral').length;
   const risingCount = trends.filter(t => ['Rising', 'Emerging'].includes(t.trendStatus)).length;
   const avgGrowth = trends.length ? Math.round(trends.reduce((s, t) => s + (t.growthRate || 0), 0) / trends.length) : 0;
 
@@ -323,7 +339,7 @@ export function TrendPage() {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
           { label: 'Total Trends', value: trends.length, icon: <TrendingUp className="w-5 h-5 text-primary-600" />, sub: 'tracked live' },
-          { label: 'Hot Trends', value: hotCount, icon: <Flame className="w-5 h-5 text-red-500" />, sub: 'score ≥ 80' },
+          { label: 'Viral / Hot', value: `${viralCount} / ${hotCount}`, icon: <Flame className="w-5 h-5 text-red-500" />, sub: '🚀 viral • 🔥 hot' },
           { label: 'Emerging / Rising', value: risingCount, icon: <ArrowUpRight className="w-5 h-5 text-amber-500" />, sub: 'momentum' },
           { label: 'Avg Growth', value: `${avgGrowth}%`, icon: <Sparkles className="w-5 h-5 text-violet-500" />, sub: '7-day rate' },
         ].map((stat, i) => (
@@ -416,6 +432,7 @@ export function TrendPage() {
               <option value="3d">3 days</option>
               <option value="7d">7 days</option>
               <option value="15d">15 days</option>
+              <option value="30d">30 days</option>
             </select>
             <select
               value={sortBy}
@@ -426,6 +443,7 @@ export function TrendPage() {
               <option value="viralProbability">Viral %</option>
               <option value="growthRate">Growth</option>
               <option value="engagementCount">Engagement</option>
+              <option value="createdAt">Newest</option>
             </select>
           </div>
           <span className="text-xs text-neutral-400 self-center flex-shrink-0">{filtered.length} found</span>
@@ -479,6 +497,11 @@ export function TrendPage() {
                       {trend.category && (
                         <span className="text-[10px] text-neutral-400 bg-neutral-100 px-2 py-0.5 rounded-full">{trend.category}</span>
                       )}
+                      {trend.platform && (
+                        <span className="text-[10px] text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full font-medium">
+                          {SOURCE_ICON[trend.platform] || '🌐'} {trend.platform === 'google_trends' ? 'Google' : trend.platform === 'hackernews' ? 'HN' : trend.platform.charAt(0).toUpperCase() + trend.platform.slice(1)}
+                        </span>
+                      )}
                       {(trend.country || trend.region) && (
                         <span className="text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-full font-semibold flex items-center gap-0.5">
                           {"\uD83D\uDCCD "}{trend.country || trend.region}
@@ -493,7 +516,7 @@ export function TrendPage() {
                 </div>
 
                 {/* Stats */}
-                <div className="grid grid-cols-3 gap-2 mb-3">
+                <div className="grid grid-cols-4 gap-2 mb-3">
                   {[
                     { label: 'Engagement', value: formatNumber(trend.engagementCount) },
                     {
@@ -506,6 +529,11 @@ export function TrendPage() {
                       ),
                     },
                     { label: 'Lifespan', value: `${trend.lifespanDays || '?'}d` },
+                    { label: 'Competition', value: (
+                      <span className={`font-bold ${(trend.competitionLevel || 0) >= 0.7 ? 'text-red-500' : (trend.competitionLevel || 0) >= 0.4 ? 'text-amber-500' : 'text-emerald-500'}`}>
+                        {(trend.competitionLevel || 0) >= 0.7 ? '🔴 High' : (trend.competitionLevel || 0) >= 0.4 ? '🟡 Med' : '🟢 Low'}
+                      </span>
+                    ) },
                   ].map((s, i) => (
                     <div key={i} className="bg-neutral-50 rounded-lg p-2 text-center">
                       <div className="text-xs font-bold text-neutral-800">{s.value}</div>
@@ -545,6 +573,17 @@ export function TrendPage() {
                     <Sparkles className="w-3.5 h-3.5" />
                     Generate Post
                   </Button>
+                  {trend.sourceUrl && (
+                  <a
+                    href={trend.sourceUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-2 rounded-lg border bg-neutral-50 border-neutral-200 text-neutral-400 hover:text-blue-600 hover:border-blue-300 transition-colors"
+                    title="View source"
+                  >
+                    <ArrowUpRight className="w-4 h-4" />
+                  </a>
+                  )}
                   <button
                     onClick={() => setSaved(prev => { const n = new Set(prev); n.has(trend.id) ? n.delete(trend.id) : n.add(trend.id); return n; })}
                     className={`p-2 rounded-lg border transition-colors ${saved.has(trend.id) ? 'bg-violet-100 border-violet-300 text-violet-600' : 'bg-neutral-50 border-neutral-200 text-neutral-400 hover:text-neutral-600'}`}

@@ -123,7 +123,7 @@ scheduleTrialChecker();
     } catch (e: any) {
       console.error('[TrendScheduler] Error:', e.message);
     }
-  }, 2 * 60 * 60 * 1000); // Every 2 hours
+  }, 30 * 60 * 1000); // Every 30 minutes
 
   console.log(`🚀 SmmtAI API running on port ${config.port}`);
   console.log(`   Environment: ${config.nodeEnv}`);
