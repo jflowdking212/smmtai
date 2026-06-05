@@ -130,6 +130,54 @@ usersRouter.patch(
   },
 );
 
+
+// ── GET /users/preferences ────────────────────────────────────────────────────
+usersRouter.get(
+  '/preferences',
+  authenticate,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const userId = req.userId!;
+      const record = await prisma.systemConfig.findUnique({
+        where: { key: `user_prefs_${userId}` }
+      });
+      const prefs = record?.value ? JSON.parse(record.value) : {};
+      res.json({ success: true, data: prefs });
+    } catch (err) { next(err); }
+  },
+);
+
+// ── PATCH /users/preferences ──────────────────────────────────────────────────
+usersRouter.patch(
+  '/preferences',
+  authenticate,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const userId = req.userId!;
+      const allowed = ['aiName', 'favoriteColor', 'platforms', 'contentType',
+                       'birthday', 'goal', 'food', 'onboardingComplete', 'onboardingStep'];
+      const incoming = req.body.preferences || req.body;
+
+      const existing = await prisma.systemConfig.findUnique({
+        where: { key: `user_prefs_${userId}` }
+      });
+      const current: Record<string, any> = existing?.value ? JSON.parse(existing.value) : {};
+      const merged: Record<string, any> = { ...current };
+      for (const key of allowed) {
+        if (incoming[key] !== undefined) merged[key] = incoming[key];
+      }
+
+      await prisma.systemConfig.upsert({
+        where: { key: `user_prefs_${userId}` },
+        create: { key: `user_prefs_${userId}`, value: JSON.stringify(merged) },
+        update: { value: JSON.stringify(merged) },
+      });
+
+      res.json({ success: true, data: merged });
+    } catch (err) { next(err); }
+  },
+);
+
 // ── GET /users/entrepreneurs ─────────────────────────────────────────────────
 usersRouter.get(
   '/entrepreneurs',

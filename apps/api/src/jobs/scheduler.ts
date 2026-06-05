@@ -25,11 +25,11 @@ const WEEKDAY_TO_CRON: Record<string, number> = {
 };
 
 function getRecurringJobId(postId: string): string {
-  return `recurring:${postId}`;
+  return `recurring-${postId}`;
 }
 
 function getUpcomingReminderJobId(postId: string): string {
-  return `upcoming:${postId}`;
+  return `upcoming-${postId}`;
 }
 
 const upcomingLeadMs = (() => {

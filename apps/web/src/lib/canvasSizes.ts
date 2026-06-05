@@ -1,4 +1,4 @@
-import type { PlatformType } from '@ee-postmind/shared';
+import { PLATFORMS, type PlatformType } from '@ee-postmind/shared';
 import type { CanvasSize } from '@/hooks/useCanvas';
 
 export type PostType = 'post' | 'story' | 'cover' | 'ad';
@@ -57,6 +57,43 @@ export const CANVAS_SIZES: Record<string, Record<string, CanvasSize>> = {
   iohah: {
     post: { width: 1200, height: 630, label: 'Iohah Post' },
   },
+  threads: {
+    post: { width: 1080, height: 1080, label: 'Threads Post' },
+    story: { width: 1080, height: 1920, label: 'Threads Vertical' },
+  },
+  reddit: {
+    post: { width: 1200, height: 630, label: 'Reddit Post' },
+  },
+  tumblr: {
+    post: { width: 1280, height: 1280, label: 'Tumblr Post' },
+  },
+  google_business: {
+    post: { width: 1200, height: 900, label: 'Google Business Image' },
+  },
+  discord: {
+    post: { width: 1200, height: 630, label: 'Discord Post' },
+  },
+  slack: {
+    post: { width: 1200, height: 630, label: 'Slack Post' },
+  },
+  wordpress: {
+    post: { width: 1200, height: 630, label: 'WordPress Featured' },
+  },
+  medium: {
+    post: { width: 1200, height: 630, label: 'Medium Cover' },
+  },
+  blogger: {
+    post: { width: 1200, height: 630, label: 'Blogger Post' },
+  },
+  truth_social: {
+    post: { width: 1200, height: 630, label: 'Truth Social Post' },
+  },
+  lemmy: {
+    post: { width: 1200, height: 630, label: 'Lemmy Post' },
+  },
+  pleroma: {
+    post: { width: 1200, height: 630, label: 'Pleroma Post' },
+  },
 };
 
 export function getCanvasSize(platform: string, postType: string): CanvasSize {
@@ -66,3 +103,13 @@ export function getCanvasSize(platform: string, postType: string): CanvasSize {
 export function getAvailablePostTypes(platform: string): string[] {
   return Object.keys(CANVAS_SIZES[platform] || { post: true });
 }
+
+// Dynamic fallback for any newly added platforms in PLATFORMS that don't have custom sizes
+Object.keys(PLATFORMS).forEach((platformKey) => {
+  if (!CANVAS_SIZES[platformKey]) {
+    const name = PLATFORMS[platformKey as PlatformType]?.name || platformKey;
+    CANVAS_SIZES[platformKey] = {
+      post: { width: 1200, height: 630, label: `${name} Post` }
+    };
+  }
+});

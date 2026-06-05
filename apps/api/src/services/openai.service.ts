@@ -1,6 +1,39 @@
 import OpenAI, { toFile } from 'openai';
+import { prisma } from '../config/database.js';
 
 let openaiClient: OpenAI | null = null;
+let openRouterClient: OpenAI | null = null;
+
+let cachedConfig: any = null;
+let cacheExpiry = 0;
+
+async function getChatConfig() {
+  if (cachedConfig && Date.now() < cacheExpiry) {
+    return cachedConfig;
+  }
+  const defaults = {
+    model: 'gpt-4o-mini',
+    apiKey: '',
+    systemPrompt: '',
+    maxTokens: 250,
+    isEnabled: true,
+    openrouterApiKey: '',
+    openrouterDefault: false,
+    openrouterModel: 'google/gemini-2.5-flash',
+  };
+  try {
+    const record = await prisma.systemConfig.findUnique({ where: { key: 'chatbot_config' } });
+    if (record?.value) {
+      cachedConfig = { ...defaults, ...JSON.parse(record.value) };
+    } else {
+      cachedConfig = defaults;
+    }
+  } catch {
+    cachedConfig = defaults;
+  }
+  cacheExpiry = Date.now() + 5000; // 5 seconds cache
+  return cachedConfig;
+}
 
 function getClient(apiKey?: string): OpenAI {
   if (apiKey) return new OpenAI({ apiKey });
@@ -10,6 +43,20 @@ function getClient(apiKey?: string): OpenAI {
     openaiClient = new OpenAI({ apiKey: key });
   }
   return openaiClient;
+}
+
+function getOpenRouterClient(apiKey: string): OpenAI {
+  if (!openRouterClient || openRouterClient.apiKey !== apiKey) {
+    openRouterClient = new OpenAI({
+      baseURL: 'https://openrouter.ai/api/v1',
+      apiKey: apiKey,
+      defaultHeaders: {
+        'HTTP-Referer': 'https://smmtai.com',
+        'X-Title': 'SmmtAI',
+      }
+    });
+  }
+  return openRouterClient;
 }
 
 function normalizeModel(model: string): string {
@@ -24,40 +71,144 @@ function delay(ms: number): Promise<void> {
 
 export async function chatCompletion(
   messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
-  options?: { model?: string; temperature?: number; maxTokens?: number; apiKey?: string },
+  options?: {
+    model?: string;
+    temperature?: number;
+    maxTokens?: number;
+    apiKey?: string;
+    openrouterApiKey?: string;
+    openrouterDefault?: boolean;
+    openrouterModel?: string;
+  },
 ): Promise<string> {
-  const model = normalizeModel(options?.model || 'gpt-4o-mini');
-  const client = getClient(options?.apiKey);
+  const chatConfig = await getChatConfig();
+  const openrouterApiKey = options?.openrouterApiKey || chatConfig.openrouterApiKey;
+  const openrouterDefault = options?.openrouterDefault !== undefined ? options.openrouterDefault : chatConfig.openrouterDefault;
+  const openrouterModel = options?.openrouterModel || chatConfig.openrouterModel || 'google/gemini-2.5-flash';
+  const apiKey = options?.apiKey || chatConfig.apiKey || process.env.OPENAI_API_KEY;
 
-  const call = (m: string) =>
-    client.chat.completions.create({
+  const hasOpenRouter = typeof openrouterApiKey === 'string' && openrouterApiKey.trim().length > 10;
+  const hasOpenAI = typeof apiKey === 'string' && apiKey.trim().length > 10;
+
+  const callOpenAI = async (m: string) => {
+    const client = getClient(apiKey);
+    const response = await client.chat.completions.create({
       model: m,
       messages,
       temperature: options?.temperature ?? 0.7,
       max_tokens: options?.maxTokens || 1000,
       stream: false,
     });
-
-  try {
-    const response = await call(model);
     return response.choices?.[0]?.message?.content || '';
-  } catch (error: any) {
-    const msg = String(error?.message || '').toLowerCase();
-    const code = String(error?.code || error?.error?.code || '').toLowerCase();
-    if (error?.status === 404 && model !== 'gpt-4o-mini' && (code === 'model_not_found' || msg.includes('model'))) {
-      console.warn(`[OpenAI] Model "${model}" unavailable; falling back to gpt-4o-mini`);
-      const fallback = await call('gpt-4o-mini');
-      return fallback.choices?.[0]?.message?.content || '';
+  };
+
+  const callOpenRouter = async (modelToUse = openrouterModel) => {
+    const client = getOpenRouterClient(openrouterApiKey!);
+    try {
+      const response = await client.chat.completions.create({
+        model: modelToUse,
+        messages,
+        temperature: options?.temperature ?? 0.7,
+        max_tokens: options?.maxTokens || 1000,
+        stream: false,
+      });
+      return response.choices?.[0]?.message?.content || '';
+    } catch (err: any) {
+      // Internal OpenRouter fallback
+      const isDeepSeek = modelToUse.includes('deepseek');
+      const isGemini = modelToUse.includes('gemini');
+      let fallbackModel = '';
+      if (isDeepSeek) {
+        fallbackModel = 'google/gemini-2.5-flash';
+      } else if (isGemini) {
+        fallbackModel = 'meta-llama/llama-3.3-70b-instruct';
+      } else {
+        fallbackModel = 'google/gemini-2.5-flash';
+      }
+      
+      if (fallbackModel && fallbackModel !== modelToUse) {
+        console.warn(`[OpenRouter] Model ${modelToUse} failed: ${err.message}. Falling back to OpenRouter ${fallbackModel}`);
+        try {
+          const response = await client.chat.completions.create({
+            model: fallbackModel,
+            messages,
+            temperature: options?.temperature ?? 0.7,
+            max_tokens: options?.maxTokens || 1000,
+            stream: false,
+          });
+          return response.choices?.[0]?.message?.content || '';
+        } catch (fallbackErr: any) {
+          console.error(`[OpenRouter Fallback] Internal fallback to ${fallbackModel} failed: ${fallbackErr.message}`);
+          throw err;
+        }
+      }
+      throw err;
     }
-    if (error.status === 429) throw new Error('Rate limit exceeded. Please try again later.');
-    if (error.status === 401) throw new Error('Invalid OpenAI API key');
-    throw new Error('AI service temporarily unavailable');
+  };
+
+  const normalizedOpenAIModel = normalizeModel(options?.model || chatConfig.model || 'gpt-4o-mini');
+
+  if (openrouterDefault && hasOpenRouter) {
+    try {
+      console.log(`[OpenRouter] Routing to primary model: ${openrouterModel}`);
+      return await callOpenRouter();
+    } catch (err: any) {
+      console.warn(`[OpenRouter] Error: ${err.message}. Falling back to OpenAI if available.`);
+      if (hasOpenAI) {
+        try {
+          return await callOpenAI(normalizedOpenAIModel);
+        } catch (openaiErr: any) {
+          console.error(`[OpenAI Fallback] Failed: ${openaiErr.message}`);
+          throw err;
+        }
+      }
+      throw err;
+    }
+  } else {
+    try {
+      return await callOpenAI(normalizedOpenAIModel);
+    } catch (err: any) {
+      const msg = String(err?.message || '').toLowerCase();
+      const status = err?.status;
+      const isApiIssue = status === 401 || status === 402 || status === 429 || msg.includes('credit') || msg.includes('revoked') || msg.includes('invalid api key') || msg.includes('quotalimit');
+
+      if (isApiIssue && hasOpenRouter) {
+        console.warn(`[OpenAI] Primary API issue (${status || msg}). Falling back to OpenRouter: ${openrouterModel}`);
+        try {
+          return await callOpenRouter();
+        } catch (orErr: any) {
+          console.error(`[OpenRouter Fallback] Failed: ${orErr.message}`);
+          throw err;
+        }
+      }
+
+      if (err.status === 404 && normalizedOpenAIModel !== 'gpt-4o-mini' && (err.code === 'model_not_found' || msg.includes('model'))) {
+        console.warn(`[OpenAI] Model "${normalizedOpenAIModel}" unavailable; falling back to gpt-4o-mini`);
+        try {
+          return await callOpenAI('gpt-4o-mini');
+        } catch (fallbackErr) {
+          throw err;
+        }
+      }
+      if (err.status === 429) throw new Error('Rate limit exceeded. Please try again later.');
+      if (err.status === 401) throw new Error('Invalid OpenAI API key');
+      throw err;
+    }
   }
 }
 
 export async function chatWithRetry(
   messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
-  options?: { model?: string; temperature?: number; maxTokens?: number; timeoutMs?: number; apiKey?: string },
+  options?: {
+    model?: string;
+    temperature?: number;
+    maxTokens?: number;
+    timeoutMs?: number;
+    apiKey?: string;
+    openrouterApiKey?: string;
+    openrouterDefault?: boolean;
+    openrouterModel?: string;
+  },
 ): Promise<string> {
   const maxRetries = 3;
   let lastError: Error = new Error('All retry attempts failed');
@@ -83,12 +234,57 @@ export async function chatWithTools(
   messages: Array<any>,
   tools: any[],
   toolExecutor: (name: string, args: any) => Promise<any>,
-  options?: { model?: string; temperature?: number; maxTokens?: number; timeoutMs?: number; apiKey?: string },
+  options?: {
+    model?: string;
+    temperature?: number;
+    maxTokens?: number;
+    timeoutMs?: number;
+    apiKey?: string;
+    openrouterApiKey?: string;
+    openrouterDefault?: boolean;
+    openrouterModel?: string;
+  },
 ): Promise<string> {
-  const model = normalizeModel(options?.model || 'gpt-4o-mini');
-  const client = getClient(options?.apiKey);
-  
-  // Create a deep copy of messages to append to
+  const chatConfig = await getChatConfig();
+  const openrouterApiKey = options?.openrouterApiKey || chatConfig.openrouterApiKey;
+  const openrouterDefault = options?.openrouterDefault !== undefined ? options.openrouterDefault : chatConfig.openrouterDefault;
+  const openrouterModel = options?.openrouterModel || chatConfig.openrouterModel || 'google/gemini-2.5-flash';
+  const apiKey = options?.apiKey || chatConfig.apiKey || process.env.OPENAI_API_KEY;
+
+  const hasOpenRouter = typeof openrouterApiKey === 'string' && openrouterApiKey.trim().length > 10;
+  const hasOpenAI = typeof apiKey === 'string' && apiKey.trim().length > 10;
+
+  let useOpenRouter = openrouterDefault && hasOpenRouter;
+  let openrouterFallbackActive = false;
+
+  const getClientAndModel = () => {
+    if (useOpenRouter) {
+      let model = openrouterModel;
+      if (openrouterFallbackActive) {
+        const isDeepSeek = openrouterModel.includes('deepseek');
+        const isGemini = openrouterModel.includes('gemini');
+        if (isDeepSeek) {
+          model = 'google/gemini-2.5-flash';
+        } else if (isGemini) {
+          model = 'meta-llama/llama-3.3-70b-instruct';
+        } else {
+          model = 'google/gemini-2.5-flash';
+        }
+      }
+      return {
+        client: getOpenRouterClient(openrouterApiKey!),
+        model,
+        isOR: true,
+      };
+    } else {
+      return {
+        client: getClient(apiKey),
+        model: normalizeModel(options?.model || chatConfig.model || 'gpt-4o-mini'),
+        isOR: false,
+      };
+    }
+  };
+
   const msgs = [...messages];
   let iterations = 0;
   const MAX_ITERATIONS = 5;
@@ -96,6 +292,7 @@ export async function chatWithTools(
   while (iterations < MAX_ITERATIONS) {
     iterations++;
     try {
+      const { client, model } = getClientAndModel();
       const response = await client.chat.completions.create({
         model,
         messages: msgs,
@@ -135,8 +332,45 @@ export async function chatWithTools(
       }
     } catch (error: any) {
       const msg = String(error?.message || '').toLowerCase();
+      const status = error.status;
+      const isApiIssue = status === 401 || status === 402 || status === 429 || msg.includes('credit') || msg.includes('revoked') || msg.includes('invalid api key') || msg.includes('quotalimit');
+
+      if (useOpenRouter && !openrouterFallbackActive) {
+        const isDeepSeek = openrouterModel.includes('deepseek');
+        const isGemini = openrouterModel.includes('gemini');
+        let fallbackModel = '';
+        if (isDeepSeek) {
+          fallbackModel = 'google/gemini-2.5-flash';
+        } else if (isGemini) {
+          fallbackModel = 'meta-llama/llama-3.3-70b-instruct';
+        } else {
+          fallbackModel = 'google/gemini-2.5-flash';
+        }
+
+        if (fallbackModel && fallbackModel !== openrouterModel) {
+          console.warn(`[OpenRouter Tools] Primary model ${openrouterModel} failed (${status || msg}). Falling back to ${fallbackModel}`);
+          openrouterFallbackActive = true;
+          iterations--;
+          continue;
+        }
+      }
+
+      if (!useOpenRouter && isApiIssue && hasOpenRouter) {
+        console.warn(`[OpenAI Tools] API issue (${status || msg}). Falling back to OpenRouter: ${openrouterModel}`);
+        useOpenRouter = true;
+        iterations--; // retry current iteration with OpenRouter
+        continue;
+      }
+
+      if (useOpenRouter && !openrouterDefault && hasOpenAI) {
+        console.warn(`[OpenRouter Tools] Fallback failed. Reverting to OpenAI.`);
+        useOpenRouter = false;
+        iterations--;
+        continue;
+      }
+
       if (error.status === 429) throw new Error('Rate limit exceeded. Please try again later.');
-      if (error.status === 401) throw new Error('Invalid OpenAI API key');
+      if (error.status === 401) throw new Error('Invalid API key');
       throw new Error(`AI tool execution failed: ${msg}`);
     }
   }

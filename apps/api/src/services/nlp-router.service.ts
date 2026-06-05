@@ -227,7 +227,7 @@ const STOP_WORDS = new Set([
   'just', 'some', 'all', 'is', 'are', 'there', 'what', 'tell', 'about', 'with'
 ]);
 
-function tokenize(s: string): string[] {
+export function tokenize(s: string): string[] {
   return s
     .toLowerCase()
     .replace(/[^\w\s]/g, '')
@@ -235,7 +235,7 @@ function tokenize(s: string): string[] {
     .filter(token => token.length > 0 && !STOP_WORDS.has(token));
 }
 
-function calculateSimilarity(str1: string, str2: string): number {
+export function calculateSimilarity(str1: string, str2: string): number {
   const tokens1 = tokenize(str1);
   const tokens2 = tokenize(str2);
 

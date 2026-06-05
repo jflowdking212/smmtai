@@ -60,7 +60,7 @@ async function getConfigGroup(prefix: string): Promise<Record<string, string>> {
   return result;
 }
 
-function maskSecret(value: string | undefined): string {
+export function maskSecret(value: string | undefined): string {
   if (!value) return '';
   if (value.length <= 4) return '****';
   return '****' + value.slice(-4);
@@ -70,7 +70,7 @@ function normalizeValue(value: string | undefined | null): string {
   return typeof value === 'string' ? value.trim() : '';
 }
 
-function isMaskedSecret(value: string | undefined): boolean {
+export function isMaskedSecret(value: string | undefined): boolean {
   if (!value) return false;
   return /^\*{4,}/.test(value.trim());
 }
@@ -594,7 +594,8 @@ export async function getEffectiveLimits(tier: string): Promise<{
   const defaults = SUBSCRIPTION_LIMITS[tier as keyof typeof SUBSCRIPTION_LIMITS] as any;
   const config = await getPlanConfig();
   const overrides = config[tier];
-  if (!overrides) return { ...defaults, trendEngineAccess: false, trendOpportunityDetection: false, trendForecasting: false, trendCampaignGeneration: false, trendViralScore: false, trendGeoIntelligence: false, trendPersonalization: false, trendSavedTrends: false, trendAdvancedAnalytics: false, trendDailyLimit: 0, ...(defaults as any) } as any;
+  const _isPaidTier = ['pro', 'business', 'enterprise'].includes(tier);
+  if (!overrides) return { ...defaults, trendEngineAccess: _isPaidTier, trendOpportunityDetection: _isPaidTier, trendForecasting: _isPaidTier, trendCampaignGeneration: _isPaidTier, trendViralScore: _isPaidTier, trendGeoIntelligence: _isPaidTier, trendPersonalization: _isPaidTier, trendSavedTrends: _isPaidTier, trendAdvancedAnalytics: _isPaidTier, trendDailyLimit: 0, ...(defaults as any) } as any;
 
   return {
     socialAccounts: overrides.socialAccounts ?? defaults.socialAccounts,
@@ -603,15 +604,15 @@ export async function getEffectiveLimits(tier: string): Promise<{
     templatesPerMonth: overrides.templatesPerMonth ?? defaults.templatesPerMonth,
     teamMembers: overrides.teamMembers ?? defaults.teamMembers,
     analyticsDays: overrides.analyticsDays ?? defaults.analyticsDays,
-    trendEngineAccess: (overrides as any).trendEngineAccess ?? (defaults as any).trendEngineAccess ?? false,
-    trendOpportunityDetection: (overrides as any).trendOpportunityDetection ?? (defaults as any).trendOpportunityDetection ?? false,
-    trendForecasting: (overrides as any).trendForecasting ?? (defaults as any).trendForecasting ?? false,
-    trendCampaignGeneration: (overrides as any).trendCampaignGeneration ?? (defaults as any).trendCampaignGeneration ?? false,
-    trendViralScore: (overrides as any).trendViralScore ?? (defaults as any).trendViralScore ?? false,
-    trendGeoIntelligence: (overrides as any).trendGeoIntelligence ?? (defaults as any).trendGeoIntelligence ?? false,
-    trendPersonalization: (overrides as any).trendPersonalization ?? (defaults as any).trendPersonalization ?? false,
-    trendSavedTrends: (overrides as any).trendSavedTrends ?? (defaults as any).trendSavedTrends ?? false,
-    trendAdvancedAnalytics: (overrides as any).trendAdvancedAnalytics ?? (defaults as any).trendAdvancedAnalytics ?? false,
+    trendEngineAccess: (overrides as any).trendEngineAccess ?? (defaults as any).trendEngineAccess ?? _isPaidTier,
+    trendOpportunityDetection: (overrides as any).trendOpportunityDetection ?? (defaults as any).trendOpportunityDetection ?? _isPaidTier,
+    trendForecasting: (overrides as any).trendForecasting ?? (defaults as any).trendForecasting ?? _isPaidTier,
+    trendCampaignGeneration: (overrides as any).trendCampaignGeneration ?? (defaults as any).trendCampaignGeneration ?? _isPaidTier,
+    trendViralScore: (overrides as any).trendViralScore ?? (defaults as any).trendViralScore ?? _isPaidTier,
+    trendGeoIntelligence: (overrides as any).trendGeoIntelligence ?? (defaults as any).trendGeoIntelligence ?? _isPaidTier,
+    trendPersonalization: (overrides as any).trendPersonalization ?? (defaults as any).trendPersonalization ?? _isPaidTier,
+    trendSavedTrends: (overrides as any).trendSavedTrends ?? (defaults as any).trendSavedTrends ?? _isPaidTier,
+    trendAdvancedAnalytics: (overrides as any).trendAdvancedAnalytics ?? (defaults as any).trendAdvancedAnalytics ?? _isPaidTier,
     trendDailyLimit: (overrides as any).trendDailyLimit ?? (defaults as any).trendDailyLimit ?? 0,
   };
 }

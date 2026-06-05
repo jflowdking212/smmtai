@@ -1,0 +1,22 @@
+Options -Indexes
+RewriteEngine On
+
+# Block hidden files except ACME validation files in .well-known
+RewriteRule "(^|/)\.(?!well-known/)" - [F,L]
+
+# Block source/repo directories from direct web access
+RewriteRule ^(apps|packages|scripts|node_modules|backups|tmp|\.git)(/|$) - [F,L,NC]
+
+# Block repository/config files from direct web access
+RewriteRule ^(package(-lock)?\.json|turbo\.json|docker-compose(\.prod)?\.yml|ecosystem\.config\.js|eslint\.config\.js|APP_PLANNING\.md|TELEGRAM-SETUP\.txt|API-PUB\.txt|destination|link|media|post)$ - [F,L,NC]
+
+# Proxy API requests to the Node API service
+RewriteRule ^api/(.*)$ http://127.0.0.1:4016/api/$1 [P,L]
+
+# Proxy uploaded media served by the API
+RewriteRule ^uploads/(.*)$ http://127.0.0.1:4016/uploads/$1 [P,L]
+
+# SPA fallback
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ index.html [L]

@@ -27,6 +27,15 @@ const CHAR_LIMITS: Record<string, number> = {
   discord: 2000, slack: 4000, wordpress: 100000, medium: 100000,
   blogger: 100000, truth_social: 500, lemmy: 10000, pleroma: 500,
 };
+
+// Dynamic fallback for newly added platforms in CHAR_LIMITS
+Object.keys(PLATFORMS).forEach((platformKey) => {
+  if (!(platformKey in CHAR_LIMITS)) {
+    const maxChars = PLATFORMS[platformKey as PlatformType]?.maxCharacters;
+    CHAR_LIMITS[platformKey] = maxChars !== null ? maxChars : 100000;
+  }
+});
+
 const HASHTAG_LIMITS: Record<string, number> = {
   instagram: 30,
   linkedin: 5,
@@ -217,6 +226,18 @@ const INLINE_AI_TONES: AiTone[] = [
   'persuasive',
 ];
 
+const PLATFORM_LIMITS: Record<string, number> = {
+  twitter: 280,
+  threads: 500,
+  pinterest: 500,
+  instagram: 2200,
+  tiktok: 2200,
+  linkedin: 3000,
+  youtube: 5000,
+  reddit: 40000,
+  facebook: 63000,
+};
+
 export function ComposePage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -240,6 +261,7 @@ export function ComposePage() {
   const [inlineAiAction, setInlineAiAction] = useState<InlineAiAction | null>(null);
   const [inlineAiError, setInlineAiError] = useState<string | null>(null);
   const [inlineAiSuggestion, setInlineAiSuggestion] = useState<InlineAiSuggestion | null>(null);
+  const [inlineAiLength, setInlineAiLength] = useState<'short' | 'medium' | 'long' | 'extra_long'>('medium');
   const [selectedTextLength, setSelectedTextLength] = useState(0);
   const [publishing, setPublishing] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
@@ -383,6 +405,22 @@ export function ComposePage() {
       ? candidate as PlatformType
       : 'facebook';
   }, [connections, selectedIds]);
+
+  useEffect(() => {
+    const limit = PLATFORM_LIMITS[inlineAiPlatform] || 2200;
+    const lenMaxes = { short: 150, medium: 500, long: 1500, extra_long: 5000 };
+    if (lenMaxes[inlineAiLength] > limit) {
+      if (limit >= 5000) {
+        setInlineAiLength('extra_long');
+      } else if (limit >= 1500) {
+        setInlineAiLength('long');
+      } else if (limit >= 500) {
+        setInlineAiLength('medium');
+      } else {
+        setInlineAiLength('short');
+      }
+    }
+  }, [inlineAiPlatform, inlineAiLength]);
 
   useEffect(() => {
     if (!selectedFbConnection) {
@@ -1079,6 +1117,7 @@ export function ComposePage() {
         tone: inlineAiTone,
         include_cta: true,
         include_emoji: true,
+        length: inlineAiLength,
       });
       const captionData = captionRes.data || {};
       const baseCaption = typeof captionData.caption === 'string' ? captionData.caption.trim() : '';
@@ -1094,6 +1133,7 @@ export function ComposePage() {
         platform: inlineAiPlatform,
         tone: inlineAiTone,
         instruction: `Humanize this content so it sounds natural, authentic, and conversational while staying clear and post-ready.${instructionSuffix}`,
+        length: inlineAiLength,
       });
       const rewriteData = rewriteRes.data || {};
       const rewritten = typeof rewriteData.rewritten === 'string' && rewriteData.rewritten.trim().length > 0
@@ -1140,6 +1180,7 @@ export function ComposePage() {
         platform: inlineAiPlatform,
         tone: inlineAiTone,
         instruction,
+        length: inlineAiLength,
       });
       const rewriteData = rewriteRes.data || {};
       const rewritten = typeof rewriteData.rewritten === 'string' ? rewriteData.rewritten.trim() : '';
@@ -1758,6 +1799,35 @@ export function ComposePage() {
                       {tone}
                     </button>
                   ))}
+                </div>
+
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    { id: 'short', label: 'Short (~150 chars)', max: 150 },
+                    { id: 'medium', label: 'Medium (~500 chars)', max: 500 },
+                    { id: 'long', label: 'Long (~1500 chars)', max: 1500 },
+                    { id: 'extra_long', label: 'Extra Long (~5000 chars)', max: 5000 },
+                  ].map((len) => {
+                    const limit = PLATFORM_LIMITS[inlineAiPlatform] || 2200;
+                    const isDisabled = len.max > limit;
+                    return (
+                      <button
+                        key={len.id}
+                        type="button"
+                        disabled={isDisabled}
+                        onClick={() => setInlineAiLength(len.id as any)}
+                        className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition ${
+                          isDisabled
+                            ? 'bg-neutral-50 border border-neutral-100 text-neutral-300 cursor-not-allowed opacity-50'
+                            : inlineAiLength === len.id
+                            ? 'bg-brand-blue text-white'
+                            : 'bg-white border border-neutral-200 text-neutral-600 hover:border-neutral-300'
+                        }`}
+                      >
+                        {len.label}
+                      </button>
+                    );
+                  })}
                 </div>
 
                 <div className="flex flex-wrap gap-2">

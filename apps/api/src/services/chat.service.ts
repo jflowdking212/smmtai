@@ -3,7 +3,70 @@ import { chatWithRetry, chatWithTools } from './openai.service.js';
 import * as knowledgeBaseService from './knowledge-base.service.js';
 import * as conversationService from './conversation.service.js';
 import { adminTools, userTools } from './chat-tools.service.js';
-import { tryRouteLocally, tryStaticRoute, logSuccessfulRoute, logRoutingOutcome } from './nlp-router.service.js';
+import { tryRouteLocally, tryStaticRoute, logSuccessfulRoute, logRoutingOutcome, calculateSimilarity } from './nlp-router.service.js';
+
+interface QaCacheRecord {
+  phrase: string;
+  response: string;
+  count: number;
+  lastUsedAt?: string;
+}
+
+async function loadQaCache(): Promise<QaCacheRecord[]> {
+  try {
+    const record = await prisma.systemConfig.findUnique({
+      where: { key: 'nlp_qa_cache' }
+    });
+    if (record?.value) {
+      const parsed = JSON.parse(record.value);
+      return Array.isArray(parsed) ? parsed : [];
+    }
+  } catch (err) {
+    console.error('[Chat Service] Failed to load Q&A cache:', err);
+  }
+  return [];
+}
+
+async function saveQaCache(data: QaCacheRecord[]) {
+  try {
+    const sorted = [...data].sort((a, b) => (b.count || 0) - (a.count || 0)).slice(0, 300);
+    await prisma.systemConfig.upsert({
+      where: { key: 'nlp_qa_cache' },
+      update: { value: JSON.stringify(sorted) },
+      create: { key: 'nlp_qa_cache', value: JSON.stringify(sorted), encrypted: false }
+    });
+  } catch (err) {
+    console.error('[Chat Service] Failed to save Q&A cache:', err);
+  }
+}
+
+async function logSuccessfulQa(phrase: string, response: string) {
+  try {
+    const data = await loadQaCache();
+    const cleanPhrase = phrase.toLowerCase().trim();
+    const existing = data.find(d => d.phrase === cleanPhrase);
+    if (existing) {
+      existing.count += 1;
+      existing.lastUsedAt = new Date().toISOString();
+      existing.response = response;
+    } else {
+      data.push({ phrase: cleanPhrase, response, count: 1, lastUsedAt: new Date().toISOString() });
+    }
+    await saveQaCache(data);
+    console.log(`[Chat Service] Logged Q&A Cache: "${cleanPhrase}"`);
+  } catch (err) {
+    console.error('[Chat Service] Error logging Q&A cache:', err);
+  }
+}
+
+function isCacheableQuery(phrase: string): boolean {
+  const lower = phrase.toLowerCase().trim();
+  const creativeWords = [
+    'write', 'create', 'generate', 'rewrite', 'compose', 'make', 'translate',
+    'post a', 'caption for', 'new post', 'draft a', 'translate to', 'rewrite this'
+  ];
+  return !creativeWords.some(w => lower.startsWith(w) || lower.includes(' ' + w));
+}
 
 // ????????? ???? TEST MODE ???????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????
 // Set to true to disable the OpenAI fallback and test ONLY the local NLP router.
@@ -24,12 +87,12 @@ function getCache<T>(key: string): T | null {
   return entry.value as T;
 }
 
-async function getChatConfig(): Promise<{ model: string; apiKey: string; systemPrompt: string; maxTokens: number; isEnabled: boolean }> {
+async function getChatConfig(): Promise<{ model: string; apiKey: string; systemPrompt: string; maxTokens: number; isEnabled: boolean; openrouterApiKey?: string; openrouterDefault?: boolean; openrouterModel?: string }> {
   const cacheKey = 'chatbot_config';
   const cached = getCache<any>(cacheKey);
   if (cached) return cached;
 
-  const defaults = { model: 'gpt-4o-mini', apiKey: '', systemPrompt: '', maxTokens: 250, isEnabled: true };
+  const defaults = { model: 'gpt-4o-mini', apiKey: '', systemPrompt: '', maxTokens: 250, isEnabled: true, openrouterApiKey: '', openrouterDefault: false, openrouterModel: 'google/gemini-2.5-flash' };
 
   try {
     const record = await prisma.systemConfig.findUnique({ where: { key: 'chatbot_config' } });
@@ -135,17 +198,64 @@ export async function chatWithCustomer(message: string, context = 'general', ses
       }
     }
 
+    // ?????? LAYER 1.5: GENERAL Q&A CACHE ????????????????????????????????????????????????????????????????????????????????????????????????????????????????????
+    // Check if there is an identical or extremely similar general question
+    // that has been answered before to avoid invoking LLM.
+    const qaCache = await loadQaCache();
+    let bestQaMatch: QaCacheRecord | null = null;
+    let highestQaScore = 0;
+
+    for (const record of qaCache) {
+      const score = calculateSimilarity(message, record.phrase);
+      if (score >= 0.85 && score > highestQaScore) {
+        highestQaScore = score;
+        bestQaMatch = record;
+      }
+    }
+
+    if (bestQaMatch) {
+      const cachedRes = bestQaMatch.response;
+      logSuccessfulQa(bestQaMatch.phrase, cachedRes).catch(console.error);
+      
+      if (sessionId) {
+        await conversationService.addMessage(sessionId, { role: 'bot', content: cachedRes, timestamp: new Date() });
+      }
+      return {
+        success: true,
+        response: cachedRes,
+        usedKnowledgeBase: false,
+        sources: [],
+        routedLocally: true,
+      };
+    }
+
     // ?????? LAYER 2: KNOWLEDGE BASE SEARCH ?????????????????????????????????????????????????????????????????????????????????????????????????????????????????????
-    // Only runs when layers 0 and 1 didn't match. Searches KB for relevant
-    // context to inject into the OpenAI prompt to improve accuracy.
+    // Only runs when layers 0, 1 and 1.5 didn't match. Searches KB.
+    // If similarity >= 0.75, return directly to save LLM tokens.
     const knowledgeResults = await knowledgeBaseService.searchKnowledge(message, 3);
+
+    if (knowledgeResults.length > 0 && knowledgeResults[0].similarity >= 0.75) {
+      const topMatch = knowledgeResults[0];
+      if (sessionId) {
+        await conversationService.addMessage(sessionId, { role: 'bot', content: topMatch.content, timestamp: new Date() });
+      }
+      logSuccessfulQa(message, topMatch.content).catch(console.error);
+
+      return {
+        success: true,
+        response: topMatch.content,
+        usedKnowledgeBase: true,
+        sources: [{ title: topMatch.title, category: topMatch.category }],
+        routedLocally: true,
+      };
+    }
 
     let contextInfo = '';
     const hasKBMatch = knowledgeResults.length > 0;
     if (hasKBMatch) {
       contextInfo = '\n\n=== KNOWLEDGE BASE ===\n';
       knowledgeResults.forEach((kb: any, i: number) => {
-        contextInfo += `${i + 1}. ${kb.title}\n${kb.content}\n\n`;
+        contextInfo += (i + 1) + '. ' + kb.title + '\n' + kb.content + '\n\n';
       });
       contextInfo += '=== END KNOWLEDGE BASE ===\n';
     }
@@ -301,12 +411,35 @@ ${contextInfo}`
 
     const finalSystemPrompt = agentSystemPrompt || finalPrompt;
     const effectiveMaxTokens = isAgentMode ? 1500 : chatConfig.maxTokens;
+
+    // Adaptive LLM Model Routing based on context (dashboard activities vs general chat)
+    const hasOpenRouter = typeof chatConfig.openrouterApiKey === 'string' && chatConfig.openrouterApiKey.trim().length > 10;
+    let resolvedModel = chatConfig.model || 'gpt-4o-mini';
+    let openrouterDefault = chatConfig.openrouterDefault === true;
+    let openrouterModel = chatConfig.openrouterModel || 'google/gemini-2.5-flash';
+    
+    if (hasOpenRouter) {
+      if (isAgentMode) {
+        // Dashboard activities / Agent mode: Use DeepSeek Pro (deepseek-chat) for function calling
+        resolvedModel = 'deepseek/deepseek-chat';
+        openrouterDefault = true;
+        openrouterModel = 'deepseek/deepseek-chat';
+      } else {
+        // General Chat & Content: Use Gemini 2.5 Flash (highly capable, extremely low cost)
+        openrouterDefault = true;
+        openrouterModel = 'google/gemini-2.5-flash';
+      }
+    }
+
     const openaiOptions = {
-      model: chatConfig.model,
+      model: resolvedModel,
       temperature: isAgentMode ? 0.4 : 0.7,
       maxTokens: effectiveMaxTokens,
       apiKey: effectiveKey,
-      timeoutMs: isAgentMode ? 30000 : 15000
+      timeoutMs: isAgentMode ? 30000 : 15000,
+      openrouterApiKey: chatConfig.openrouterApiKey,
+      openrouterDefault: openrouterDefault,
+      openrouterModel: openrouterModel
     };
     const conversationMessages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
       { role: 'system', content: finalSystemPrompt },
@@ -355,6 +488,11 @@ ${contextInfo}`
 
     if (sessionId && finalResponse) {
       await conversationService.addMessage(sessionId, { role: 'bot', content: finalResponse, timestamp: new Date() });
+    }
+
+    // Cache the response locally if it is informational Q&A to continuously learn
+    if (finalResponse && !finalResponse.includes('cannot connect') && !finalResponse.includes('timed out') && isCacheableQuery(message)) {
+      logSuccessfulQa(message, finalResponse).catch(console.error);
     }
 
     if (finalResponse) {

@@ -20,6 +20,8 @@ import {
   getGlobalCredentialPlatforms,
   getPlanConfig,
   savePlanConfig,
+  maskSecret,
+  isMaskedSecret,
 } from '../services/admin-settings.service.js';
 import { couponService } from '../services/coupon.service.js';
 import { uploadPublicFile } from '../services/storage.service.js';
@@ -155,6 +157,83 @@ adminRouter.post('/settings/site/favicon', logoUpload.single('favicon'), async (
     const faviconUrl = uploaded.url;
     await saveSiteSettings({ site_favicon: faviconUrl });
     res.json({ success: true, data: { url: faviconUrl } });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ----- Chatbot & AI -----
+
+adminRouter.get('/settings/chatbot', async (_req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const record = await prisma.systemConfig.findUnique({ where: { key: 'chatbot_config' } });
+    const defaults = {
+      model: 'gpt-4o-mini',
+      apiKey: '',
+      systemPrompt: '',
+      maxTokens: 250,
+      isEnabled: true,
+      openrouterApiKey: '',
+      openrouterDefault: false,
+      openrouterModel: 'google/gemini-2.5-flash',
+    };
+    if (record?.value) {
+      const parsed = JSON.parse(record.value);
+      res.json({
+        success: true,
+        data: {
+          ...defaults,
+          ...parsed,
+          apiKey: maskSecret(parsed.apiKey),
+          openrouterApiKey: maskSecret(parsed.openrouterApiKey),
+        },
+      });
+    } else {
+      res.json({ success: true, data: defaults });
+    }
+  } catch (err) {
+    next(err);
+  }
+});
+
+adminRouter.put('/settings/chatbot', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { model, apiKey, systemPrompt, maxTokens, isEnabled, openrouterApiKey, openrouterDefault, openrouterModel } = req.body;
+
+    const record = await prisma.systemConfig.findUnique({ where: { key: 'chatbot_config' } });
+    let existing: any = {};
+    if (record?.value) {
+      try { existing = JSON.parse(record.value); } catch {}
+    }
+
+    const finalApiKey = isMaskedSecret(apiKey) ? existing.apiKey : apiKey;
+    const finalOpenRouterApiKey = isMaskedSecret(openrouterApiKey) ? existing.openrouterApiKey : openrouterApiKey;
+
+    const config = {
+      model: model || 'gpt-4o-mini',
+      apiKey: finalApiKey || '',
+      systemPrompt: systemPrompt || '',
+      maxTokens: parseInt(maxTokens, 10) || 250,
+      isEnabled: isEnabled !== false,
+      openrouterApiKey: finalOpenRouterApiKey || '',
+      openrouterDefault: openrouterDefault === true,
+      openrouterModel: openrouterModel || 'google/gemini-2.5-flash',
+    };
+
+    await prisma.systemConfig.upsert({
+      where: { key: 'chatbot_config' },
+      update: { value: JSON.stringify(config) },
+      create: { key: 'chatbot_config', value: JSON.stringify(config), encrypted: false },
+    });
+
+    res.json({
+      success: true,
+      data: {
+        ...config,
+        apiKey: maskSecret(config.apiKey),
+        openrouterApiKey: maskSecret(config.openrouterApiKey),
+      },
+    });
   } catch (err) {
     next(err);
   }

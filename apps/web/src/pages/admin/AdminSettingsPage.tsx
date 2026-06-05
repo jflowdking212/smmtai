@@ -6,16 +6,17 @@ import { invalidateSiteSettings } from '@/hooks/useSiteSettings';
 import { GLOBAL_CREDENTIAL_PLATFORMS, PLATFORMS, type PlatformType } from '@ee-postmind/shared';
 import { useAuthStore } from '@/stores/authStore';
 import {
-  Save, Mail, Cloud, Globe, Key, CheckCircle, XCircle, Settings2,
+  Save, Mail, Cloud, Globe, Key, CheckCircle, XCircle, Settings2, MessageSquare,
 } from 'lucide-react';
 
-type SettingsSection = 'site' | 'smtp' | 'storage' | 'platforms' | 'promo';
+type SettingsSection = 'site' | 'smtp' | 'storage' | 'platforms' | 'chatbot' | 'promo';
 
 const SECTIONS: { id: SettingsSection; label: string; icon: React.ReactNode }[] = [
   { id: 'site', label: 'Site Settings', icon: <Globe className="w-4 h-4" /> },
   { id: 'smtp', label: 'SMTP / Email', icon: <Mail className="w-4 h-4" /> },
   { id: 'storage', label: 'Cloud Storage', icon: <Cloud className="w-4 h-4" /> },
   { id: 'platforms', label: 'Platform Credentials', icon: <Key className="w-4 h-4" /> },
+  { id: 'chatbot', label: 'AI & Chatbot', icon: <MessageSquare className="w-4 h-4" /> },
   { id: 'promo', label: 'Seasonal Campaign', icon: <Settings2 className="w-4 h-4" /> },
 ];
 
@@ -57,6 +58,16 @@ export function AdminSettingsPage() {
     promo_footer: '',
   });
   const [platformCreds, setPlatformCreds] = useState<Record<string, { access_token: string; server_key: string; client_id: string; client_secret: string }>>({});
+  const [chatbotConfig, setChatbotConfig] = useState({
+    isEnabled: true,
+    model: 'gpt-4o-mini',
+    apiKey: '',
+    systemPrompt: '',
+    maxTokens: 250,
+    openrouterApiKey: '',
+    openrouterDefault: false,
+    openrouterModel: 'google/gemini-2.5-flash',
+  });
   const [saving, setSaving] = useState<string | null>(null);
 
   useEffect(() => {
@@ -68,6 +79,7 @@ export function AdminSettingsPage() {
       for (const k of Object.keys(res.data)) cleaned[k] = { access_token: '', server_key: '', client_id: '', client_secret: '' };
       setPlatformCreds(cleaned);
     }).catch(() => {});
+    api.admin.getChatbotConfig().then((res) => setChatbotConfig((prev) => ({ ...prev, ...res.data, apiKey: '', openrouterApiKey: '' }))).catch(() => {});
   }, []);
 
   async function saveSmtp() {
@@ -137,6 +149,16 @@ export function AdminSettingsPage() {
       setPlatformCreds(cleaned);
       toast.success('Saved', 'Platform credentials saved.');
     } catch (err: any) { toast.error('Error', err.message || 'Failed'); }
+    finally { setSaving(null); }
+  }
+
+  async function saveChatbot() {
+    setSaving('chatbot');
+    try {
+      const res = await api.admin.saveChatbotConfig(chatbotConfig);
+      setChatbotConfig((prev) => ({ ...prev, ...res.data, apiKey: '', openrouterApiKey: '' }));
+      toast.success('Saved', 'AI & Chatbot settings saved.');
+    } catch (err: any) { toast.error('Error', err.message || 'Failed to save chatbot settings.'); }
     finally { setSaving(null); }
   }
 
@@ -394,6 +416,146 @@ export function AdminSettingsPage() {
                 })}
               </div>
               <Button onClick={savePlatforms} loading={saving === 'platforms'} className="bg-red-600 hover:bg-red-700 text-white"><Save className="w-4 h-4" /> Save Credentials</Button>
+            </Card>
+          )}
+
+          {section === 'chatbot' && (
+            <Card className="p-6 space-y-5 bg-neutral-900 border-neutral-800">
+              <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+                <MessageSquare className="w-5 h-5 text-neutral-400" />
+                AI & Chatbot Configuration
+              </h2>
+              <p className="text-sm text-neutral-400">
+                Configure primary AI settings for the platform. SMMTAI supports OpenRouter as a cost-effective default or automatic fallback.
+              </p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Enabled Toggle */}
+                <div>
+                  <label className="block text-xs text-neutral-400 mb-1">Chatbot Service Status</label>
+                  <select
+                    value={chatbotConfig.isEnabled ? 'true' : 'false'}
+                    onChange={(e) => setChatbotConfig((prev) => ({ ...prev, isEnabled: e.target.value === 'true' }))}
+                    className={inputClass}
+                  >
+                    <option value="true">Active & Enabled</option>
+                    <option value="false">Disabled / Under Maintenance</option>
+                  </select>
+                </div>
+
+                {/* OpenRouter Default Toggle */}
+                <div>
+                  <label className="block text-xs text-neutral-400 mb-1">Model Provider Priority</label>
+                  <select
+                    value={chatbotConfig.openrouterDefault ? 'true' : 'false'}
+                    onChange={(e) => setChatbotConfig((prev) => ({ ...prev, openrouterDefault: e.target.value === 'true' }))}
+                    className={inputClass}
+                  >
+                    <option value="false">Primary OpenAI (Fallback to OpenRouter)</option>
+                    <option value="true">Primary OpenRouter (Fallback to OpenAI)</option>
+                  </select>
+                </div>
+
+                <div className="border-t border-neutral-800/80 my-2 sm:col-span-2" />
+
+                {/* OpenAI Section */}
+                <div className="sm:col-span-2">
+                  <h3 className="text-xs font-semibold text-neutral-300 uppercase tracking-wider mb-2">1. Standard OpenAI Config</h3>
+                </div>
+
+                <div>
+                  <label className="block text-xs text-neutral-400 mb-1">OpenAI Model</label>
+                  <select
+                    value={chatbotConfig.model}
+                    onChange={(e) => setChatbotConfig((prev) => ({ ...prev, model: e.target.value }))}
+                    className={inputClass}
+                  >
+                    <option value="gpt-4o-mini">gpt-4o-mini (Recommended - Cheap & Fast)</option>
+                    <option value="gpt-4o">gpt-4o (Premium Quality)</option>
+                    <option value="gpt-4-turbo">gpt-4-turbo</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs text-neutral-400 mb-1">OpenAI API Key</label>
+                  <input
+                    type="password"
+                    value={chatbotConfig.apiKey}
+                    onChange={(e) => setChatbotConfig((prev) => ({ ...prev, apiKey: e.target.value }))}
+                    className={inputClass}
+                    placeholder="sk-••••••••••••••••"
+                  />
+                  <p className="text-[10px] text-neutral-500 mt-0.5">Leave blank to use key from .env file.</p>
+                </div>
+
+                <div className="border-t border-neutral-800/80 my-2 sm:col-span-2" />
+
+                {/* OpenRouter Section */}
+                <div className="sm:col-span-2">
+                  <h3 className="text-xs font-semibold text-neutral-300 uppercase tracking-wider mb-2">2. OpenRouter Fallback Config</h3>
+                </div>
+
+                <div>
+                  <label className="block text-xs text-neutral-400 mb-1">OpenRouter Model</label>
+                  <select
+                    value={chatbotConfig.openrouterModel}
+                    onChange={(e) => setChatbotConfig((prev) => ({ ...prev, openrouterModel: e.target.value }))}
+                    className={inputClass}
+                  >
+                    <option value="google/gemini-2.5-flash">google/gemini-2.5-flash (Extremely Cost-effective & Fast)</option>
+                    <option value="deepseek/deepseek-chat">deepseek/deepseek-chat (DeepSeek V3 - Incredibly Cheap)</option>
+                    <option value="deepseek/deepseek-v4-flash">deepseek/deepseek-v4-flash (DeepSeek V4 Flash - Ultra Low-Cost & Fast)</option>
+                    <option value="deepseek/deepseek-v4-pro">deepseek/deepseek-v4-pro (DeepSeek V4 Pro - Flagship Logic)</option>
+                    <option value="anthropic/claude-3.5-sonnet">anthropic/claude-3.5-sonnet (High-end Claude)</option>
+                    <option value="meta-llama/llama-3.3-70b-instruct">meta-llama/llama-3.3-70b-instruct (Powerful Llama)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs text-neutral-400 mb-1">OpenRouter API Key</label>
+                  <input
+                    type="password"
+                    value={chatbotConfig.openrouterApiKey}
+                    onChange={(e) => setChatbotConfig((prev) => ({ ...prev, openrouterApiKey: e.target.value }))}
+                    className={inputClass}
+                    placeholder="sk-or-••••••••••••••••"
+                  />
+                  <p className="text-[10px] text-neutral-500 mt-0.5">API key from OpenRouter dashboard.</p>
+                </div>
+
+                <div className="border-t border-neutral-800/80 my-2 sm:col-span-2" />
+
+                {/* Response Parameters */}
+                <div className="sm:col-span-2">
+                  <h3 className="text-xs font-semibold text-neutral-300 uppercase tracking-wider mb-2">3. Chatbot System Parameters</h3>
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="block text-xs text-neutral-400 mb-1">Custom System Prompt</label>
+                  <textarea
+                    rows={4}
+                    value={chatbotConfig.systemPrompt}
+                    onChange={(e) => setChatbotConfig((prev) => ({ ...prev, systemPrompt: e.target.value }))}
+                    className="w-full px-3 py-2 rounded-lg border border-neutral-700 bg-neutral-800 text-white text-sm focus:outline-none focus:ring-1 focus:ring-red-500 placeholder:text-neutral-500"
+                    placeholder="Instructions for the AI assistant chatbot..."
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs text-neutral-400 mb-1">Max Generation Length (Tokens)</label>
+                  <input
+                    type="number"
+                    value={chatbotConfig.maxTokens}
+                    onChange={(e) => setChatbotConfig((prev) => ({ ...prev, maxTokens: parseInt(e.target.value, 10) }))}
+                    className={inputClass}
+                    placeholder="250"
+                  />
+                </div>
+              </div>
+
+              <Button onClick={saveChatbot} loading={saving === 'chatbot'} className="bg-red-600 hover:bg-red-700 text-white">
+                <Save className="w-4 h-4" /> Save AI & Chatbot Settings
+              </Button>
             </Card>
           )}
 

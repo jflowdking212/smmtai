@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { MessageCircle, X, Send, Bot, User, Minimize2, Phone, Mail, UserIcon, Mic, MicOff, Loader2 } from 'lucide-react';
+import { MessageCircle, X, Send, Bot, User, Minimize2, Phone, Mail, UserIcon, Mic, MicOff, Loader2, Pencil, Check } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
 
 interface Message {
@@ -17,6 +17,105 @@ interface CustomerInfo {
 }
 
 const API_BASE = '/api/v1';
+
+// ── User preferences & onboarding ───────────────────────────────────────────
+const ONBOARDING_PREFS_KEY = 'smmtai_user_prefs_v1';
+const ONBOARDING_DONE_KEY  = 'smmtai_onboarding_v2_done';
+
+function getStoredPrefs(): Record<string, any> {
+  try { return JSON.parse(localStorage.getItem(ONBOARDING_PREFS_KEY) || '{}'); } catch { return {}; }
+}
+function saveStoredPrefs(patch: Record<string, any>): Record<string, any> {
+  const merged = { ...getStoredPrefs(), ...patch };
+  localStorage.setItem(ONBOARDING_PREFS_KEY, JSON.stringify(merged));
+  return merged;
+}
+function getAiName(): string { return getStoredPrefs().aiName || ''; }
+function isOnboardingDone(): boolean {
+  if (localStorage.getItem(ONBOARDING_DONE_KEY) === '1') return true;
+  if (localStorage.getItem('smmtai_onboarding_dismissed') === 'true') return true;
+  return false;
+}
+
+// -- Onboarding steps (popup-based) --
+const ONBOARDING_STEPS: Array<{
+  key: string;
+  emoji: string;
+  title: string;
+  subtitle: string;
+  inputType: 'text' | 'date' | 'chips' | 'multi-chips';
+  placeholder?: string;
+  options?: string[];
+}> = [
+  {
+    key: 'favoriteColor',
+    emoji: '🎨',
+    title: "What's your favorite color?",
+    subtitle: 'Helps us personalize your experience.',
+    inputType: 'chips',
+    options: ['Red', 'Orange', 'Yellow', 'Green', 'Blue', 'Purple', 'Pink', 'Black', 'White', 'Other'],
+  },
+  {
+    key: 'platforms',
+    emoji: '📱',
+    title: 'Which platforms do you use most?',
+    subtitle: 'Select all that apply.',
+    inputType: 'multi-chips',
+    options: ['Facebook', 'Instagram', 'Twitter/X', 'LinkedIn', 'YouTube', 'TikTok', 'Pinterest', 'Discord', 'Slack', 'Telegram', 'Reddit', 'Threads', 'Tumblr', 'Bluesky', 'WordPress', 'Medium'],
+  },
+  {
+    key: 'contentType',
+    emoji: '✍️',
+    title: 'What type of content do you create?',
+    subtitle: "We'll tailor suggestions to your style.",
+    inputType: 'chips',
+    options: ['Educational', 'Entertainment', 'Inspirational', 'Promotional', 'Behind-the-Scenes', 'Mixed'],
+  },
+  {
+    key: 'food',
+    emoji: '🍕',
+    title: "What's your favorite food?",
+    subtitle: 'Just for fun — helps me know you better!',
+    inputType: 'text',
+    placeholder: 'e.g. Pizza, Sushi, Jollof rice',
+  },
+  {
+    key: 'birthday',
+    emoji: '🎂',
+    title: "When's your birthday?",
+    subtitle: "I'll send you a special greeting on your big day!",
+    inputType: 'date',
+    placeholder: 'e.g. April 15',
+  },
+  {
+    key: 'goal',
+    emoji: '🎯',
+    title: 'What is your main goal with SmmtAI?',
+    subtitle: 'Choose the one that fits best.',
+    inputType: 'chips',
+    options: ['Grow my audience', 'Save time posting', 'Track analytics', 'Build my brand', 'Generate leads', 'All of the above'],
+  },
+  {
+    key: 'aiName',
+    emoji: '🤖',
+    title: 'What should I call myself?',
+    subtitle: "Give your AI assistant a personal name!",
+    inputType: 'text',
+    placeholder: 'e.g. Aria, Max, Luna, Zara',
+  },
+];
+
+async function syncPrefsToServer(prefs: Record<string, any>): Promise<void> {
+  try {
+    await fetch('/api/v1/users/preferences', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(prefs),
+    });
+  } catch { /* non-critical */ }
+}
+
 const CSRF_COOKIE = 'csrfToken';
 
 // ─── Enhanced Markdown renderer ───────────────────────────────────────────
@@ -173,8 +272,78 @@ function getJsonHeaders(): HeadersInit {
   return headers;
 }
 
+
+// ── Apply a new AI name immediately (chat or inline edit) ─────────────────────
+function applyRenameHelper(name: string, setCurrentAiName: (n: string) => void) {
+  const trimmed = name.trim().slice(0, 40);
+  if (!trimmed) return;
+  setCurrentAiName(trimmed);
+  saveStoredPrefs({ aiName: trimmed });
+  syncPrefsToServer({ aiName: trimmed }).catch(() => {});
+}
+
+// ── Detect rename intent from natural language ─────────────────────────────────
+function detectRenameIntent(msg: string): string | null {
+  const m = msg.trim();
+  const patterns = [
+    /^(?:please\s+)?(?:rename\s+yourself|call\s+yourself|your\s+name\s+is\s+now|your\s+new\s+name\s+is|go\s+by|i(?:'ll|\s+will)\s+call\s+you|from\s+now\s+on\s+(?:you(?:'re|\s+are)|your\s+name\s+is)|you(?:'re|\s+are)\s+now\s+called)\s+(.+)/i,
+    /^(?:i\s+want\s+to\s+(?:call|name)\s+you|let(?:'s|\s+me)\s+call\s+you)\s+(.+)/i,
+    /^(?:change\s+your\s+name\s+to|set\s+your\s+name\s+to|name\s+yourself)\s+(.+)/i,
+  ];
+  for (const rx of patterns) {
+    const match = m.match(rx);
+    if (match) {
+      // Strip trailing punctuation
+      return match[1].replace(/[.!?,;]+$/, '').trim().slice(0, 40);
+    }
+  }
+  return null;
+}
+
+// Build personalized onboarding completion message
+function buildCompletionMessage(
+  answers: Record<string, string>,
+  aiName: string,
+  userName: string
+): string {
+  const name = aiName || 'your SmmtAI assistant';
+  const who  = userName ? ', ' + userName : '';
+  const lines: string[] = [
+    answers.favoriteColor ? '• Favorite color: **' + answers.favoriteColor + '**' : '',
+    answers.platforms     ? '• Platforms: **' + answers.platforms + '**' : '',
+    answers.contentType   ? '• Content type: **' + answers.contentType + '**' : '',
+    answers.food          ? '• Favorite food: **' + answers.food + '**' : '',
+    answers.birthday      ? '• Birthday: **' + answers.birthday + '**' : '',
+    answers.goal          ? '• Goal: **' + answers.goal + '**' : '',
+  ].filter(Boolean);
+  return [
+    '🎉 **All set' + who + '!**',
+    '',
+    'I\'m now **' + name + '** — personalized just for you! 😊',
+    lines.length ? '' : '',
+    lines.length ? 'Here\'s what I noted:' : '',
+    ...lines,
+    '',
+    'How can I help you today?',
+  ].filter((l, i, arr) => !(l === '' && arr[i - 1] === '')).join('\n');
+}
+
 export function AIChatbot() {
   const [isOpen, setIsOpen] = useState(false);
+  // Onboarding state
+  const [onboardingActive, setOnboardingActive] = useState(false);
+  const [onboardingStepIdx, setOnboardingStepIdx] = useState(0);
+  const [onboardingAnswers, setOnboardingAnswers] = useState<Record<string, string>>({});
+  const [currentAiName, setCurrentAiName] = useState(getAiName);
+  // Inline rename state
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [editNameValue, setEditNameValue] = useState('');
+  // Popup onboarding state
+  const [onboardingPopupOpen, setOnboardingPopupOpen] = useState(false);
+  const [onboardingPopupStep, setOnboardingPopupStep] = useState(0);
+  const [onboardingPopupInput, setOnboardingPopupInput] = useState('');
+  const [onboardingMultiSel, setOnboardingMultiSel] = useState<string[]>([]);
+
 
   // Read auth state reactively from the store (persisted across page loads)
   const authUser = useAuthStore((s) => s.user);
@@ -188,9 +357,10 @@ export function AIChatbot() {
     return () => window.removeEventListener('open-chatbot', handler);
   }, []);
 
+  const storedAiName = currentAiName || getAiName();
   const greeting = isLoggedIn && authUser
-    ? `Hi ${authUser.name}! 👋 I'm your SmmtAI assistant. I have full visibility into your workspace — ask me about your posts, analytics, drafts, or just tell me to do something!`
-    : "Hi! I'm your SmmtAI assistant. I can help you with questions about social media management, scheduling, analytics, and more. How can I help?";
+    ? `Hi ${authUser.name}! 👋 I'm ${storedAiName || 'your SmmtAI assistant'}. I have full visibility into your workspace — ask me about your posts, analytics, drafts, or just tell me to do something!`
+    : `Hi! 👋 I'm ${storedAiName || 'your SmmtAI assistant'}. I can help you with questions about social media management, scheduling, analytics, and more. How can I help?`;
 
   const [messages, setMessages] = useState<Message[]>(() => [
     { id: '1', content: greeting, sender: 'bot', timestamp: new Date() },
@@ -362,8 +532,8 @@ export function AIChatbot() {
 
       // Reset messages to base greeting first to prevent flash of previous history
       const currentGreeting = isLoggedIn && authUser
-        ? `Hi ${authUser.name}! 👋 I'm your SmmtAI assistant. I have full visibility into your workspace — ask me about your posts, analytics, drafts, or just tell me to do something!`
-        : "Hi! I'm your SmmtAI assistant. I can help you with questions about social media management, scheduling, analytics, and more. How can I help?";
+        ? `Hi ${authUser.name}! 👋 I'm ${storedAiName || currentAiName || 'your SmmtAI assistant'}. I have full visibility into your workspace — ask me about your posts, analytics, drafts, or just tell me to do something!`
+        : `Hi! 👋 I'm ${storedAiName || currentAiName || 'your SmmtAI assistant'}. I can help you with questions about social media management, scheduling, analytics, and more. How can I help?`;
 
       setMessages([
         { id: '1', content: currentGreeting, sender: 'bot', timestamp: new Date() },
@@ -506,6 +676,23 @@ export function AIChatbot() {
     setMessages(prev => [...prev, userMessage]);
     setInputMessage('');
 
+
+    // ── Natural-language rename detection (works any time, even during normal chat) ─
+    const _renameTarget = detectRenameIntent(content);
+    if (_renameTarget) {
+      applyRenameHelper(_renameTarget, setCurrentAiName);
+      const confirmation = `✨ Done! From now on, I'm **${_renameTarget}**. How can I help you today?`;
+      setMessages(prev => [...prev, {
+        id: `rename-${Date.now()}`,
+        content: confirmation,
+        sender: 'bot' as const,
+        timestamp: new Date(),
+      }]);
+      return;
+    }
+
+    // (Onboarding handled via popup -- see JSX overlay below)
+
     if (contactStage === 'name') {
       setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), content: "I'd love to help! But first, could you please share your name?", sender: 'bot', timestamp: new Date() }]);
       return;
@@ -568,6 +755,205 @@ export function AIChatbot() {
 
   const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); sendMessage(inputMessage, false); };
 
+  // Trigger onboarding popup for new logged-in users
+  useEffect(() => {
+    if (isOpen && isLoggedIn && authUser && !isOnboardingDone() && !onboardingPopupOpen) {
+      const t = setTimeout(() => {
+        setOnboardingPopupOpen(true);
+        setOnboardingPopupStep(0);
+        setOnboardingPopupInput('');
+        setOnboardingMultiSel([]);
+      }, 600);
+      return () => clearTimeout(t);
+    }
+  }, [isOpen, isLoggedIn, authUser]);
+
+
+  // ── Onboarding popup handlers ──────────────────────────────────────────────
+  const _obStep     = ONBOARDING_STEPS[onboardingPopupStep];
+  const _obIsLast   = onboardingPopupStep === ONBOARDING_STEPS.length - 1;
+  const _obIsMulti  = _obStep?.inputType === 'multi-chips';
+  const _obCanNext  = _obIsMulti
+    ? onboardingMultiSel.length > 0
+    : onboardingPopupInput.trim().length > 0;
+
+  const obCommitAndAdvance = (answer: string) => {
+    const newAnswers = { ...onboardingAnswers, [(_obStep?.key || '')]: answer };
+    setOnboardingAnswers(newAnswers);
+    if (answer) saveStoredPrefs({ [_obStep?.key || '']: answer });
+    if (_obIsLast) {
+      const rawName = _obStep?.key === 'aiName' ? answer : (newAnswers.aiName || '');
+      const nameToUse = rawName.trim() || (currentAiName !== 'SmmtAI Assistant' ? currentAiName : '');
+      if (nameToUse) { setCurrentAiName(nameToUse); saveStoredPrefs({ aiName: nameToUse }); }
+      localStorage.setItem(ONBOARDING_DONE_KEY, '1');
+      localStorage.setItem('smmtai_onboarding_dismissed', 'true');
+      setOnboardingPopupOpen(false);
+      setOnboardingActive(false);
+      syncPrefsToServer({ ...newAnswers, aiName: nameToUse, onboardingComplete: true });
+      setMessages(prev => [...prev, {
+        id: 'ob-done-' + Date.now(),
+        content: buildCompletionMessage(newAnswers, nameToUse, authUser?.name || ''),
+        sender: 'bot' as const,
+        timestamp: new Date(),
+      }]);
+    } else {
+      setOnboardingPopupStep(s => s + 1);
+      setOnboardingPopupInput('');
+      setOnboardingMultiSel([]);
+    }
+  };
+
+  const obHandleNext     = () => obCommitAndAdvance(_obIsMulti ? onboardingMultiSel.join(', ') : onboardingPopupInput.trim());
+  const obHandleSkipStep = () => obCommitAndAdvance('');
+  const obHandleSkipAll  = () => {
+    localStorage.setItem(ONBOARDING_DONE_KEY, '1');
+    localStorage.setItem('smmtai_onboarding_dismissed', 'true');
+    setOnboardingPopupOpen(false);
+    setOnboardingActive(false);
+    if (Object.keys(onboardingAnswers).length > 0) {
+      syncPrefsToServer({ ...onboardingAnswers, onboardingComplete: false });
+    }
+  };
+
+  // ── Onboarding popup JSX (rendered as variable, NOT an IIFE) ──────────────
+  const onboardingPopupJSX = onboardingPopupOpen && _obStep ? (
+    <div
+      className="absolute inset-0 z-20 flex items-end sm:items-center justify-center p-3"
+      style={{ background: 'rgba(0,0,0,0.52)', backdropFilter: 'blur(4px)', borderRadius: 'inherit' }}
+    >
+      <div
+        className="w-full bg-white dark:bg-neutral-800 rounded-2xl shadow-2xl"
+        style={{ maxHeight: '94%', display: 'flex', flexDirection: 'column' }}
+      >
+        {/* Popup Header */}
+        <div className="bg-brand-blue px-4 py-3 rounded-t-2xl flex items-center justify-between">
+          <div>
+            <p className="text-white/70 text-xs font-medium">Personalizing your experience</p>
+            <p className="text-white font-bold text-sm">Step {onboardingPopupStep + 1} of {ONBOARDING_STEPS.length}</p>
+          </div>
+          <button
+            onClick={obHandleSkipAll}
+            className="text-white/60 hover:text-white text-xs underline underline-offset-2 transition-colors"
+          >
+            Skip setup
+          </button>
+        </div>
+
+        {/* Progress bar */}
+        <div className="flex gap-1.5 px-4 pt-3">
+          {ONBOARDING_STEPS.map((_, i) => (
+            <div
+              key={i}
+              className="flex-1 h-1 rounded-full transition-all duration-300"
+              style={{ background: i <= onboardingPopupStep ? '#2563eb' : '#e5e7eb' }}
+            />
+          ))}
+        </div>
+
+        {/* Step body */}
+        <div className="px-4 py-4 flex-1 overflow-y-auto">
+          <div className="text-center mb-5">
+            <div className="text-4xl mb-2">{_obStep.emoji}</div>
+            <h3 className="font-bold text-neutral-800 dark:text-neutral-100 text-base leading-snug">
+              {_obStep.title}
+            </h3>
+            <p className="text-neutral-500 dark:text-neutral-400 text-xs mt-1">{_obStep.subtitle}</p>
+          </div>
+
+          {/* Chip options */}
+          {(_obStep.inputType === 'chips' || _obStep.inputType === 'multi-chips') && _obStep.options && (
+            <div className="flex flex-wrap gap-2 justify-center">
+              {_obStep.options.map(opt => {
+                const sel = _obIsMulti ? onboardingMultiSel.includes(opt) : onboardingPopupInput === opt;
+                return (
+                  <button
+                    key={opt}
+                    onClick={() => {
+                      if (_obIsMulti) {
+                        setOnboardingMultiSel(prev =>
+                          prev.includes(opt) ? prev.filter(x => x !== opt) : [...prev, opt]
+                        );
+                      } else {
+                        setOnboardingPopupInput(sel ? '' : opt);
+                      }
+                    }}
+                    className="px-3 py-1.5 rounded-full text-xs font-medium border transition-all duration-150 select-none"
+                    style={{
+                      background:   sel ? '#2563eb' : 'transparent',
+                      color:        sel ? '#fff'     : '#374151',
+                      borderColor:  sel ? '#2563eb'  : '#d1d5db',
+                      transform:    sel ? 'scale(1.06)' : 'scale(1)',
+                    }}
+                  >
+                    {opt}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Free-text input */}
+          {_obStep.inputType === 'text' && (
+            <input
+              autoFocus
+              type="text"
+              value={onboardingPopupInput}
+              onChange={e => setOnboardingPopupInput(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter' && _obCanNext) obHandleNext(); }}
+              placeholder={_obStep.placeholder}
+              maxLength={80}
+              className="w-full border border-neutral-200 dark:border-neutral-600 rounded-xl px-4 py-3 text-sm bg-neutral-50 dark:bg-neutral-700 text-neutral-800 dark:text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-neutral-400"
+            />
+          )}
+
+          {/* Date input */}
+          {_obStep.inputType === 'date' && (
+            <div className="space-y-2">
+              <input
+                autoFocus
+                type="date"
+                onChange={e => setOnboardingPopupInput(e.target.value)}
+                className="w-full border border-neutral-200 dark:border-neutral-600 rounded-xl px-4 py-3 text-sm bg-neutral-50 dark:bg-neutral-700 text-neutral-800 dark:text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <p className="text-center text-xs text-neutral-400">or type it below</p>
+              <input
+                type="text"
+                value={onboardingPopupInput}
+                onChange={e => setOnboardingPopupInput(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && _obCanNext) obHandleNext(); }}
+                placeholder="e.g. April 15, 1995"
+                maxLength={30}
+                className="w-full border border-neutral-200 dark:border-neutral-600 rounded-xl px-4 py-3 text-sm bg-neutral-50 dark:bg-neutral-700 text-neutral-800 dark:text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-neutral-400"
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-4 pb-4 pt-1 flex items-center gap-2">
+          <button
+            onClick={obHandleSkipStep}
+            className="flex-1 py-2.5 text-xs font-medium text-neutral-500 dark:text-neutral-400 border border-neutral-200 dark:border-neutral-600 rounded-xl hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors"
+          >
+            Skip this
+          </button>
+          <button
+            onClick={obHandleNext}
+            disabled={!_obCanNext}
+            className="flex-1 py-2.5 text-sm font-semibold rounded-xl text-white transition-all duration-200"
+            style={{
+              background: _obCanNext ? '#2563eb' : '#9ca3af',
+              cursor:     _obCanNext ? 'pointer' : 'not-allowed',
+              transform:  _obCanNext ? 'scale(1)' : 'scale(0.97)',
+            }}
+          >
+            {_obIsLast ? '🎉 Finish!' : 'Next →'}
+          </button>
+        </div>
+      </div>
+    </div>
+  ) : null;
+
   return (
     <>
       {/* Floating Chat Button */}
@@ -581,7 +967,8 @@ export function AIChatbot() {
 
       {/* Chat Window */}
       {isOpen && (
-        <div className="fixed bottom-24 right-4 left-4 sm:left-auto sm:right-6 z-50 sm:w-96 h-[500px] max-h-[70vh] bg-blue-50 dark:bg-neutral-900 rounded-2xl shadow-2xl border border-blue-100 dark:border-neutral-700 flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-200">
+        <div className="fixed bottom-24 right-4 left-4 sm:left-auto sm:right-6 z-50 sm:w-96 h-[500px] max-h-[70vh] bg-blue-50 dark:bg-neutral-900 rounded-2xl shadow-2xl border border-blue-100 dark:border-neutral-700 overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-200">
+          <div className="relative flex flex-col h-full w-full">
           {/* Header */}
           <div className="bg-brand-blue text-white p-3 sm:p-4 flex items-center justify-between">
             <div className="flex items-center gap-2 sm:gap-3">
@@ -589,7 +976,39 @@ export function AIChatbot() {
                 <Bot className="w-4 h-4" />
               </div>
               <div>
-                <h3 className="font-semibold text-sm">SmmtAI Assistant</h3>
+                {isEditingName ? (
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      if (editNameValue.trim()) {
+                        applyRenameHelper(editNameValue.trim(), setCurrentAiName);
+                      }
+                      setIsEditingName(false);
+                    }}
+                    className="flex items-center gap-1"
+                  >
+                    <input
+                      autoFocus
+                      value={editNameValue}
+                      onChange={(e) => setEditNameValue(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Escape') setIsEditingName(false); }}
+                      maxLength={40}
+                      placeholder="Enter AI name…"
+                      className="text-sm font-semibold bg-white/20 text-white placeholder-white/60 border border-white/40 rounded px-2 py-0.5 w-36 focus:outline-none focus:ring-1 focus:ring-white/60"
+                    />
+                    <button type="submit" className="p-0.5 hover:bg-white/20 rounded transition-colors" aria-label="Save name">
+                      <Check className="w-3.5 h-3.5" />
+                    </button>
+                    <button type="button" onClick={() => setIsEditingName(false)} className="p-0.5 hover:bg-white/20 rounded transition-colors" aria-label="Cancel">
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </form>
+                ) : (
+                  <div className="flex items-center gap-1.5 group cursor-pointer" onClick={() => { setEditNameValue(currentAiName || 'SmmtAI Assistant'); setIsEditingName(true); }}>
+                    <h3 className="font-semibold text-sm">{currentAiName || 'SmmtAI Assistant'}</h3>
+                    <Pencil className="w-3 h-3 opacity-0 group-hover:opacity-70 transition-opacity" />
+                  </div>
+                )}
                 <p className="text-xs opacity-90">Online now</p>
               </div>
             </div>
@@ -597,6 +1016,8 @@ export function AIChatbot() {
               <Minimize2 className="w-4 h-4" />
             </button>
           </div>
+
+          {onboardingPopupJSX}
 
           {/* Messages */}
           <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3 sm:space-y-4">
@@ -748,6 +1169,7 @@ export function AIChatbot() {
               </button>
             </form>
             <p className="text-[10px] sm:text-xs text-neutral-500 mt-2 text-center">Powered by SmmtAI AI</p>
+          </div>
           </div>
         </div>
       )}

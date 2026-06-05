@@ -484,3 +484,81 @@ model KnowledgeBase {
   @@index([isActive])
   @@map("knowledge_base")
 }
+
+
+// ============================================================
+// Trend Engine Models
+// ============================================================
+
+model Trend {
+  id               String    @id @default(cuid())
+  topic            String
+  normalizedTopic  String?
+  category         String?
+  platform         String
+  score            Int       @default(0)
+  engagementCount  Int       @default(0)
+  growthRate       Float?    @default(0)
+  trendStatus      String    @default("Emerging")
+  sentiment        String?   @default("neutral")
+  sourceUrl        String?
+  competitionLevel Float?    @default(0.5)
+  viralProbability Float?    @default(0)
+  peakTimeEstimate DateTime?
+  lifespanDays     Int?
+  country          String?
+  region           String?
+  isNsfw           Boolean   @default(false)
+  isBlacklisted    Boolean   @default(false)
+  isFlagged        Boolean   @default(false)
+  flagReason       String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  savedBy          SavedTrend[]
+
+  @@unique([topic, platform])
+  @@index([category])
+  @@index([createdAt])
+  @@index([platform])
+  @@index([trendStatus])
+  @@map("trends")
+}
+
+model SavedTrend {
+  id      String   @id @default(cuid())
+  userId  String
+  trendId String
+  savedAt DateTime @default(now())
+
+  trend   Trend    @relation(fields: [trendId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, trendId])
+  @@index([userId])
+  @@map("saved_trends")
+}
+
+model TrendBlacklist {
+  id        String   @id @default(cuid())
+  keyword   String   @unique
+  reason    String?
+  addedBy   String?
+  createdAt DateTime @default(now())
+
+  @@map("trend_blacklist")
+}
+
+model UserTrendPreference {
+  id                  String   @id @default(cuid())
+  userId              String   @unique
+  preferredCategories String[] @default([])
+  preferredPlatforms  String[] @default([])
+  blockedCategories   String[] @default([])
+  region              String?
+  country             String?
+  updatedAt           DateTime @updatedAt
+  createdAt           DateTime @default(now())
+
+  @@map("user_trend_preferences")
+}
+

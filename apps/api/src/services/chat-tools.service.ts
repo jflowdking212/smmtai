@@ -1,3 +1,4 @@
+import { PLATFORMS } from '@ee-postmind/shared';
 import { prisma } from '../config/database.js';
 import { connectionService } from './connection.service.js';
 import { postService } from './post.service.js';
@@ -276,7 +277,9 @@ export const userTools: Record<string, { definition: ToolDefinition; handler: To
     },
     handler: async (args, context) => {
       if (!args.content || !args.content.trim()) {
-        return 'Cannot create a post with empty content. Please provide the post text.';
+        const platforms5a = (args.platforms || []) as string[];
+        const platformHint5a = platforms5a.length ? ` to **${platforms5a.map((p: string) => p.charAt(0).toUpperCase() + p.slice(1)).join(', ')}**` : '';
+        return `Got it! You want to create a post${platformHint5a}.\n\nWhat would you like to say? Just tell me the content, or say something like:\n\u2022 *"write something about [topic] for ${platforms5a[0] || 'my page'}"*\n\u2022 *"create an AI post about [your topic]"*\n\nI\u2019ll write the full post for you! \u{1F4DD}`;
       }
 
       const targetPlatforms = args.platforms || [];
@@ -324,7 +327,7 @@ export const userTools: Record<string, { definition: ToolDefinition; handler: To
       });
 
       const platformStr = post.platforms.length ? post.platforms.join(', ') : 'no platforms selected';
-      return `✅ Draft created successfully!\n\n**Content preview:** ${post.content.substring(0, 100)}${post.content.length > 100 ? '…' : ''}\n**Platforms:** ${platformStr}\n**Post ID:** \`${post.id}\`\n\nYou can schedule or publish this draft from the Posts section.`;
+      return `\u2705 Draft created successfully!\n\n**Content preview:** ${post.content.substring(0, 100)}${post.content.length > 100 ? '\u2026' : ''}\n**Platforms:** ${platformStr}\n**Post ID:** \`${post.id}\`\n\n\u{1F449} [Open in Compose](/compose?draftId=${post.id}) \u2022 [View All Drafts](/posts?filter=DRAFT)\n\nOr ask me to **schedule it**, **publish it now**, or **improve the content**!`;
     }
   },
 
@@ -648,7 +651,7 @@ export const userTools: Record<string, { definition: ToolDefinition; handler: To
         parameters: {
           type: 'object',
           properties: {
-            platform: { type: 'string', enum: ['facebook', 'instagram', 'twitter', 'linkedin', 'youtube', 'pinterest', 'tiktok', 'telegram', 'bluesky', 'mastodon'], description: 'The target social platform' }
+            platform: { type: 'string', enum: Object.keys(PLATFORMS), description: 'The target social platform' }
           },
           required: ['platform']
         },
@@ -1101,7 +1104,7 @@ export const userTools: Record<string, { definition: ToolDefinition; handler: To
         });
 
         const platformLabels = targetPlatforms.map((p: string) => p.toUpperCase()).join(' & ');
-        return `🎨 **I have generated your premium ${palettePreset.toUpperCase()} style ${sizePreset.toUpperCase()} ad template (${layoutPreset} layout) for ${platformLabels}!**\n\n👉 [Open in Visual Editor](/editor?draftId=${post.id})\n\nPlease click the link to preview the layout, adjust details visually in SmmtAI's editor, upload your custom logo, and publish or schedule the post when ready!`;
+        return `\u{1F3A8} **Premium ${palettePreset.toUpperCase()} ${sizePreset.toUpperCase()} Ad Created!** (${layoutPreset} layout \u2022 ${platformLabels})\n\n**Post ID:** \`${post.id}\`\n\n\u{1F449} [Open in Visual Editor](/compose?draftId=${post.id}) \u2022 [View All Drafts](/posts?filter=DRAFT)\n\nIn the editor you can:\n\u2022 Preview the full design\n\u2022 Upload your custom logo\n\u2022 Adjust text, colors, and images\n\u2022 Publish or schedule directly\n\nOr ask me to **publish it now**, **schedule it**, or **tweak the design**!`;
       } catch (err: any) {
         return `Failed to create designed post draft: ${err?.message || err}`;
       }

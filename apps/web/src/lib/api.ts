@@ -592,6 +592,13 @@ export const api = {
         method: 'PUT',
         body: JSON.stringify(data, (_k, v) => (v === Infinity ? '__INFINITY__' : v)),
       }),
+    getChatbotConfig: () =>
+      request<{ success: true; data: Record<string, any> }>('/admin/settings/chatbot'),
+    saveChatbotConfig: (data: Record<string, any>) =>
+      request<{ success: true; data: Record<string, any> }>('/admin/settings/chatbot', {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
     getCoupons: () =>
       request<{ success: true; data: any[] }>('/admin/coupons'),
     createCoupon: (data: Record<string, any>) =>

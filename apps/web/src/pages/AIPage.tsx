@@ -1,5 +1,18 @@
-import { useState } from 'react';
+import { PLATFORMS as SHARED_PLATFORMS, type PlatformType } from '@ee-postmind/shared';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+
+const PLATFORM_LIMITS: Record<string, number> = {
+  twitter: 280,
+  threads: 500,
+  pinterest: 500,
+  instagram: 2200,
+  tiktok: 2200,
+  linkedin: 3000,
+  youtube: 5000,
+  reddit: 40000,
+  facebook: 63000,
+};
 import { Card, Button, Badge } from '@/components/ui';
 import { api } from '@/lib/api';
 import { saveComposeSeed } from '@/lib/composeSeed';
@@ -156,7 +169,7 @@ const AUDIENCE_PERSONA_OPTIONS = [
   'Women entrepreneurs',
   'First-time buyers',
 ];
-const PLATFORMS = ['facebook', 'instagram', 'tiktok', 'linkedin', 'twitter', 'youtube', 'pinterest', 'bluesky', 'mastodon', 'telegram', 'entreprenrs', 'chrxstians', 'iohah'];
+const PLATFORMS = Object.keys(SHARED_PLATFORMS);
 const HISTORY_LIMIT = 12;
 
 function summarizeResult(tab: Tab, value: any): string {
@@ -206,6 +219,23 @@ export function AIPage() {
   const [audiencePersona, setAudiencePersona] = useState('');
   const [brandVoiceProfile, setBrandVoiceProfile] = useState('');
   const [brandVoice, setBrandVoice] = useState('');
+  const [length, setLength] = useState<'short' | 'medium' | 'long' | 'extra_long'>('medium');
+
+  useEffect(() => {
+    const limit = PLATFORM_LIMITS[platform] || 2200;
+    const lenMaxes = { short: 150, medium: 500, long: 1500, extra_long: 5000 };
+    if (lenMaxes[length] > limit) {
+      if (limit >= 5000) {
+        setLength('extra_long');
+      } else if (limit >= 1500) {
+        setLength('long');
+      } else if (limit >= 500) {
+        setLength('medium');
+      } else {
+        setLength('short');
+      }
+    }
+  }, [platform, length]);
 
   const optionalValue = (value: string) => value.trim() || undefined;
 
@@ -227,6 +257,7 @@ export function AIPage() {
             brand_voice: optionalValue(brandVoice),
             industry: optionalValue(industry),
             audience_persona: optionalValue(audiencePersona),
+            length,
           });
           break;
         case 'hashtags':
@@ -242,7 +273,7 @@ export function AIPage() {
           res = await api.ai.imagePrompt({ topic, platform, style: 'modern, clean, professional' });
           break;
         case 'rewrite':
-          res = await api.ai.rewrite({ content, platform, tone });
+          res = await api.ai.rewrite({ content, platform, tone, length });
           break;
         case 'translate':
           res = await api.ai.translate({ content, platform, target_language: targetLang });
@@ -344,9 +375,14 @@ export function AIPage() {
               onChange={(e) => setPlatform(e.target.value)}
               className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue"
             >
-              {PLATFORMS.map((p) => (
-                <option key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</option>
-              ))}
+              {PLATFORMS.map((p) => {
+                const meta = SHARED_PLATFORMS[p as PlatformType];
+                return (
+                  <option key={p} value={p}>
+                    {meta?.name || (p.charAt(0).toUpperCase() + p.slice(1))}
+                  </option>
+                );
+              })}
             </select>
           </div>
 
@@ -365,6 +401,40 @@ export function AIPage() {
                     {t}
                   </button>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {/* Length (for caption/rewrite) */}
+          {['caption', 'rewrite'].includes(tab) && (
+            <div>
+              <label className="block text-sm font-medium text-neutral-700 mb-1">Content Length</label>
+              <div className="flex flex-wrap gap-1.5">
+                {[
+                  { id: 'short', label: 'Short (~150 chars)', max: 150 },
+                  { id: 'medium', label: 'Medium (~500 chars)', max: 500 },
+                  { id: 'long', label: 'Long (~1500 chars)', max: 1500 },
+                  { id: 'extra_long', label: 'Extra Long (~5000 chars)', max: 5000 },
+                ].map((len) => {
+                  const limit = PLATFORM_LIMITS[platform] || 2200;
+                  const isDisabled = len.max > limit;
+                  return (
+                    <button
+                      key={len.id}
+                      disabled={isDisabled}
+                      onClick={() => setLength(len.id as any)}
+                      className={`px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
+                        isDisabled
+                          ? 'bg-neutral-50 border border-neutral-100 text-neutral-300 cursor-not-allowed opacity-50'
+                          : length === len.id
+                          ? 'bg-brand-blue text-white'
+                          : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
+                      }`}
+                    >
+                      {len.label}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
