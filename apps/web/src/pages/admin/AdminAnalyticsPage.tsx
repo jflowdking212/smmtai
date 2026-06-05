@@ -38,7 +38,7 @@ export function AdminAnalyticsPage() {
   if (loading) {
     return (
       <div className="space-y-6">
-        <h1 className="text-2xl font-heading font-bold text-white">Analytics</h1>
+        <h1 className="text-2xl font-heading font-bold text-neutral-900 dark:text-white">Analytics</h1>
         <p className="text-neutral-500 text-sm">Loading analytics...</p>
       </div>
     );
@@ -47,7 +47,7 @@ export function AdminAnalyticsPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-heading font-bold text-white">System Analytics</h1>
+        <h1 className="text-2xl font-heading font-bold text-neutral-900 dark:text-white">System Analytics</h1>
         <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">User growth, engagement, and platform health metrics.</p>
       </div>
 
@@ -59,7 +59,7 @@ export function AdminAnalyticsPage() {
 
       {/* User Growth */}
       <Card className="p-6 bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800">
-        <h2 className="text-lg font-heading font-semibold text-white mb-4">
+        <h2 className="text-lg font-heading font-semibold text-neutral-900 dark:text-white mb-4">
           <Users className="w-5 h-5 inline-block mr-2 text-blue-400" />
           User Growth
         </h2>
@@ -72,7 +72,7 @@ export function AdminAnalyticsPage() {
 
       {/* Engagement */}
       <Card className="p-6 bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800">
-        <h2 className="text-lg font-heading font-semibold text-white mb-4">
+        <h2 className="text-lg font-heading font-semibold text-neutral-900 dark:text-white mb-4">
           <FileText className="w-5 h-5 inline-block mr-2 text-amber-400" />
           Content & Engagement
         </h2>
@@ -85,7 +85,7 @@ export function AdminAnalyticsPage() {
 
       {/* Conversations */}
       <Card className="p-6 bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800">
-        <h2 className="text-lg font-heading font-semibold text-white mb-4">
+        <h2 className="text-lg font-heading font-semibold text-neutral-900 dark:text-white mb-4">
           <MessageCircle className="w-5 h-5 inline-block mr-2 text-green-400" />
           Conversations
         </h2>
@@ -97,7 +97,7 @@ export function AdminAnalyticsPage() {
 
       {/* Plan Distribution */}
       <Card className="p-6 bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800">
-        <h2 className="text-lg font-heading font-semibold text-white mb-4">
+        <h2 className="text-lg font-heading font-semibold text-neutral-900 dark:text-white mb-4">
           <TrendingUp className="w-5 h-5 inline-block mr-2 text-purple-400" />
           Plan Distribution
         </h2>
@@ -105,7 +105,7 @@ export function AdminAnalyticsPage() {
           {['basic', 'pro', 'business', 'enterprise'].map((tier) => (
             <div key={tier} className="p-4 rounded-xl bg-neutral-50 dark:bg-neutral-50 dark:bg-neutral-800/50 border border-neutral-300 dark:border-neutral-700/50 text-center">
               <p className="text-xs text-neutral-500 dark:text-neutral-400 capitalize mb-1">{tier}</p>
-              <p className="text-2xl font-bold text-white">{data.planDistribution[tier] || 0}</p>
+              <p className="text-2xl font-bold text-neutral-900 dark:text-white">{data.planDistribution[tier] || 0}</p>
             </div>
           ))}
         </div>

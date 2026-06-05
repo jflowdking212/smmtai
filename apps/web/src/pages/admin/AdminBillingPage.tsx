@@ -123,7 +123,7 @@ export function AdminBillingPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-heading font-bold text-white">Payments & Billing</h1>
+          <h1 className="text-2xl font-heading font-bold text-neutral-900 dark:text-white">Payments & Billing</h1>
           <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">Manage subscriptions, track revenue, and monitor transactions.</p>
         </div>
         <Button
@@ -148,7 +148,7 @@ export function AdminBillingPage() {
               <Badge variant="default" className="bg-neutral-50 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300">Live</Badge>
             </div>
             <div className="mt-4">
-              <p className="text-2xl font-bold text-white">{loading ? '—' : stat.value}</p>
+              <p className="text-2xl font-bold text-neutral-900 dark:text-white">{loading ? '—' : stat.value}</p>
               <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-0.5">{stat.label}</p>
             </div>
           </Card>
@@ -158,7 +158,7 @@ export function AdminBillingPage() {
       {/* Subscriptions Section */}
       <div className="space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <h2 className="text-lg font-heading font-bold text-white flex items-center gap-2">
+          <h2 className="text-lg font-heading font-bold text-neutral-900 dark:text-white flex items-center gap-2">
             <Users className="w-5 h-5 text-neutral-500 dark:text-neutral-400" />
             Workspace Subscriptions
           </h2>
@@ -255,7 +255,7 @@ export function AdminBillingPage() {
 
       {/* Transactions Section */}
       <div className="space-y-4">
-        <h2 className="text-lg font-heading font-bold text-white flex items-center gap-2">
+        <h2 className="text-lg font-heading font-bold text-neutral-900 dark:text-white flex items-center gap-2">
           <CreditCard className="w-5 h-5 text-neutral-500 dark:text-neutral-400" />
           Recent Stripe Payments Ledger
         </h2>
@@ -327,20 +327,20 @@ export function AdminBillingPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-2xl p-6 w-full max-w-md shadow-2xl">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+              <h3 className="text-lg font-bold text-neutral-900 dark:text-white flex items-center gap-2">
                 <ShieldAlert className="w-5 h-5 text-red-500" />
                 Cancel Auto-Renewal
               </h3>
               <button
                 onClick={() => setCancelTarget(null)}
-                className="text-neutral-500 hover:text-white transition-colors"
+                className="text-neutral-500 hover:text-neutral-900 dark:text-white transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
             <p className="text-sm text-neutral-600 dark:text-neutral-300 mb-2">
               Are you sure you want to cancel the auto-renewal for the workspace{' '}
-              <strong className="text-white">"{cancelTarget.workspaceName}"</strong>?
+              <strong className="text-neutral-900 dark:text-white">"{cancelTarget.workspaceName}"</strong>?
             </p>
             <p className="text-xs text-neutral-500 bg-neutral-50 dark:bg-neutral-800 p-3 rounded-lg border border-neutral-300 dark:border-neutral-700 mb-5 leading-relaxed">
               This will set the subscription's auto-renewal flag to off in Stripe. The owner ({cancelTarget.ownerName}) will continue to enjoy paid features until their current period ends on <strong>{new Date(cancelTarget.currentPeriodEnd).toLocaleDateString()}</strong>, after which their access will expire.

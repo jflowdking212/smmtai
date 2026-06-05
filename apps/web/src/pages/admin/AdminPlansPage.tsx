@@ -152,7 +152,7 @@ export function AdminPlansPage() {
   if (loading) {
     return (
       <div className="space-y-6">
-        <h1 className="text-2xl font-heading font-bold text-white">Plan Management</h1>
+        <h1 className="text-2xl font-heading font-bold text-neutral-900 dark:text-white">Plan Management</h1>
         <p className="text-neutral-500 text-sm">Loading...</p>
       </div>
     );
@@ -162,7 +162,7 @@ export function AdminPlansPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-heading font-bold text-white">Plan Management</h1>
+          <h1 className="text-2xl font-heading font-bold text-neutral-900 dark:text-white">Plan Management</h1>
           <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">Configure subscription plans, limits, and pricing. All 25 platforms available.</p>
         </div>
         <Button size="sm" onClick={handleSave} loading={saving} className="bg-red-600 hover:bg-red-700 text-white">
@@ -171,7 +171,7 @@ export function AdminPlansPage() {
       </div>
 
       <Card className="p-6 bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800">
-        <h2 className="text-lg font-heading font-semibold text-white mb-4">
+        <h2 className="text-lg font-heading font-semibold text-neutral-900 dark:text-white mb-4">
           <Percent className="w-5 h-5 inline-block mr-2 text-amber-400" />
           Billing Period Discounts
         </h2>
@@ -183,7 +183,7 @@ export function AdminPlansPage() {
             { key: 'yearlyDiscount',    label: 'Yearly',    sublabel: 'Annual billing',   default: 30 },
           ].map(({ key, label, sublabel, default: def }) => (
             <div key={key} className="flex flex-col gap-2">
-              <label className="text-sm font-medium text-white">{label}</label>
+              <label className="text-sm font-medium text-neutral-900 dark:text-white">{label}</label>
               <p className="text-xs text-neutral-500">{sublabel}</p>
               <div className="flex items-center gap-2">
                 <input
@@ -195,7 +195,7 @@ export function AdminPlansPage() {
                     const val = Math.min(100, Math.max(0, parseInt(e.target.value, 10) || 0));
                     setPlanConfig((prev) => ({ ...prev, [key]: val }));
                   }}
-                  className="w-24 px-3 py-2.5 rounded-xl border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-white text-sm focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500"
+                  className="w-24 px-3 py-2.5 rounded-xl border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500"
                 />
                 <span className="text-neutral-500 dark:text-neutral-400 text-sm">% off</span>
               </div>
@@ -234,7 +234,7 @@ export function AdminPlansPage() {
             <Card key={tier} className="p-6 bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800">
               <div className="flex items-center justify-between mb-5">
                 <div>
-                  <h3 className="text-lg font-semibold text-white capitalize">{tier}</h3>
+                  <h3 className="text-lg font-semibold text-neutral-900 dark:text-white capitalize">{tier}</h3>
                   <p className="text-xs text-neutral-500 mt-0.5">{assignedPlatforms.length}/{allCount} platforms enabled</p>
                 </div>
                 <Badge variant={tier === 'enterprise' ? 'brand' : tier === 'business' ? 'success' : tier === 'pro' ? 'warning' : 'default'}>
@@ -250,7 +250,7 @@ export function AdminPlansPage() {
                     step={0.01}
                     value={config.monthlyPrice ?? (tier === 'basic' ? 4.99 : tier === 'pro' ? 24.99 : tier === 'business' ? 49.99 : 99.99)}
                     onChange={(e) => updatePlan(tier, 'monthlyPrice', parseFloat(e.target.value) || 0)}
-                    className="w-full px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-white text-sm focus:outline-none focus:ring-1 focus:ring-red-500"
+                    className="w-full px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm focus:outline-none focus:ring-1 focus:ring-red-500"
                   />
                 </div>
 
@@ -262,7 +262,7 @@ export function AdminPlansPage() {
                       value={formatValue(config[key] ?? defaults[key])}
                       onChange={(e) => updatePlan(tier, key, parseValue(e.target.value))}
                       placeholder={formatValue(defaults[key])}
-                      className="w-full px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-white text-sm focus:outline-none focus:ring-1 focus:ring-red-500"
+                      className="w-full px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm focus:outline-none focus:ring-1 focus:ring-red-500"
                     />
                     <p className="text-[10px] text-neutral-600 mt-0.5">Default: {formatValue(defaults[key])}</p>
                   </div>
@@ -307,7 +307,7 @@ export function AdminPlansPage() {
                             className="w-4 h-4 rounded accent-red-500 mt-0.5 cursor-pointer disabled:cursor-not-allowed"
                           />
                           <div className="text-left">
-                            <p className="text-xs font-semibold text-neutral-600 dark:text-neutral-300 group-hover:text-white transition-colors">
+                            <p className="text-xs font-semibold text-neutral-600 dark:text-neutral-300 group-hover:text-neutral-900 dark:text-white transition-colors">
                               {f.name}
                             </p>
                             <p className="text-[10px] text-neutral-500 leading-normal">
@@ -357,7 +357,7 @@ export function AdminPlansPage() {
                             onChange={() => togglePlatform(tier, id)}
                             className="w-3.5 h-3.5 rounded accent-red-500 cursor-pointer"
                           />
-                          <span className="flex items-center gap-1.5 text-xs text-neutral-600 dark:text-neutral-300 group-hover:text-white transition-colors">
+                          <span className="flex items-center gap-1.5 text-xs text-neutral-600 dark:text-neutral-300 group-hover:text-neutral-900 dark:text-white transition-colors">
                             <span
                               className="w-2 h-2 rounded-full inline-block shrink-0"
                               style={{ backgroundColor: color }}
@@ -379,7 +379,7 @@ export function AdminPlansPage() {
                             onChange={() => togglePlatform(tier, id)}
                             className="w-3.5 h-3.5 rounded accent-red-500 cursor-pointer"
                           />
-                          <span className="flex items-center gap-1.5 text-xs text-neutral-600 dark:text-neutral-300 group-hover:text-white transition-colors">
+                          <span className="flex items-center gap-1.5 text-xs text-neutral-600 dark:text-neutral-300 group-hover:text-neutral-900 dark:text-white transition-colors">
                             <span
                               className="w-2 h-2 rounded-full inline-block shrink-0"
                               style={{ backgroundColor: color }}

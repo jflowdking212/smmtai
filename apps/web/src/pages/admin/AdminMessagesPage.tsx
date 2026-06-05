@@ -63,7 +63,7 @@ export function AdminMessagesPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-heading font-bold text-white">Messages</h1>
+        <h1 className="text-2xl font-heading font-bold text-neutral-900 dark:text-white">Messages</h1>
         <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">Monitor all user conversations and support inquiries.</p>
       </div>
 
@@ -162,7 +162,7 @@ export function AdminMessagesPage() {
             {selectedConversation ? (
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-semibold text-white">Conversation Detail</h3>
+                  <h3 className="text-sm font-semibold text-neutral-900 dark:text-white">Conversation Detail</h3>
                   <Badge variant={getStatusColor(selectedConversation.status)}>{selectedConversation.status}</Badge>
                 </div>
                 <div className="space-y-1 text-xs">

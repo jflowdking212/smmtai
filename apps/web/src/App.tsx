@@ -48,6 +48,7 @@ import { AdminCouponsPage } from '@/pages/admin/AdminCouponsPage';
 import { AdminAnalyticsPage } from '@/pages/admin/AdminAnalyticsPage';
 import { AdminMessagesPage } from '@/pages/admin/AdminMessagesPage';
 import { AdminSettingsPage } from '@/pages/admin/AdminSettingsPage';
+import { AdminBillingPage } from '@/pages/admin/AdminBillingPage';
 
 // Lazy-load heavy pages
 const EditorPage = lazy(() => import('@/pages/EditorPage').then((m) => ({ default: m.EditorPage })));
@@ -196,6 +197,7 @@ export default function App() {
             <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
             <Route path="/admin/users" element={<AdminUsersPage />} />
             <Route path="/admin/plans" element={<AdminPlansPage />} />
+            <Route path="/admin/billing" element={<AdminBillingPage />} />
             <Route path="/admin/coupons" element={<AdminCouponsPage />} />
             <Route path="/admin/analytics" element={<AdminAnalyticsPage />} />
             <Route path="/admin/messages" element={<AdminMessagesPage />} />

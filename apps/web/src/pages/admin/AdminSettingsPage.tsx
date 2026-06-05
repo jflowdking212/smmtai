@@ -193,7 +193,7 @@ export function AdminSettingsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-heading font-bold text-white">System Settings</h1>
+        <h1 className="text-2xl font-heading font-bold text-neutral-900 dark:text-white">System Settings</h1>
         <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">Configure SMTP, cloud storage, site settings, and platform credentials.</p>
       </div>
 
@@ -218,7 +218,7 @@ export function AdminSettingsPage() {
         <div className="flex-1 space-y-6">
           {section === 'site' && (
             <Card className="p-6 space-y-5 bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800">
-              <h2 className="text-lg font-semibold text-white">
+              <h2 className="text-lg font-semibold text-neutral-900 dark:text-white">
                 <Globe className="w-5 h-5 inline-block mr-2 text-neutral-500 dark:text-neutral-400" />Site Settings
               </h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -289,7 +289,7 @@ export function AdminSettingsPage() {
 
           {section === 'smtp' && (
             <Card className="p-6 space-y-5 bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800">
-              <h2 className="text-lg font-semibold text-white">
+              <h2 className="text-lg font-semibold text-neutral-900 dark:text-white">
                 <Mail className="w-5 h-5 inline-block mr-2 text-neutral-500 dark:text-neutral-400" />SMTP Configuration
               </h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -322,7 +322,7 @@ export function AdminSettingsPage() {
 
           {section === 'storage' && (
             <Card className="p-6 space-y-5 bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800">
-              <h2 className="text-lg font-semibold text-white">
+              <h2 className="text-lg font-semibold text-neutral-900 dark:text-white">
                 <Cloud className="w-5 h-5 inline-block mr-2 text-neutral-500 dark:text-neutral-400" />Cloud Storage
               </h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -351,7 +351,7 @@ export function AdminSettingsPage() {
 
           {section === 'platforms' && (
             <Card className="p-6 space-y-5 bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800">
-              <h2 className="text-lg font-semibold text-white">
+              <h2 className="text-lg font-semibold text-neutral-900 dark:text-white">
                 <Key className="w-5 h-5 inline-block mr-2 text-neutral-500 dark:text-neutral-400" />Platform Credentials
               </h2>
               <p className="text-sm text-neutral-500 dark:text-neutral-400">Configure API/OAuth credentials for all platforms. Credentials are stored securely on the server.</p>
@@ -421,7 +421,7 @@ export function AdminSettingsPage() {
 
           {section === 'chatbot' && (
             <Card className="p-6 space-y-5 bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800">
-              <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+              <h2 className="text-lg font-semibold text-neutral-900 dark:text-white flex items-center gap-2">
                 <MessageSquare className="w-5 h-5 text-neutral-500 dark:text-neutral-400" />
                 AI & Chatbot Configuration
               </h2>
@@ -536,7 +536,7 @@ export function AdminSettingsPage() {
                     rows={4}
                     value={chatbotConfig.systemPrompt}
                     onChange={(e) => setChatbotConfig((prev) => ({ ...prev, systemPrompt: e.target.value }))}
-                    className="w-full px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-white text-sm focus:outline-none focus:ring-1 focus:ring-red-500 placeholder:text-neutral-500"
+                    className="w-full px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm focus:outline-none focus:ring-1 focus:ring-red-500 placeholder:text-neutral-500"
                     placeholder="Instructions for the AI assistant chatbot..."
                   />
                 </div>
@@ -561,7 +561,7 @@ export function AdminSettingsPage() {
 
           {section === 'promo' && (
             <Card className="p-6 space-y-5 bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800">
-              <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+              <h2 className="text-lg font-semibold text-neutral-900 dark:text-white flex items-center gap-2">
                 <Settings2 className="w-5 h-5 text-neutral-500 dark:text-neutral-400" />
                 Seasonal Campaign Page Settings
               </h2>
@@ -606,7 +606,7 @@ export function AdminSettingsPage() {
                     rows={2}
                     value={siteConfig.promo_subheadline}
                     onChange={(e) => setSiteConfig((prev) => ({ ...prev, promo_subheadline: e.target.value }))}
-                    className="w-full px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-white text-sm focus:outline-none focus:ring-1 focus:ring-red-500 placeholder:text-neutral-500"
+                    className="w-full px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm focus:outline-none focus:ring-1 focus:ring-red-500 placeholder:text-neutral-500"
                   />
                 </div>
 

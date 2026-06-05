@@ -66,7 +66,7 @@ export function AdminDashboardPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-heading font-bold text-neutral-900 dark:text-white">Admin Dashboard</h1>
+          <h1 className="text-2xl font-heading font-bold text-neutral-900 dark:text-neutral-900 dark:text-white">Admin Dashboard</h1>
           <p className="text-sm text-neutral-400 mt-1">System overview and key metrics.</p>
         </div>
         <Button variant="secondary" size="sm" loading={refreshing} onClick={handleRefresh} className="border-neutral-200 dark:border-neutral-700 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:bg-neutral-800">
@@ -91,7 +91,7 @@ export function AdminDashboardPage() {
               <Badge variant="default" className="bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300">Live</Badge>
             </div>
             <div className="mt-4">
-              <p className="text-2xl font-bold text-neutral-900 dark:text-white">{loading ? '—' : stat.value}</p>
+              <p className="text-2xl font-bold text-neutral-900 dark:text-neutral-900 dark:text-white">{loading ? '—' : stat.value}</p>
               <p className="text-sm text-neutral-400 mt-0.5">{stat.label}</p>
             </div>
           </Card>
@@ -100,7 +100,7 @@ export function AdminDashboardPage() {
 
       {/* Plan Breakdown */}
       <Card className="p-6 bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800">
-        <h2 className="text-lg font-heading font-semibold text-neutral-900 dark:text-white mb-4">
+        <h2 className="text-lg font-heading font-semibold text-neutral-900 dark:text-neutral-900 dark:text-white mb-4">
           <CreditCard className="w-5 h-5 inline-block mr-2 text-neutral-400" />
           Subscription Distribution
         </h2>
@@ -108,7 +108,7 @@ export function AdminDashboardPage() {
           {['basic', 'pro', 'business', 'enterprise'].map((tier) => (
             <div key={tier} className="p-4 rounded-xl bg-neutral-100 dark:bg-neutral-800/50 border border-neutral-200 dark:border-neutral-700/50">
               <p className="text-sm text-neutral-400 capitalize">{tier}</p>
-              <p className="text-xl font-bold text-neutral-900 dark:text-white mt-1">{stats.planBreakdown[tier] || 0}</p>
+              <p className="text-xl font-bold text-neutral-900 dark:text-neutral-900 dark:text-white mt-1">{stats.planBreakdown[tier] || 0}</p>
             </div>
           ))}
         </div>
@@ -116,7 +116,7 @@ export function AdminDashboardPage() {
 
       {/* Recent Activity placeholder */}
       <Card className="p-6 bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800">
-        <h2 className="text-lg font-heading font-semibold text-neutral-900 dark:text-white mb-4">
+        <h2 className="text-lg font-heading font-semibold text-neutral-900 dark:text-neutral-900 dark:text-white mb-4">
           <Activity className="w-5 h-5 inline-block mr-2 text-neutral-400" />
           Recent Admin Activity
         </h2>

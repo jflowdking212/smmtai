@@ -178,12 +178,12 @@ export function AdminCouponsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-heading font-bold text-white">Coupon Manager</h1>
+        <h1 className="text-2xl font-heading font-bold text-neutral-900 dark:text-white">Coupon Manager</h1>
         <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">Create checkout coupons with limits by total uses, unique users, and per user.</p>
       </div>
 
       <Card className="p-6 bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 space-y-4">
-        <h2 className="text-lg font-heading font-semibold text-white">
+        <h2 className="text-lg font-heading font-semibold text-neutral-900 dark:text-white">
           <Ticket className="w-5 h-5 inline-block mr-2 text-emerald-400" />
           Create Coupon
         </h2>
@@ -196,7 +196,7 @@ export function AdminCouponsPage() {
               value={couponForm.code}
               onChange={(e) => setCouponForm((prev) => ({ ...prev, code: e.target.value.toUpperCase() }))}
               placeholder="LAUNCH50"
-              className="w-full px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-white text-sm"
+              className="w-full px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm"
             />
           </div>
           <div>
@@ -206,7 +206,7 @@ export function AdminCouponsPage() {
               value={couponForm.name}
               onChange={(e) => setCouponForm((prev) => ({ ...prev, name: e.target.value }))}
               placeholder="Launch Promo"
-              className="w-full px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-white text-sm"
+              className="w-full px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm"
             />
           </div>
           <div className="md:col-span-2">
@@ -216,7 +216,7 @@ export function AdminCouponsPage() {
               value={couponForm.description}
               onChange={(e) => setCouponForm((prev) => ({ ...prev, description: e.target.value }))}
               placeholder="First 100 users"
-              className="w-full px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-white text-sm"
+              className="w-full px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm"
             />
           </div>
           <div>
@@ -227,7 +227,7 @@ export function AdminCouponsPage() {
               max={100}
               value={couponForm.discountPercent}
               onChange={(e) => setCouponForm((prev) => ({ ...prev, discountPercent: e.target.value }))}
-              className="w-full px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-white text-sm"
+              className="w-full px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm"
             />
           </div>
           <div>
@@ -238,7 +238,7 @@ export function AdminCouponsPage() {
               max={730}
               value={couponForm.freeDurationDays}
               onChange={(e) => setCouponForm((prev) => ({ ...prev, freeDurationDays: e.target.value }))}
-              className="w-full px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-white text-sm"
+              className="w-full px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm"
             />
           </div>
           <div>
@@ -249,7 +249,7 @@ export function AdminCouponsPage() {
               max={36}
               value={couponForm.discountDurationMonths}
               onChange={(e) => setCouponForm((prev) => ({ ...prev, discountDurationMonths: e.target.value }))}
-              className="w-full px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-white text-sm"
+              className="w-full px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm"
             />
           </div>
           <div>
@@ -259,7 +259,7 @@ export function AdminCouponsPage() {
               min={1}
               value={couponForm.maxTotalUses}
               onChange={(e) => setCouponForm((prev) => ({ ...prev, maxTotalUses: e.target.value }))}
-              className="w-full px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-white text-sm"
+              className="w-full px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm"
             />
           </div>
           <div>
@@ -269,7 +269,7 @@ export function AdminCouponsPage() {
               min={1}
               value={couponForm.maxUniqueUsers}
               onChange={(e) => setCouponForm((prev) => ({ ...prev, maxUniqueUsers: e.target.value }))}
-              className="w-full px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-white text-sm"
+              className="w-full px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm"
             />
           </div>
           <div>
@@ -279,7 +279,7 @@ export function AdminCouponsPage() {
               min={1}
               value={couponForm.maxUsesPerUser}
               onChange={(e) => setCouponForm((prev) => ({ ...prev, maxUsesPerUser: e.target.value }))}
-              className="w-full px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-white text-sm"
+              className="w-full px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm"
             />
           </div>
           <div>
@@ -290,7 +290,7 @@ export function AdminCouponsPage() {
                 ...prev,
                 requireCardForFreeCheckout: (e.target.value === 'no' ? 'no' : 'yes'),
               }))}
-              className="w-full px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-white text-sm"
+              className="w-full px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm"
             >
               <option value="yes">Yes, require card details</option>
               <option value="no">No, allow without card</option>
@@ -302,7 +302,7 @@ export function AdminCouponsPage() {
               type="datetime-local"
               value={couponForm.startsAt}
               onChange={(e) => setCouponForm((prev) => ({ ...prev, startsAt: e.target.value }))}
-              className="w-full px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-white text-sm"
+              className="w-full px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm"
             />
           </div>
           <div>
@@ -311,7 +311,7 @@ export function AdminCouponsPage() {
               type="datetime-local"
               value={couponForm.endsAt}
               onChange={(e) => setCouponForm((prev) => ({ ...prev, endsAt: e.target.value }))}
-              className="w-full px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-white text-sm"
+              className="w-full px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm"
             />
           </div>
         </div>
@@ -348,7 +348,7 @@ export function AdminCouponsPage() {
             <select
               value={couponForm.defaultPriceKey}
               onChange={(e) => setCouponForm((prev) => ({ ...prev, defaultPriceKey: e.target.value }))}
-              className="w-full px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-white text-sm"
+              className="w-full px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm"
             >
               <option value="">No default package</option>
               {(couponForm.allowedPriceKeys.length > 0
@@ -378,7 +378,7 @@ export function AdminCouponsPage() {
         </div>
 
         <div className="flex justify-end">
-          <Button onClick={handleCreateCoupon} loading={couponSaving} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+          <Button onClick={handleCreateCoupon} loading={couponSaving} className="bg-emerald-600 hover:bg-emerald-700 text-neutral-900 dark:text-white">
             Create Coupon
           </Button>
         </div>
@@ -386,7 +386,7 @@ export function AdminCouponsPage() {
 
       <Card className="p-6 bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-heading font-semibold text-white">Existing Coupons</h2>
+          <h2 className="text-lg font-heading font-semibold text-neutral-900 dark:text-white">Existing Coupons</h2>
           <Button size="sm" variant="secondary" onClick={() => void refreshCoupons()}>Refresh</Button>
         </div>
 
@@ -401,7 +401,7 @@ export function AdminCouponsPage() {
                 <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="font-semibold text-white">{coupon.code}</span>
+                      <span className="font-semibold text-neutral-900 dark:text-white">{coupon.code}</span>
                       <Badge variant={coupon.isActive ? 'success' : 'default'}>{coupon.isActive ? 'Active' : 'Inactive'}</Badge>
                     </div>
                     <p className="text-sm text-neutral-600 dark:text-neutral-300 mt-1">{coupon.name}</p>
