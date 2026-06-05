@@ -291,6 +291,92 @@ async function fetchGoogleTrends() {
   return results;
 }
 
+
+async function fetchMastodonTrends() {
+  const results: any[] = [];
+  const instances = ['mastodon.social', 'mstdn.social', 'mas.to'];
+  
+  for (const instance of instances) {
+    // Trending tags
+    try {
+      const tags = await fetchJson(`https://${instance}/api/v1/trends/tags?limit=20`);
+      for (const tag of (tags || [])) {
+        if (!tag?.name) continue;
+        const totalUses = (tag.history || []).reduce((s: number, d: any) => s + parseInt(d.uses || '0', 10), 0);
+        const totalAccounts = (tag.history || []).reduce((s: number, d: any) => s + parseInt(d.accounts || '0', 10), 0);
+        results.push({
+          topic: `#${tag.name} trending on Mastodon`,
+          platform: 'mastodon',
+          score: Math.min(Math.round(totalUses / 10), 100),
+          engagementCount: totalUses + totalAccounts,
+          growthRate: Math.min(totalAccounts * 3, 300),
+          sourceUrl: tag.url || `https://${instance}/tags/${tag.name}`,
+        });
+      }
+    } catch (e: any) { console.warn(`[Mastodon tags ${instance}] ${e.message}`); }
+
+    // Trending statuses (posts)
+    try {
+      const statuses = await fetchJson(`https://${instance}/api/v1/trends/statuses?limit=10`);
+      for (const status of (statuses || [])) {
+        if (!status?.content) continue;
+        const text = status.content.replace(/<[^>]+>/g, '').slice(0, 200);
+        if (!text || text.length < 15) continue;
+        const reblogs = status.reblogs_count || 0;
+        const favs = status.favourites_count || 0;
+        const replies = status.replies_count || 0;
+        results.push({
+          topic: text,
+          platform: 'mastodon',
+          score: Math.min(Math.round((reblogs + favs) / 15), 100),
+          engagementCount: reblogs + favs + replies,
+          growthRate: Math.min(reblogs * 5, 300),
+          sourceUrl: status.url || status.uri || '',
+        });
+      }
+    } catch (e: any) { console.warn(`[Mastodon statuses ${instance}] ${e.message}`); }
+
+    await sleep(500);
+  }
+  return results;
+}
+
+
+async function fetchYouTubeTrends() {
+  const results: any[] = [];
+  // YouTube trending via RSS feeds for different categories
+  const categories = [
+    { url: 'https://www.youtube.com/feeds/videos.xml?chart=trending&gl=US', tag: 'Trending US' },
+  ];
+  
+  for (const cat of categories) {
+    try {
+      const xml = await fetchText(cat.url);
+      // Parse entries from Atom XML
+      const entries = xml.split('<entry>').slice(1, 16);
+      for (const entry of entries) {
+        const titleMatch = entry.match(/<title>([^<]+)<\/title>/);
+        const linkMatch = entry.match(/<link[^>]*href="([^"]+)"/);
+        const viewsMatch = entry.match(/<media:statistics views="(\d+)"/);
+        const authorMatch = entry.match(/<name>([^<]+)<\/name>/);
+        if (!titleMatch) continue;
+        const title = titleMatch[1].replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"');
+        const views = viewsMatch ? parseInt(viewsMatch[1], 10) : 0;
+        results.push({
+          topic: title,
+          platform: 'youtube',
+          score: Math.min(Math.round(views / 500000), 100),
+          engagementCount: views,
+          growthRate: Math.min(Math.round(views / 100000), 500),
+          sourceUrl: linkMatch ? linkMatch[1] : '',
+          category: 'Entertainment',
+        });
+      }
+    } catch (e: any) { console.warn('[YouTube] ' + e.message); }
+  }
+  return results;
+}
+
 export class TrendCollectorService {
   static async collectAllTrends(): Promise<number> {
     console.log('[TrendCollector] Starting collection cycle...');
@@ -303,6 +389,8 @@ export class TrendCollectorService {
       { name: 'Dev.to',      fn: fetchDevToTrends },
       { name: 'Wikipedia',   fn: fetchWikipediaCurrentEvents },
       { name: 'GoogleTrends', fn: fetchGoogleTrends },
+      { name: 'Mastodon',     fn: fetchMastodonTrends },
+      { name: 'YouTube',      fn: fetchYouTubeTrends },
     ];
 
     for (const source of sources) {

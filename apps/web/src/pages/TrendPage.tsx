@@ -18,7 +18,7 @@ interface Trend {
   score: number;
   engagementCount: number;
   growthRate: number;
-  trendStatus: 'Emerging' | 'Rising' | 'Hot' | 'Peak' | 'Declining';
+  trendStatus: 'Emerging' | 'Rising' | 'Hot' | 'Peak' | 'Declining' | 'Viral' | 'Saturated';
   sentiment: 'positive' | 'neutral' | 'negative';
   competitionLevel: number;
   viralProbability: number;
@@ -30,32 +30,15 @@ interface Trend {
 }
 
 const PLATFORMS = [
-  { id: 'all', label: 'All' },
-  { id: 'facebook', label: 'Facebook' },
-  { id: 'instagram', label: 'Instagram' },
-  { id: 'twitter', label: 'X / Twitter' },
-  { id: 'linkedin', label: 'LinkedIn' },
-  { id: 'tiktok', label: 'TikTok' },
-  { id: 'youtube', label: 'YouTube' },
-  { id: 'pinterest', label: 'Pinterest' },
-  { id: 'threads', label: 'Threads' },
-  { id: 'reddit', label: 'Reddit' },
-  { id: 'telegram', label: 'Telegram' },
-  { id: 'slack', label: 'Slack' },
-  { id: 'discord', label: 'Discord' },
-  { id: 'wordpress', label: 'WordPress' },
-  { id: 'medium', label: 'Medium' },
-  { id: 'blogger', label: 'Blogger' },
-  { id: 'google_business', label: 'Google Business' },
-  { id: 'bluesky', label: 'Bluesky' },
-  { id: 'mastodon', label: 'Mastodon' },
-  { id: 'tumblr', label: 'Tumblr' },
-  { id: 'truth_social', label: 'Truth Social' },
-  { id: 'lemmy', label: 'Lemmy' },
-  { id: 'pleroma', label: 'Pleroma' },
-  { id: 'entreprenrs', label: 'Entreprenrs' },
-  { id: 'chrxstians', label: 'Chrxstians' },
-  { id: 'iohah', label: 'Iohah' },
+  { id: 'all', label: '🌐 All Platforms' },
+  { id: 'google_trends', label: '📊 Google Trends' },
+  { id: 'youtube', label: '▶️ YouTube' },
+  { id: 'mastodon', label: '🐘 Mastodon / X' },
+  { id: 'reddit', label: '🟠 Reddit' },
+  { id: 'hackernews', label: '🟧 Hacker News' },
+  { id: 'github', label: '⚡ GitHub' },
+  { id: 'devto', label: '💻 Dev.to' },
+  { id: 'wikipedia', label: '📖 Wikipedia' },
 ];
 
 const CATEGORIES = ['All', 'Art & Culture', 'Business', 'Crypto / Web3', 'Education', 'Entertainment', 'Environment', 'Fashion', 'Film / TV', 'Finance', 'Food', 'Gaming', 'Health', 'Lifestyle', 'Marketing', 'Music', 'News / Current Events', 'Parenting & Family', 'Politics', 'Real Estate', 'Religion / Faith', 'Science', 'Sports', 'Technology', 'Travel'];
@@ -116,6 +99,8 @@ const SOURCE_ICON: Record<string, string> = {
   hackernews: '🟧',
   github: '⚡',
   devto: '💻',
+  mastodon: '🐘',
+  youtube: '▶️',
 };
 
 function formatNumber(n: number): string {
