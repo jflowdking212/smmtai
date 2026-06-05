@@ -717,6 +717,13 @@ adminRouter.delete('/users/:id', async (req: AuthRequest, res: Response, next: N
         error: { message: 'Cannot delete a user with an active subscription. Suspend them instead, or wait until the subscription expires.', code: 'ACTIVE_SUBSCRIPTION' }
       });
     }
+    // Block deletion if the user has a future trial end date
+    if (primarySubscription && primarySubscription.trialEndsAt && primarySubscription.trialEndsAt > new Date()) {
+      return res.status(403).json({
+        success: false,
+        error: { message: 'Cannot delete a user with an active trial. Suspend them instead, or wait until the trial expires.', code: 'ACTIVE_SUBSCRIPTION' }
+      });
+    }
 
     // Cannot delete the last owner
     const isOwner = user.workspaces.some((m) => m.role === 'owner');

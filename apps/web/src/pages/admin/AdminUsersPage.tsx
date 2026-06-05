@@ -159,7 +159,7 @@ export function AdminUsersPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-heading font-bold text-white">User Management</h1>
+        <h1 className="text-2xl font-heading font-bold text-neutral-900 dark:text-white">User Management</h1>
         <p className="text-sm text-neutral-400 mt-1">View and manage all registered users.</p>
       </div>
 
@@ -172,20 +172,20 @@ export function AdminUsersPage() {
             placeholder="Search by name or email..."
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-            className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-neutral-700 bg-neutral-800 text-neutral-200 placeholder:text-neutral-500 text-sm focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500"
+            className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-neutral-100 dark:bg-neutral-800 text-neutral-200 placeholder:text-neutral-500 text-sm focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500"
           />
         </div>
-        <Badge variant="default" className="bg-neutral-800 text-neutral-300 self-center">
+        <Badge variant="default" className="bg-neutral-100 dark:bg-neutral-800 text-neutral-300 self-center">
           {total} users
         </Badge>
       </div>
 
       {/* Users Table */}
-      <Card className="bg-neutral-900 border-neutral-800 overflow-hidden">
+      <Card className="bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-neutral-800">
+              <tr className="border-b border-neutral-200 dark:border-neutral-800">
                 <th className="text-left px-4 py-3 text-xs font-medium text-neutral-400 uppercase tracking-wider">User</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-neutral-400 uppercase tracking-wider">Role</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-neutral-400 uppercase tracking-wider">Plan</th>
@@ -203,7 +203,7 @@ export function AdminUsersPage() {
                 <tr><td colSpan={8} className="px-4 py-8 text-center text-neutral-500">No users found.</td></tr>
               ) : (
                 users.map((user) => (
-                  <tr key={user.id} className="hover:bg-neutral-800/30 transition-colors">
+                  <tr key={user.id} className="hover:bg-neutral-100 dark:bg-neutral-800/30 transition-colors">
                     <td className="px-4 py-3">
                       <div>
                         <p className="text-sm font-medium text-neutral-200">{user.name}</p>
@@ -223,16 +223,25 @@ export function AdminUsersPage() {
                       </Badge>
                     </td>
                     <td className="px-4 py-3">
-                      <select
-                        value={user.plan}
-                        onChange={(e) => handlePlanSelection(user, e.target.value)}
-                        disabled={actionLoading === user.id}
-                        className="text-xs px-2 py-1 rounded-lg bg-neutral-800 border border-neutral-700 text-neutral-300 focus:outline-none focus:ring-1 focus:ring-red-500"
-                      >
-                        {TIERS.map((t) => (
-                          <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>
-                        ))}
-                      </select>
+                      <div className="flex items-center gap-2">
+                        <select
+                          value={user.plan}
+                          onChange={(e) => handlePlanSelection(user, e.target.value)}
+                          disabled={actionLoading === user.id}
+                          className="text-xs px-2 py-1 rounded-lg bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-900 dark:text-neutral-300 focus:outline-none focus:ring-1 focus:ring-red-500"
+                        >
+                          {TIERS.map((t) => (
+                            <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>
+                          ))}
+                        </select>
+                        <button
+                          onClick={() => handlePlanSelection(user, user.plan)}
+                          className="text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-colors"
+                          title="Edit Plan Details"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+                        </button>
+                      </div>
                     </td>
                     <td className="px-4 py-3">
                       <Badge variant={getStatusVariant(user.subscriptionStatus)}>
@@ -256,7 +265,7 @@ export function AdminUsersPage() {
                         ) : (
                           <button
                             onClick={() => handlePlanSelection(user, user.plan)}
-                            className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-300 border border-neutral-700 hover:border-neutral-500 transition-colors cursor-pointer flex items-center gap-1"
+                            className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-300 border border-neutral-200 dark:border-neutral-700 hover:border-neutral-500 transition-colors cursor-pointer flex items-center gap-1"
                             title="Click to edit expiration date"
                           >
                             <Calendar className="w-3 h-3" />
@@ -337,7 +346,7 @@ export function AdminUsersPage() {
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-neutral-800">
+          <div className="flex items-center justify-between px-4 py-3 border-t border-neutral-200 dark:border-neutral-800">
             <p className="text-xs text-neutral-500">Page {page} of {totalPages}</p>
             <div className="flex gap-2">
               <Button variant="ghost" size="sm" onClick={() => setPage(page - 1)} disabled={page <= 1} className="text-neutral-400">
@@ -354,15 +363,15 @@ export function AdminUsersPage() {
       {/* Delete confirmation modal */}
       {deleteTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="bg-neutral-900 border border-neutral-700 rounded-2xl p-6 w-full max-w-md shadow-2xl">
+          <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-2xl p-6 w-full max-w-md shadow-2xl">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-white">Delete User</h3>
-              <button onClick={() => setDeleteTarget(null)} className="text-neutral-500 hover:text-white transition-colors">
+              <h3 className="text-lg font-bold text-neutral-900 dark:text-white">Delete User</h3>
+              <button onClick={() => setDeleteTarget(null)} className="text-neutral-500 hover:text-neutral-900 dark:text-white transition-colors">
                 <X className="w-5 h-5" />
               </button>
             </div>
             <p className="text-sm text-neutral-400 mb-1">
-              You are about to permanently delete <span className="text-white font-medium">{deleteTarget.name}</span> ({deleteTarget.email}).
+              You are about to permanently delete <span className="text-neutral-900 dark:text-white font-medium">{deleteTarget.name}</span> ({deleteTarget.email}).
             </p>
             {deleteTarget.isSystemAdmin && (
               <p className="text-xs text-amber-400 bg-amber-500/10 rounded-lg px-3 py-2 mb-3 mt-2">
@@ -377,7 +386,7 @@ export function AdminUsersPage() {
               onKeyDown={(e) => e.key === 'Enter' && handleDeleteConfirm()}
               placeholder="Your password"
               autoFocus
-              className="w-full px-4 py-2.5 rounded-xl border border-neutral-700 bg-neutral-800 text-neutral-200 placeholder:text-neutral-500 text-sm focus:outline-none focus:ring-2 focus:ring-red-500/40 focus:border-red-500 mb-4"
+              className="w-full px-4 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-neutral-100 dark:bg-neutral-800 text-neutral-200 placeholder:text-neutral-500 text-sm focus:outline-none focus:ring-2 focus:ring-red-500/40 focus:border-red-500 mb-4"
             />
             <div className="flex gap-3">
               <Button variant="ghost" className="flex-1 text-neutral-400" onClick={() => setDeleteTarget(null)}>
@@ -385,7 +394,7 @@ export function AdminUsersPage() {
               </Button>
               <Button
                 variant="primary"
-                className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+                className="flex-1 bg-red-600 hover:bg-red-700 text-neutral-900 dark:text-white"
                 loading={deleteLoading}
                 disabled={!deletePassword.trim()}
                 onClick={handleDeleteConfirm}
@@ -400,15 +409,15 @@ export function AdminUsersPage() {
       {/* Plan change modal */}
       {planChangeTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="bg-neutral-900 border border-neutral-700 rounded-2xl p-6 w-full max-w-md shadow-2xl">
+          <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-2xl p-6 w-full max-w-md shadow-2xl">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-white">Update Plan for {planChangeTarget.user.name}</h3>
-              <button onClick={() => setPlanChangeTarget(null)} className="text-neutral-500 hover:text-white transition-colors">
+              <h3 className="text-lg font-bold text-neutral-900 dark:text-white">Update Plan for {planChangeTarget.user.name}</h3>
+              <button onClick={() => setPlanChangeTarget(null)} className="text-neutral-500 hover:text-neutral-900 dark:text-white transition-colors">
                 <X className="w-5 h-5" />
               </button>
             </div>
             <p className="text-sm text-neutral-400 mb-4">
-              You are changing the plan from <span className="font-bold text-white">{planChangeTarget.user.plan}</span> to <span className="font-bold text-white">{planChangeTarget.tier}</span>.
+              You are changing the plan from <span className="font-bold text-neutral-900 dark:text-white">{planChangeTarget.user.plan}</span> to <span className="font-bold text-neutral-900 dark:text-white">{planChangeTarget.tier}</span>.
             </p>
             
             <div className="mb-4">
@@ -419,7 +428,7 @@ export function AdminUsersPage() {
                   id="unlimitedPlan"
                   checked={planIsUnlimited}
                   onChange={(e) => setPlanIsUnlimited(e.target.checked)}
-                  className="w-4 h-4 bg-neutral-800 border-neutral-600 rounded text-red-500 focus:ring-red-500"
+                  className="w-4 h-4 bg-neutral-100 dark:bg-neutral-800 border-neutral-600 rounded text-red-500 focus:ring-red-500"
                 />
                 <label htmlFor="unlimitedPlan" className="text-sm text-neutral-400">Unlimited (No expiration)</label>
               </div>
@@ -430,7 +439,7 @@ export function AdminUsersPage() {
                   value={planEndDate}
                   min={new Date().toISOString().split('T')[0]}
                   onChange={(e) => setPlanEndDate(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl border border-neutral-700 bg-neutral-800 text-neutral-200 focus:outline-none focus:ring-2 focus:ring-red-500/40 focus:border-red-500 [color-scheme:dark]"
+                  className="w-full px-4 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-neutral-100 dark:bg-neutral-800 text-neutral-200 focus:outline-none focus:ring-2 focus:ring-red-500/40 focus:border-red-500 [color-scheme:dark]"
                 />
               )}
             </div>
@@ -441,7 +450,7 @@ export function AdminUsersPage() {
               </Button>
               <Button
                 variant="primary"
-                className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+                className="flex-1 bg-red-600 hover:bg-red-700 text-neutral-900 dark:text-white"
                 loading={actionLoading === planChangeTarget.user.id}
                 disabled={!planIsUnlimited && !planEndDate}
                 onClick={confirmPlanChange}
