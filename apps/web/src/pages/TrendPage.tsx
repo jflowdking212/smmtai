@@ -32,8 +32,11 @@ interface Trend {
 const PLATFORMS = [
   { id: 'all', label: '🌐 All Platforms' },
   { id: 'google_trends', label: '📊 Google Trends' },
+  { id: 'twitter', label: '🐦 Twitter / X' },
+  { id: 'tiktok', label: '📱 TikTok' },
   { id: 'youtube', label: '▶️ YouTube' },
-  { id: 'mastodon', label: '🐘 Mastodon / X' },
+  { id: 'instagram', label: '📸 Instagram' },
+  { id: 'facebook', label: '👥 Facebook' },
   { id: 'reddit', label: '🟠 Reddit' },
   { id: 'hackernews', label: '🟧 Hacker News' },
   { id: 'github', label: '⚡ GitHub' },
@@ -94,13 +97,17 @@ const STATUS_LABEL: Record<string, string> = {
 
 const SOURCE_ICON: Record<string, string> = {
   google_trends: '📊',
-  wikipedia: '📖',
+  twitter: '🐦',
+  tiktok: '📱',
+  youtube: '▶️',
+  instagram: '📸',
+  facebook: '👥',
   reddit: '🟠',
   hackernews: '🟧',
   github: '⚡',
   devto: '💻',
+  wikipedia: '📖',
   mastodon: '🐘',
-  youtube: '▶️',
 };
 
 function formatNumber(n: number): string {
@@ -484,7 +491,7 @@ export function TrendPage() {
                       )}
                       {trend.platform && (
                         <span className="text-[10px] text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full font-medium">
-                          {SOURCE_ICON[trend.platform] || '🌐'} {trend.platform === 'google_trends' ? 'Google' : trend.platform === 'hackernews' ? 'HN' : trend.platform.charAt(0).toUpperCase() + trend.platform.slice(1)}
+                          {SOURCE_ICON[trend.platform] || '🌐'} {trend.platform === 'google_trends' ? 'Google' : trend.platform === 'hackernews' ? 'HN' : trend.platform === 'devto' ? 'Dev.to' : trend.platform.charAt(0).toUpperCase() + trend.platform.slice(1)}
                         </span>
                       )}
                       {(trend.country || trend.region) && (
