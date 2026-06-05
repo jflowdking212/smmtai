@@ -653,23 +653,24 @@ export async function runTrialCheckJob(): Promise<void> {
       }
     }
 
-    // 3. Expire overdue subscriptions
+    // 3. Expire overdue admin-managed subscriptions (skip Stripe-managed and system admin)
     const expiredSubscriptions = await prisma.subscription.findMany({
       where: { 
         status: 'active', 
         tier: { not: 'basic' }, 
-        currentPeriodEnd: { lt: now } 
+        currentPeriodEnd: { lt: now },
+        stripeSubscriptionId: null, // Only expire admin-assigned subs; Stripe handles its own
+        workspace: { owner: { email: { not: 'judeobidozie@gmail.com' } } }, // Never downgrade system admin
       },
+      include: { workspace: { include: { owner: { select: { email: true, name: true } } } } },
     });
     for (const sub of expiredSubscriptions) {
       await prisma.subscription.update({ where: { id: sub.id }, data: { tier: 'basic', currentPeriodEnd: null } });
-      const workspace = await prisma.workspace.findUnique({
-        where: { id: sub.workspaceId },
-        include: { owner: { select: { email: true, name: true } } }
-      }).catch(() => null);
-      const user = workspace?.owner;
-      // We could add an email notification here if desired
-      console.log(`[TrialJob] Expired subscription: workspace ${sub.workspaceId}`);
+      const user = sub.workspace?.owner;
+      if (user?.email) {
+        await emailService.sendTrialExpired(user.email, user.name || 'there', upgradeUrl).catch(console.error);
+      }
+      console.log(`[TrialJob] Expired subscription: workspace ${sub.workspaceId} (${user?.email || 'unknown'})`);
     }
 
     console.log(`[TrialJob] Done. Expired trials: ${expired.length}, Expired subscriptions: ${expiredSubscriptions.length}`);

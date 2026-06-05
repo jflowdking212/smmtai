@@ -584,6 +584,9 @@ adminRouter.put('/users/:id/plan', async (req: AuthRequest, res: Response, next:
     let parsedEndDate: Date | null = null;
     if (currentPeriodEnd && currentPeriodEnd !== 'unlimited') {
       parsedEndDate = new Date(currentPeriodEnd);
+      if (isNaN(parsedEndDate.getTime())) {
+        return res.status(400).json({ success: false, error: { message: 'Invalid end date format', code: 'VALIDATION_ERROR' } });
+      }
     }
 
     const user = await prisma.user.findUnique({
@@ -602,12 +605,12 @@ adminRouter.put('/users/:id/plan', async (req: AuthRequest, res: Response, next:
         where: { id: workspace.subscription.id },
         data: { tier, currentPeriodEnd: parsedEndDate },
       });
-      await logAdminAction(req.userId!, 'user.plan_change', 'user', id, { oldTier, newTier: tier });
+      await logAdminAction(req.userId!, 'user.plan_change', 'user', id, { oldTier, newTier: tier, currentPeriodEnd: parsedEndDate?.toISOString() || 'unlimited' });
     } else if (workspace) {
       await prisma.subscription.create({
         data: { workspaceId: workspace.id, tier, status: 'active', currentPeriodEnd: parsedEndDate },
       });
-      await logAdminAction(req.userId!, 'user.plan_change', 'user', id, { oldTier: 'none', newTier: tier });
+      await logAdminAction(req.userId!, 'user.plan_change', 'user', id, { oldTier: 'none', newTier: tier, currentPeriodEnd: parsedEndDate?.toISOString() || 'unlimited' });
     }
 
     res.json({ success: true, data: { message: `User plan updated to ${tier}` } });
@@ -700,6 +703,14 @@ adminRouter.delete('/users/:id', async (req: AuthRequest, res: Response, next: N
     }
 
     const primarySubscription = user.workspaces[0]?.workspace?.subscription;
+    // Block deletion if the user has an active Stripe subscription
+    if (primarySubscription && primarySubscription.stripeSubscriptionId && primarySubscription.status === 'active') {
+      return res.status(403).json({
+        success: false,
+        error: { message: 'Cannot delete a user with an active payment gateway subscription. Suspend them instead, or cancel their Stripe subscription first.', code: 'ACTIVE_SUBSCRIPTION' }
+      });
+    }
+    // Block deletion if the user has a future admin-assigned end date
     if (primarySubscription && primarySubscription.currentPeriodEnd && primarySubscription.currentPeriodEnd > new Date()) {
       return res.status(403).json({
         success: false,

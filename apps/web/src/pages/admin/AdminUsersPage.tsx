@@ -12,6 +12,7 @@ import {
   ArrowDownCircle,
   Trash2,
   X,
+  Calendar,
 } from 'lucide-react';
 
 interface AdminUser {
@@ -189,6 +190,7 @@ export function AdminUsersPage() {
                 <th className="text-left px-4 py-3 text-xs font-medium text-neutral-400 uppercase tracking-wider">Role</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-neutral-400 uppercase tracking-wider">Plan</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-neutral-400 uppercase tracking-wider">Status</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-neutral-400 uppercase tracking-wider">End Date</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-neutral-400 uppercase tracking-wider">Posts</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-neutral-400 uppercase tracking-wider">Joined</th>
                 <th className="text-right px-4 py-3 text-xs font-medium text-neutral-400 uppercase tracking-wider">Actions</th>
@@ -196,9 +198,9 @@ export function AdminUsersPage() {
             </thead>
             <tbody className="divide-y divide-neutral-800/50">
               {loading ? (
-                <tr><td colSpan={7} className="px-4 py-8 text-center text-neutral-500">Loading...</td></tr>
+                <tr><td colSpan={8} className="px-4 py-8 text-center text-neutral-500">Loading...</td></tr>
               ) : users.length === 0 ? (
-                <tr><td colSpan={7} className="px-4 py-8 text-center text-neutral-500">No users found.</td></tr>
+                <tr><td colSpan={8} className="px-4 py-8 text-center text-neutral-500">No users found.</td></tr>
               ) : (
                 users.map((user) => (
                   <tr key={user.id} className="hover:bg-neutral-800/30 transition-colors">
@@ -211,19 +213,6 @@ export function AdminUsersPage() {
                             <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">
                               ?? Trial ends {new Date(user.trialEndsAt).toLocaleDateString()}
                             </span>
-                          )}
-                          {user.currentPeriodEnd && user.plan !== 'basic' && (
-                            <button
-                              onClick={() => handlePlanSelection(user, user.plan)}
-                              className={`text-[10px] font-medium px-1.5 py-0.5 rounded border hover:opacity-80 transition-opacity cursor-pointer ${
-                                user.cancelAtPeriodEnd 
-                                  ? 'bg-red-500/10 text-red-400 border-red-500/20' 
-                                  : 'bg-neutral-800 text-neutral-400 border-neutral-700'
-                              }`}
-                              title="Click to edit expiration date"
-                            >
-                              {user.cancelAtPeriodEnd ? '?? Expires' : '?? End Date:'} {new Date(user.currentPeriodEnd).toLocaleDateString()}
-                            </button>
                           )}
                         </div>
                       </div>
@@ -249,6 +238,34 @@ export function AdminUsersPage() {
                       <Badge variant={getStatusVariant(user.subscriptionStatus)}>
                         {user.subscriptionStatus}
                       </Badge>
+                    </td>
+                    <td className="px-4 py-3">
+                      {user.plan === 'basic' ? (
+                        <span className="text-xs text-neutral-600">?</span>
+                      ) : user.isSystemAdmin ? (
+                        <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">?? Unlimited</span>
+                      ) : user.currentPeriodEnd ? (
+                        new Date(user.currentPeriodEnd) < new Date() ? (
+                          <button
+                            onClick={() => handlePlanSelection(user, user.plan)}
+                            className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-red-500/10 text-red-400 border border-red-500/20 hover:opacity-80 transition-opacity cursor-pointer"
+                            title="Expired ? click to extend"
+                          >
+                            ? Expired
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handlePlanSelection(user, user.plan)}
+                            className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-300 border border-neutral-700 hover:border-neutral-500 transition-colors cursor-pointer flex items-center gap-1"
+                            title="Click to edit expiration date"
+                          >
+                            <Calendar className="w-3 h-3" />
+                            {new Date(user.currentPeriodEnd).toLocaleDateString()}
+                          </button>
+                        )
+                      ) : (
+                        <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">?? Unlimited</span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-sm text-neutral-400">{user.postCount}</td>
                     <td className="px-4 py-3 text-xs text-neutral-500">
@@ -411,6 +428,7 @@ export function AdminUsersPage() {
                 <input
                   type="date"
                   value={planEndDate}
+                  min={new Date().toISOString().split('T')[0]}
                   onChange={(e) => setPlanEndDate(e.target.value)}
                   className="w-full px-4 py-2.5 rounded-xl border border-neutral-700 bg-neutral-800 text-neutral-200 focus:outline-none focus:ring-2 focus:ring-red-500/40 focus:border-red-500 [color-scheme:dark]"
                 />
