@@ -7,61 +7,62 @@
 • Running build in 5 packages
 • Remote caching disabled
 @ee-postmind/shared:build: cache miss, executing 48ed42f36f9eca69
-@ee-postmind/db:build: cache miss, executing 041e905686157b38
 @ee-postmind/ui:build: cache miss, executing 261bad7b89716027
+@ee-postmind/db:build: cache miss, executing 041e905686157b38
 @ee-postmind/shared:build: 
 @ee-postmind/shared:build: > @ee-postmind/shared@0.1.0 build
 @ee-postmind/shared:build: > tsc
 @ee-postmind/shared:build: 
-@ee-postmind/db:build: 
-@ee-postmind/db:build: > @ee-postmind/db@0.1.0 build
-@ee-postmind/db:build: > tsc
-@ee-postmind/db:build: 
 @ee-postmind/ui:build: 
 @ee-postmind/ui:build: > @ee-postmind/ui@0.1.0 build
 @ee-postmind/ui:build: > tsc
 @ee-postmind/ui:build: 
-@ee-postmind/web:build: cache miss, executing 226f8a4daee05b8e
+@ee-postmind/db:build: 
+@ee-postmind/db:build: > @ee-postmind/db@0.1.0 build
+@ee-postmind/db:build: > tsc
+@ee-postmind/db:build: 
+@ee-postmind/web:build: cache miss, executing 6f89644c8168c9de
 @ee-postmind/web:build: 
 @ee-postmind/web:build: > @ee-postmind/web@0.1.0 build
 @ee-postmind/web:build: > tsc -b --force 2>/dev/null; vite build
 @ee-postmind/web:build: 
-@ee-postmind/api:build: cache miss, executing a809b4ec4cdd3fed
+@ee-postmind/api:build: cache miss, executing 0c1d12a74a04da3e
 @ee-postmind/api:build: 
 @ee-postmind/api:build: > @ee-postmind/api@0.1.0 build
 @ee-postmind/api:build: > tsc; exit 0
 @ee-postmind/api:build: 
-@ee-postmind/web:build: vite v6.4.1 building for production...
-@ee-postmind/web:build: transforming...
 @ee-postmind/api:build: src/services/connection.service.ts(512,9): error TS2322: Type 'unknown' is not assignable to type 'NullableJsonNullValueInput | InputJsonValue'.
 @ee-postmind/api:build: src/services/connection.service.ts(521,9): error TS2322: Type 'unknown' is not assignable to type 'NullableJsonNullValueInput | InputJsonValue'.
 @ee-postmind/api:build: src/services/conversation.service.ts(21,26): error TS2322: Type 'unknown' is not assignable to type 'JsonNull | InputJsonValue'.
 @ee-postmind/api:build: src/services/conversation.service.ts(30,13): error TS2322: Type 'unknown' is not assignable to type 'JsonNull | InputJsonValue'.
 @ee-postmind/api:build: src/services/post.service.ts(367,9): error TS2322: Type 'unknown' is not assignable to type 'NullableJsonNullValueInput | InputJsonValue'.
 @ee-postmind/api:build: src/services/post.service.ts(690,9): error TS2322: Type 'unknown' is not assignable to type 'NullableJsonNullValueInput | InputJsonValue'.
+@ee-postmind/web:build: vite v6.4.1 building for production...
+@ee-postmind/web:build: transforming...
 @ee-postmind/web:build: ✓ 2880 modules transformed.
 @ee-postmind/web:build: rendering chunks...
 @ee-postmind/web:build: computing gzip size...
 @ee-postmind/web:build: dist/index.html                              0.78 kB │ gzip:   0.43 kB
 @ee-postmind/web:build: dist/assets/index-C_klTpyu.css             121.37 kB │ gzip:  17.27 kB
-@ee-postmind/web:build: dist/assets/heart-CNvpIu1R.js                0.41 kB │ gzip:   0.31 kB
+@ee-postmind/web:build: dist/assets/heart-DWRwkLeQ.js                0.41 kB │ gzip:   0.31 kB
 @ee-postmind/web:build: dist/assets/purify.es-B9ZVCkUG.js           22.64 kB │ gzip:   8.75 kB
-@ee-postmind/web:build: dist/assets/index.es-gBk3-dt1.js           159.42 kB │ gzip:  53.45 kB
+@ee-postmind/web:build: dist/assets/index.es-AGwCkUkW.js           159.42 kB │ gzip:  53.45 kB
 @ee-postmind/web:build: dist/assets/html2canvas.esm-QH1iLAAe.js    202.38 kB │ gzip:  48.04 kB
 @ee-postmind/web:build: dist/assets/index.min-CJGn5kkc.js          315.18 kB │ gzip:  95.74 kB
-@ee-postmind/web:build: dist/assets/EditorPage-DWtZn2VZ.js         324.65 kB │ gzip:  54.28 kB
-@ee-postmind/web:build: dist/assets/AnalyticsPage-CZf4FXcq.js      375.92 kB │ gzip: 111.58 kB
-@ee-postmind/web:build: dist/assets/jspdf.es.min-HpMUcH7R.js       389.88 kB │ gzip: 128.42 kB
-@ee-postmind/web:build: dist/assets/index-CkPL73UR.js            1,039.50 kB │ gzip: 256.53 kB
+@ee-postmind/web:build: dist/assets/EditorPage-DczblWFE.js         324.65 kB │ gzip:  54.28 kB
+@ee-postmind/web:build: dist/assets/AnalyticsPage-DVkQn_GZ.js      375.92 kB │ gzip: 111.58 kB
+@ee-postmind/web:build: dist/assets/jspdf.es.min-DKDdy41q.js       389.88 kB │ gzip: 128.42 kB
+@ee-postmind/web:build: dist/assets/index-AWrfgfTu.js            1,039.68 kB │ gzip: 256.62 kB
 @ee-postmind/web:build: 
 @ee-postmind/web:build: (!) Some chunks are larger than 500 kB after minification. Consider:
 @ee-postmind/web:build: - Using dynamic import() to code-split the application
 @ee-postmind/web:build: - Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
 @ee-postmind/web:build: - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
-@ee-postmind/web:build: ✓ built in 17.98s
+@ee-postmind/web:build: ✓ built in 15.50s
 
  Tasks:    5 successful, 5 total
 Cached:    0 cached, 5 total
-  Time:    46.015s 
+  Time:    44.701s 
 
-DEPLOYMENT SUCCESSFUL
+/home/smmt/deploy.sh: line 5: [: True: integer expression expected
+BUILD_FAILED

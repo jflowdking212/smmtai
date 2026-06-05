@@ -24,18 +24,30 @@ function normalizeTopic(raw: string): string {
 function assignCategory(topic: string): string {
   const lower = topic.toLowerCase();
   const cats: Record<string, string[]> = {
-    Technology: ['ai', 'tech', 'software', 'app', 'saas', 'blockchain', 'developer', 'programming', 'api', 'cloud', 'startup'],
-    Business: ['business', 'entrepreneur', 'marketing', 'sales', 'revenue', 'brand', 'ecommerce', 'strategy'],
-    Entertainment: ['movie', 'netflix', 'celebrity', 'music', 'concert', 'drama', 'film', 'show', 'actor', 'streaming'],
-    Sports: ['football', 'soccer', 'nba', 'nfl', 'cricket', 'tennis', 'match', 'championship', 'player', 'team'],
-    Health: ['health', 'fitness', 'diet', 'workout', 'wellness', 'medical', 'mental', 'exercise', 'nutrition'],
-    Politics: ['election', 'president', 'government', 'policy', 'vote', 'congress', 'senate', 'political', 'law'],
-    Finance: ['stock', 'market', 'invest', 'economy', 'inflation', 'bank', 'trading', 'fund', 'financial'],
-    Crypto: ['bitcoin', 'ethereum', 'crypto', 'nft', 'defi', 'altcoin', 'web3', 'token', 'blockchain'],
-    Gaming: ['game', 'gaming', 'esports', 'playstation', 'xbox', 'twitch', 'steam', 'streamer', 'rpg'],
-    Education: ['education', 'school', 'university', 'learning', 'course', 'study', 'research', 'student', 'teach'],
-    Lifestyle: ['travel', 'food', 'recipe', 'home', 'lifestyle', 'dating', 'relationship', 'fashion', 'style', 'beauty'],
-    News: ['breaking', 'news', 'update', 'latest', 'report', 'announced', 'today', 'just in', 'alert'],
+    Technology: ['ai', 'software', 'app', 'tech', 'startup', 'coding', 'programming', 'developer', 'saas', 'cloud', 'api', 'machine learning', 'data', 'cyber', 'robot', 'automation', 'open source', 'linux', 'windows', 'apple', 'google', 'microsoft', 'meta', 'openai', 'gpu', 'chip', 'semiconductor'],
+    Business: ['business', 'company', 'market', 'stock', 'invest', 'startup', 'revenue', 'profit', 'ceo', 'founder', 'acquisition', 'ipo', 'valuation', 'economy', 'trade', 'corporate', 'merger'],
+    Marketing: ['marketing', 'seo', 'brand', 'campaign', 'social media', 'growth', 'content', 'influencer', 'viral', 'audience', 'engagement', 'ads', 'advertising', 'funnel', 'conversion'],
+    Health: ['health', 'medical', 'doctor', 'hospital', 'vaccine', 'disease', 'mental health', 'therapy', 'fitness', 'diet', 'nutrition', 'wellness', 'pharma', 'drug', 'fda', 'clinical', 'patient', 'surgery'],
+    Finance: ['finance', 'bank', 'loan', 'interest rate', 'federal reserve', 'inflation', 'debt', 'credit', 'wall street', 'hedge fund', 'pension', 'tax', 'budget', 'gdp', 'recession'],
+    Politics: ['politics', 'government', 'election', 'vote', 'congress', 'senate', 'president', 'democrat', 'republican', 'law', 'legislation', 'parliament', 'geopolitics', 'policy', 'supreme court', 'governor', 'mayor', 'campaign', 'party', 'liberal', 'conservative', 'trump', 'biden', 'nato', 'un', 'sanctions', 'diplomat', 'protest', 'rally', 'bill', 'amendment', 'veto', 'impeach', 'referendum', 'ballot'],
+    'Religion / Faith': ['church', 'bible', 'gospel', 'prayer', 'faith', 'christian', 'jesus', 'god', 'muslim', 'islam', 'quran', 'hindu', 'buddhist', 'spiritual', 'sermon', 'worship', 'mosque', 'temple', 'pastor', 'pope', 'vatican', 'synagogue', 'rabbi', 'scripture', 'salvation', 'baptism', 'resurrection', 'ramadan', 'eid', 'diwali', 'meditation', 'monk'],
+    Science: ['research', 'study', 'nasa', 'climate', 'physics', 'biology', 'chemistry', 'astronomy', 'space', 'genome', 'lab', 'experiment', 'discovery', 'molecule', 'quantum', 'telescope', 'mars', 'satellite', 'evolution', 'fossil', 'neuroscience', 'vaccine', 'journal', 'peer review'],
+    'Crypto / Web3': ['bitcoin', 'ethereum', 'crypto', 'nft', 'defi', 'altcoin', 'web3', 'token', 'blockchain', 'solana', 'mining', 'wallet', 'exchange', 'binance', 'coinbase', 'memecoin', 'staking', 'dao', 'airdrop', 'metaverse'],
+    Gaming: ['game', 'gaming', 'esports', 'playstation', 'xbox', 'twitch', 'steam', 'streamer', 'rpg', 'nintendo', 'gamer', 'fortnite', 'valorant', 'league of legends', 'minecraft', 'fps', 'mmorpg', 'console', 'pc gaming', 'indie game'],
+    'News / Current Events': ['breaking', 'news', 'update', 'latest', 'report', 'announced', 'world', 'conflict', 'war', 'crisis', 'earthquake', 'hurricane', 'flood', 'emergency', 'disaster', 'shooting', 'explosion', 'hostage', 'ceasefire', 'refugee', 'migrant', 'terror', 'summit', 'treaty'],
+    Music: ['album', 'song', 'concert', 'rapper', 'singer', 'hip hop', 'pop', 'rock', 'spotify', 'grammy', 'billboard', 'music', 'artist', 'tour', 'festival', 'band', 'track', 'lyric', 'release', 'ep', 'mixtape', 'genre', 'country music', 'r&b', 'jazz', 'classical'],
+    'Film / TV': ['movie', 'film', 'series', 'netflix', 'streaming', 'trailer', 'review', 'oscar', 'premiere', 'cinema', 'show', 'actor', 'actress', 'director', 'box office', 'disney', 'hbo', 'hulu', 'amazon prime', 'season', 'episode', 'documentary', 'anime', 'marvel', 'dc'],
+    'Art & Culture': ['art', 'museum', 'culture', 'gallery', 'exhibition', 'painting', 'sculpture', 'design', 'architecture', 'photography', 'creative', 'illustration', 'craft', 'heritage', 'tradition', 'festival', 'theater', 'dance', 'opera', 'literary'],
+    Environment: ['climate', 'sustainability', 'green', 'renewable', 'pollution', 'ocean', 'conservation', 'wildlife', 'carbon', 'emission', 'solar', 'wind energy', 'deforestation', 'glacier', 'biodiversity', 'recycling', 'electric vehicle', 'ev', 'fossil fuel', 'ecosystem'],
+    'Parenting & Family': ['parenting', 'child', 'baby', 'family', 'marriage', 'mom', 'dad', 'pregnancy', 'school', 'kids', 'toddler', 'teenager', 'newborn', 'breastfeed', 'childcare', 'homeschool', 'custody', 'adoption', 'fertility'],
+    'Real Estate': ['housing', 'mortgage', 'property', 'rent', 'real estate', 'home buying', 'landlord', 'apartment', 'condo', 'listing', 'realtor', 'foreclosure', 'zillow', 'home price', 'construction', 'zoning'],
+    Sports: ['football', 'soccer', 'basketball', 'nba', 'nfl', 'mlb', 'tennis', 'golf', 'olympics', 'athlete', 'championship', 'playoffs', 'world cup', 'stadium', 'coach', 'draft', 'trade', 'mma', 'ufc', 'boxing', 'wrestling', 'cricket', 'f1', 'formula', 'racing'],
+    Entertainment: ['celebrity', 'hollywood', 'award', 'red carpet', 'gossip', 'reality tv', 'kardashian', 'comedy', 'standup', 'meme', 'viral video', 'youtube', 'podcast', 'tiktok trend', 'influencer'],
+    Fashion: ['fashion', 'style', 'runway', 'designer', 'brand', 'clothing', 'outfit', 'sneaker', 'luxury', 'vogue', 'trend', 'accessory', 'jewelry', 'cosmetics', 'makeup', 'skincare'],
+    Food: ['food', 'recipe', 'restaurant', 'chef', 'cooking', 'vegan', 'organic', 'michelin', 'baking', 'cuisine', 'gourmet', 'foodie', 'diet', 'meal prep', 'drink', 'cocktail', 'wine', 'coffee', 'tea'],
+    Travel: ['travel', 'destination', 'flight', 'hotel', 'tourism', 'vacation', 'airbnb', 'passport', 'visa', 'beach', 'adventure', 'backpack', 'cruise', 'resort', 'nomad', 'itinerary', 'sightseeing'],
+    Lifestyle: ['lifestyle', 'dating', 'relationship', 'self-care', 'minimalism', 'productivity', 'motivation', 'home decor', 'interior', 'garden', 'pet', 'dog', 'cat', 'mindfulness', 'yoga', 'hobby'],
+    Education: ['education', 'school', 'university', 'learning', 'course', 'study', 'research', 'student', 'teach', 'scholarship', 'degree', 'college', 'online learning', 'tutoring', 'curriculum', 'exam', 'mooc', 'certification'],
   };
   let best = 'General', bestScore = 0;
   for (const [cat, kws] of Object.entries(cats)) {
@@ -52,25 +64,26 @@ function isNsfw(topic: string): boolean {
 }
 
 function calcViralProbability(score: number, engagement: number, growth: number): number {
+  const recencyBoost = 1.15; // recency multiplier for fresh trends
   return Math.min(100, Math.round(
-    Math.min(score / 100, 1) * 30 +
-    Math.min(engagement / 50000, 1) * 40 +
-    Math.min(growth / 300, 1) * 30
+    (Math.min(score / 80, 1) * 25 +
+    Math.min(engagement / 30000, 1) * 35 +
+    Math.min(growth / 200, 1) * 40) * recencyBoost
   ));
 }
 
 function calcStatus(score: number, growth: number): string {
-  if (score >= 85 || growth >= 300) return 'Viral';
-  if (score >= 65 || growth >= 150) return 'Hot';
-  if (score >= 40 || growth >= 50) return 'Rising';
-  if (score >= 20) return 'Emerging';
+  if (score >= 70 || growth >= 250) return 'Viral';
+  if (score >= 45 || growth >= 120) return 'Hot';
+  if (score >= 25 || growth >= 50) return 'Rising';
+  if (score >= 10) return 'Emerging';
   return 'Saturated';
 }
 
 async function sleep(ms: number) { return new Promise(r => setTimeout(r, ms)); }
 
 async function fetchRedditTrends() {
-  const subs = ['all', 'worldnews', 'technology', 'business', 'entertainment', 'sports', 'science'];
+  const subs = ['all', 'worldnews', 'technology', 'business', 'entertainment', 'sports', 'science', 'politics', 'religion', 'Christianity', 'islam', 'gaming', 'pcgaming', 'music', 'hiphopheads', 'movies', 'television', 'CryptoCurrency', 'environment', 'RealEstate', 'Parenting', 'Art', 'news', 'nottheonion', 'UpliftingNews', 'AskReddit'];
   const results: any[] = [];
   for (const sub of subs) {
     try {
@@ -81,9 +94,9 @@ async function fetchRedditTrends() {
         results.push({
           topic: p.title.slice(0, 200),
           platform: 'reddit',
-          score: Math.min(Math.round((p.score || 0) / 500), 100),
+          score: Math.min(Math.round((p.score || 0) / 200), 100),
           engagementCount: (p.ups || 0) + (p.num_comments || 0),
-          growthRate: Math.min((p.upvote_ratio || 0.5) * 150, 300),
+          growthRate: Math.min((p.upvote_ratio || 0.5) * 250, 500),
           sourceUrl: `https://reddit.com${p.permalink}`,
         });
       }
@@ -160,6 +173,52 @@ async function fetchDevToTrends() {
   return results;
 }
 
+
+async function fetchWikipediaCurrentEvents() {
+  const results: any[] = [];
+  try {
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    const url = `https://en.wikipedia.org/api/rest_v1/feed/featured/${yyyy}/${mm}/${dd}`;
+    const data = await fetchJson(url);
+    // Extract from "mostread" articles
+    if (data?.mostread?.articles) {
+      for (const article of data.mostread.articles.slice(0, 20)) {
+        if (!article?.titles?.normalized || article.titles.normalized === 'Main Page') continue;
+        const desc = article.description || article.extract?.slice(0, 100) || '';
+        const topic = desc ? `${article.titles.normalized} — ${desc}` : article.titles.normalized;
+        results.push({
+          topic: topic.slice(0, 200),
+          platform: 'wikipedia',
+          score: Math.min(Math.round((article.views || 0) / 5000), 100),
+          engagementCount: article.views || 0,
+          growthRate: Math.min((article.rank ? (50 - article.rank) * 6 : 50), 300),
+          sourceUrl: article.content_urls?.desktop?.page || `https://en.wikipedia.org/wiki/${encodeURIComponent(article.titles.normalized)}`,
+        });
+      }
+    }
+    // Extract from "news" stories
+    if (data?.news) {
+      for (const newsItem of data.news.slice(0, 10)) {
+        if (!newsItem?.story) continue;
+        const storyText = newsItem.story.replace(/<[^>]+>/g, '').slice(0, 200);
+        const link = newsItem.links?.[0];
+        results.push({
+          topic: storyText,
+          platform: 'wikipedia',
+          score: 65,
+          engagementCount: link?.views || 10000,
+          growthRate: 180,
+          sourceUrl: link?.content_urls?.desktop?.page || 'https://en.wikipedia.org/wiki/Portal:Current_events',
+        });
+      }
+    }
+  } catch (e: any) { console.warn(`[Wikipedia] ${e.message}`); }
+  return results;
+}
+
 export class TrendCollectorService {
   static async collectAllTrends(): Promise<number> {
     console.log('[TrendCollector] Starting collection cycle...');
@@ -170,6 +229,7 @@ export class TrendCollectorService {
       { name: 'HackerNews',  fn: fetchHackerNewsTrends },
       { name: 'GitHub',      fn: fetchGithubTrending },
       { name: 'Dev.to',      fn: fetchDevToTrends },
+      { name: 'Wikipedia',   fn: fetchWikipediaCurrentEvents },
     ];
 
     for (const source of sources) {

@@ -57,7 +57,7 @@ const PLATFORMS = [
   { id: 'iohah', label: 'Iohah' },
 ];
 
-const CATEGORIES = ['All', 'Technology', 'Business', 'Marketing', 'Health', 'Finance', 'Lifestyle', 'Education', 'Sports', 'Entertainment', 'Fashion', 'Food', 'Travel'];
+const CATEGORIES = ['All', 'Art & Culture', 'Business', 'Crypto / Web3', 'Education', 'Entertainment', 'Environment', 'Fashion', 'Film / TV', 'Finance', 'Food', 'Gaming', 'Health', 'Lifestyle', 'Marketing', 'Music', 'News / Current Events', 'Parenting & Family', 'Politics', 'Real Estate', 'Religion / Faith', 'Science', 'Sports', 'Technology', 'Travel'];
 
 const PLATFORM_LIMITS: Record<string, number> = {
   facebook: 63000,
