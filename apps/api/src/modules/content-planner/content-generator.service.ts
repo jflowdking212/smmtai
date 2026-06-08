@@ -78,13 +78,16 @@ export async function generateAllContent(
   intent: ParsedIntent
 ): Promise<GeneratedPost[]> {
   const platforms = intent.platforms;
-  const postsPerPlatform = Math.max(1, Math.floor(intent.totalPosts / platforms.length));
+  const base = Math.max(1, Math.floor(intent.totalPosts / platforms.length));
+  const remainder = intent.totalPosts % platforms.length;
 
   const tasks: (() => Promise<GeneratedPost | null>)[] = [];
   let index = 1;
 
-  for (const platform of platforms) {
-    for (let i = 0; i < postsPerPlatform; i++) {
+  for (let pIdx = 0; pIdx < platforms.length; pIdx++) {
+    const platform = platforms[pIdx];
+    const count = base + (pIdx < remainder ? 1 : 0);
+    for (let i = 0; i < count; i++) {
       const capturedIndex = index;
       tasks.push(() => generateContentForPlatform(intent, platform, capturedIndex, intent.totalPosts));
       index++;

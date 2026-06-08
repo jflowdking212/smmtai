@@ -61,7 +61,9 @@ async function request<T>(url: string, options?: RequestInit, retryOnUnauthorize
     if (res.status === 401 && shouldAttemptRefresh(url)) {
       useAuthStore.getState().logout();
     }
-    throw new ApiError(data.error?.message || 'Request failed', data.error?.code, res.status);
+    const err = new ApiError(data.error?.message || data.error || 'Request failed', data.error?.code, res.status);
+    if (data.clarification) (err as any).clarification = data.clarification;
+    throw err;
   }
 
   return data;

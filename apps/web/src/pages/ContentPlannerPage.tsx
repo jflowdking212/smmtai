@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui';
-import { Sparkles, CalendarDays, Upload, Image as ImageIcon, Send, RefreshCw, Trash2, Edit, Palette, X, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Sparkles, CalendarDays, Upload, Image as ImageIcon, Send, RefreshCw, Trash2, Edit, Palette, X, AlertCircle, CheckCircle2, MessageSquare, Lock } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { api } from '@/lib/api';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 
 // ── Platform badge colours ───────────────────────────────────────────────────
 const PLATFORM_COLOURS: Record<string, string> = {
@@ -33,7 +33,31 @@ function PlatformBadge({ platform }: { platform: string }) {
 
 // ── Main Page ────────────────────────────────────────────────────────────────
 export function ContentPlannerPage() {
-  const [activeTab, setActiveTab] = useState<'new' | 'history'>('new');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlPlanId = searchParams.get('planId');
+  const [activeTab, setActiveTab] = useState<'new' | 'history'>(urlPlanId ? 'new' : 'new');
+  const [viewingPlanId, setViewingPlanId] = useState<string | null>(urlPlanId);
+
+  // When "View Plan" is clicked from history, show the review dashboard
+  const handleViewPlan = (planId: string) => {
+    setViewingPlanId(planId);
+    setActiveTab('new');
+    setSearchParams({ planId });
+  };
+
+  // Reset when switching to "New Plan" tab without a plan
+  const handleTabChange = (tab: 'new' | 'history') => {
+    setActiveTab(tab);
+    if (tab === 'new' && !viewingPlanId) {
+      setSearchParams({});
+    }
+  };
+
+  const handleNewPlan = () => {
+    setViewingPlanId(null);
+    setActiveTab('new');
+    setSearchParams({});
+  };
 
   return (
     <div className="container mx-auto py-8 px-4 max-w-6xl">
@@ -44,23 +68,34 @@ export function ContentPlannerPage() {
           </h1>
           <p className="text-neutral-500 mt-1 text-sm">Generate a complete multi-platform social media plan in seconds.</p>
         </div>
+        {viewingPlanId && (
+          <Button size="sm" variant="secondary" onClick={handleNewPlan}>
+            <Sparkles className="w-4 h-4 mr-1" /> New Plan
+          </Button>
+        )}
       </div>
 
       <div className="flex gap-2 mb-6 border-b border-neutral-200">
         {(['new', 'history'] as const).map(tab => (
           <button
             key={tab}
-            onClick={() => setActiveTab(tab)}
+            onClick={() => handleTabChange(tab)}
             className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors capitalize ${
               activeTab === tab ? 'border-violet-500 text-violet-600' : 'border-transparent text-neutral-500 hover:text-neutral-700'
             }`}
           >
-            {tab === 'new' ? 'New Plan' : 'History'}
+            {tab === 'new' ? (viewingPlanId ? 'Review Plan' : 'New Plan') : 'History'}
           </button>
         ))}
       </div>
 
-      {activeTab === 'new' ? <NewPlanWizard /> : <PlanHistory />}
+      {activeTab === 'new'
+        ? (viewingPlanId
+            ? <PlanReviewDashboard planId={viewingPlanId} pendingFiles={[]} />
+            : <NewPlanWizard onPlanCreated={(id) => { setViewingPlanId(id); setSearchParams({ planId: id }); }} />
+          )
+        : <PlanHistory onViewPlan={handleViewPlan} />
+      }
     </div>
   );
 }
@@ -69,14 +104,14 @@ export function ContentPlannerPage() {
 const ALL_PLATFORMS = ['Instagram', 'Facebook', 'Twitter', 'LinkedIn', 'TikTok'];
 const TONES = ['Professional', 'Casual', 'Hype', 'Educational', 'Inspirational'];
 
-function NewPlanWizard() {
+function NewPlanWizard({ onPlanCreated }: { onPlanCreated: (planId: string) => void }) {
   const [step, setStep] = useState(1);
   const [prompt, setPrompt] = useState('');
   const [platforms, setPlatforms] = useState<string[]>(['Instagram']);
   const [tone, setTone] = useState('Professional');
   const [duration, setDuration] = useState(7);
-  const [planId, setPlanId] = useState<string | null>(null);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [clarification, setClarification] = useState<string | null>(null);
 
   const generateMutation = useMutation({
     mutationFn: async () => {
@@ -84,16 +119,19 @@ function NewPlanWizard() {
       return res;
     },
     onSuccess: (data: any) => {
-      setPlanId(data.planId);
+      setClarification(null);
+      onPlanCreated(data.planId);
     },
     onError: (err: any) => {
-      toast.error(err?.message || 'Generation failed. Please try again.');
+      // E5: Extract and display clarification from parser
+      const clarificationMsg = err?.clarification || err?.response?.clarification;
+      if (clarificationMsg) {
+        setClarification(clarificationMsg);
+      } else {
+        toast.error(err?.message || 'Generation failed. Please try again.');
+      }
     }
   });
-
-  if (planId) {
-    return <PlanReviewDashboard planId={planId} pendingFiles={pendingFiles} />;
-  }
 
   const isPending = generateMutation.isPending;
 
@@ -119,13 +157,19 @@ function NewPlanWizard() {
             <h2 className="text-xl font-bold flex items-center gap-2">
               <Sparkles className="w-5 h-5 text-violet-500" /> Describe Your Goal
             </h2>
-            <p className="text-sm text-neutral-500">What do you want to achieve with your upcoming social media posts?</p>
+            <p className="text-sm text-neutral-500">What do you want to achieve with your upcoming social media posts? <span className="text-violet-500 font-medium">(Min 20 words for best results)</span></p>
             <textarea
               value={prompt}
               onChange={e => setPrompt(e.target.value)}
               placeholder="e.g. Promote our Spring Sale for 7 days. Focus on FOMO-driven content targeting young professionals."
               className="w-full min-h-[160px] px-4 py-3 rounded-xl border border-neutral-200 text-sm focus:ring-2 focus:ring-violet-500 focus:outline-none resize-none"
             />
+            <div className="flex justify-between text-xs text-neutral-400">
+              <span>{prompt.trim().split(/\s+/).filter(Boolean).length} words</span>
+              {prompt.trim().split(/\s+/).filter(Boolean).length < 20 && prompt.trim().length > 0 && (
+                <span className="text-amber-500">Add more detail for better results</span>
+              )}
+            </div>
           </div>
         )}
 
@@ -214,6 +258,23 @@ function NewPlanWizard() {
           </div>
         )}
 
+        {/* E5: Clarification dialog */}
+        {clarification && (
+          <div className="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+            <div className="flex items-start gap-3">
+              <MessageSquare className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
+              <div className="flex-1">
+                <h3 className="font-semibold text-amber-800 text-sm">Need more details</h3>
+                <p className="text-sm text-amber-700 mt-1">{clarification}</p>
+                <p className="text-xs text-amber-500 mt-2">Update your prompt above and try again.</p>
+              </div>
+              <button onClick={() => setClarification(null)} className="text-amber-400 hover:text-amber-600">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Footer */}
         <div className="flex justify-between mt-8 pt-6 border-t border-neutral-100">
           {step === 2 ? (
@@ -254,6 +315,7 @@ function PlanReviewDashboard({ planId, pendingFiles }: { planId: string; pending
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [showMediaDialog, setShowMediaDialog] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [hasUploadedInitialMedia, setHasUploadedInitialMedia] = useState(false);
 
   const { data: plan, isLoading } = useQuery({
@@ -292,14 +354,16 @@ function PlanReviewDashboard({ planId, pendingFiles }: { planId: string; pending
   const authorizeMutation = useMutation({
     mutationFn: async () => api.contentPlanner.authorizePlan(planId),
     onSuccess: (data: any) => {
+      setShowConfirmModal(false);
       if (data.errors?.length > 0) {
         toast(data.message, { icon: '⚠️' });
       } else {
-        toast.success('Plan authorized! All posts have been scheduled.');
+        toast.success('🎉 Plan authorized! All posts have been scheduled.');
       }
       queryClient.invalidateQueries({ queryKey: ['content-plan', planId] });
     },
     onError: (err: any) => {
+      setShowConfirmModal(false);
       toast.error(err?.message || 'Failed to authorize plan');
     }
   });
@@ -326,24 +390,33 @@ function PlanReviewDashboard({ planId, pendingFiles }: { planId: string; pending
 
   if (!plan) return null;
 
-  const isAuthorized = plan.status === 'authorized' || plan.status === 'partial';
+  const isAuthorized = plan.status === 'authorized' || plan.status === 'partial' || plan.status === 'cancelled';
+  const isReadOnly = isAuthorized;
+  const activePosts = plan.posts?.filter((p: any) => p.status !== 'deleted') || [];
+  const platformsCovered = [...new Set(activePosts.map((p: any) => p.platform))];
 
   return (
     <div className="space-y-6">
       {/* Header bar */}
       <div className="bg-white border border-neutral-200 rounded-xl p-6 shadow-sm flex flex-col sm:flex-row sm:items-center gap-4 justify-between">
         <div>
-          <h2 className="text-lg font-bold">Review Your Plan</h2>
+          <h2 className="text-lg font-bold">{isReadOnly ? 'Plan Overview' : 'Review Your Plan'}</h2>
           <p className="text-sm text-neutral-500">
-            {plan.posts?.length} posts generated for{' '}
+            {activePosts.length} posts across {platformsCovered.length} platform{platformsCovered.length !== 1 ? 's' : ''} for{' '}
             <span className="font-medium text-neutral-700">{plan.theme}</span>
             {STATUS_ICONS[plan.status] && (
               <span className="ml-2 inline-flex items-center gap-1">{STATUS_ICONS[plan.status]}</span>
             )}
           </p>
+          {plan.dateRangeStart && plan.dateRangeEnd && (
+            <p className="text-xs text-neutral-400 mt-1">
+              {new Date(plan.dateRangeStart).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} –{' '}
+              {new Date(plan.dateRangeEnd).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+            </p>
+          )}
         </div>
         <div className="flex gap-2 flex-wrap">
-          {!isAuthorized && (
+          {!isReadOnly && (
             <Button
               variant="secondary" size="sm"
               onClick={() => { if (confirm('Cancel this plan?')) cancelMutation.mutate(); }}
@@ -352,37 +425,53 @@ function PlanReviewDashboard({ planId, pendingFiles }: { planId: string; pending
               <X className="w-4 h-4 mr-1" /> Cancel Plan
             </Button>
           )}
-          {!isAuthorized && (
+          {!isReadOnly && (
             <Button
               size="sm"
               className="bg-violet-600 hover:bg-violet-700 shadow-sm"
-              onClick={() => authorizeMutation.mutate()}
+              onClick={() => setShowConfirmModal(true)}
               disabled={authorizeMutation.isPending}
             >
-              {authorizeMutation.isPending
-                ? <><RefreshCw className="w-4 h-4 mr-2 animate-spin" /> Scheduling...</>
-                : <><Send className="w-4 h-4 mr-2" /> Authorize &amp; Schedule All</>}
+              <Send className="w-4 h-4 mr-2" /> Authorize & Schedule All
             </Button>
           )}
-          {isAuthorized && (
+          {plan.status === 'authorized' && (
             <div className="flex items-center gap-2 text-emerald-600 font-medium text-sm">
               <CheckCircle2 className="w-5 h-5" /> All posts scheduled
+            </div>
+          )}
+          {plan.status === 'partial' && (
+            <div className="flex items-center gap-2 text-amber-600 font-medium text-sm">
+              <AlertCircle className="w-5 h-5" /> Some posts failed — check below
+            </div>
+          )}
+          {plan.status === 'cancelled' && (
+            <div className="flex items-center gap-2 text-neutral-500 font-medium text-sm">
+              <X className="w-5 h-5" /> Plan cancelled
             </div>
           )}
         </div>
       </div>
 
+      {/* Read-only banner */}
+      {isReadOnly && (
+        <div className="flex items-center gap-2 p-3 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-600">
+          <Lock className="w-4 h-4" />
+          This plan has been {plan.status === 'cancelled' ? 'cancelled' : 'authorized'}. Posts are in read-only mode.
+        </div>
+      )}
+
       {/* Post grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
         {plan.posts?.map((post: any) => (
-          <PostCard key={post.id} post={post} planId={planId} />
+          <PostCard key={post.id} post={post} planId={planId} readOnly={isReadOnly} />
         ))}
       </div>
 
       {/* Media check dialog */}
       {showMediaDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md shadow-xl p-6">
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-xl p-6 relative">
             <button onClick={() => setShowMediaDialog(false)} className="absolute top-4 right-4 text-neutral-400 hover:text-black"><X className="w-5 h-5" /></button>
             <h2 className="text-xl font-bold mb-2">Add Media to Your Posts?</h2>
             <p className="text-sm text-neutral-500 mb-6">Posts with images or videos get 2-3× more engagement. Would you like to add some?</p>
@@ -432,16 +521,56 @@ function PlanReviewDashboard({ planId, pendingFiles }: { planId: string; pending
           </div>
         </div>
       )}
+
+      {/* Confirmation modal */}
+      {showConfirmModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-xl p-6 relative">
+            <button onClick={() => setShowConfirmModal(false)} className="absolute top-4 right-4 text-neutral-400 hover:text-black"><X className="w-5 h-5" /></button>
+            <div className="text-center">
+              <div className="w-14 h-14 bg-violet-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Send className="w-7 h-7 text-violet-600" />
+              </div>
+              <h2 className="text-xl font-bold mb-2">Authorize & Schedule?</h2>
+              <p className="text-sm text-neutral-500 mb-6">
+                You're about to schedule <strong>{activePosts.length} posts</strong> across{' '}
+                <strong>{platformsCovered.length} platform{platformsCovered.length !== 1 ? 's' : ''}</strong>.
+                {plan.dateRangeStart && plan.dateRangeEnd && (
+                  <> From{' '}
+                    <strong>{new Date(plan.dateRangeStart).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</strong> to{' '}
+                    <strong>{new Date(plan.dateRangeEnd).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</strong>.
+                  </>
+                )}
+                <br /><br />
+                <span className="text-amber-600 text-xs">Authorized posts will be queued for publishing and cannot be edited.</span>
+              </p>
+              <div className="flex gap-3">
+                <Button variant="secondary" className="flex-1" onClick={() => setShowConfirmModal(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  className="flex-1 bg-violet-600 hover:bg-violet-700"
+                  onClick={() => authorizeMutation.mutate()}
+                  disabled={authorizeMutation.isPending}
+                >
+                  {authorizeMutation.isPending
+                    ? <><RefreshCw className="w-4 h-4 mr-2 animate-spin" /> Scheduling...</>
+                    : 'Confirm & Schedule'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 // ── Post Card ────────────────────────────────────────────────────────────────
-function PostCard({ post, planId }: { post: any; planId: string }) {
+function PostCard({ post, planId, readOnly }: { post: any; planId: string; readOnly: boolean }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [isEditing, setIsEditing] = useState(false);
-  // Bug fix #10: always initialize from latest post prop
   const [content, setContent] = useState(post.contentBody);
 
   // Sync content when post data changes (e.g., after regeneration)
@@ -474,11 +603,36 @@ function PostCard({ post, planId }: { post: any; planId: string }) {
   const limit = charLimit[post.platform.toLowerCase()];
   const overLimit = limit && charCount > limit;
 
+  // Visual state borders
+  const borderAccent = post.status === 'failed'
+    ? 'border-l-4 border-l-red-400'
+    : post.status === 'scheduled'
+    ? 'border-l-4 border-l-emerald-400'
+    : post.regenerated
+    ? 'border-l-4 border-l-purple-400'
+    : post.editedByUser
+    ? 'border-l-4 border-l-blue-400'
+    : '';
+
   return (
-    <div className="bg-white border border-neutral-200 rounded-2xl shadow-sm flex flex-col hover:shadow-md transition-shadow overflow-hidden">
+    <div className={`bg-white border border-neutral-200 rounded-2xl shadow-sm flex flex-col hover:shadow-md transition-shadow overflow-hidden ${borderAccent}`}>
       {/* Card header */}
       <div className="px-4 py-3 border-b border-neutral-100 bg-slate-50/60 flex items-center justify-between">
-        <PlatformBadge platform={post.platform} />
+        <div className="flex items-center gap-2">
+          <PlatformBadge platform={post.platform} />
+          {post.status === 'failed' && (
+            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-50 text-red-600">Failed</span>
+          )}
+          {post.status === 'scheduled' && (
+            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600">Scheduled</span>
+          )}
+          {post.regenerated && (
+            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-purple-50 text-purple-600">Regenerated</span>
+          )}
+          {post.editedByUser && (
+            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-600">Edited</span>
+          )}
+        </div>
         <span className="text-xs text-neutral-400 font-medium">
           {new Date(post.scheduledAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
         </span>
@@ -486,7 +640,7 @@ function PostCard({ post, planId }: { post: any; planId: string }) {
 
       {/* Content */}
       <div className="p-4 flex-1">
-        {isEditing ? (
+        {isEditing && !readOnly ? (
           <div className="space-y-2">
             <textarea
               value={content}
@@ -516,6 +670,9 @@ function PostCard({ post, planId }: { post: any; planId: string }) {
                 {post.mediaUrls.map((url: string, i: number) => (
                   <img key={i} src={url} alt="Media" className="h-20 w-20 object-cover rounded-lg border" />
                 ))}
+                <span className="text-xs text-neutral-400 self-end ml-1">
+                  {post.mediaSource === 'editor' ? '🎨 Designed' : post.mediaSource === 'upload' ? '📎 Uploaded' : ''}
+                </span>
               </div>
             )}
           </div>
@@ -524,7 +681,9 @@ function PostCard({ post, planId }: { post: any; planId: string }) {
 
       {/* Footer actions */}
       <div className="px-4 py-3 border-t border-neutral-100 flex justify-between items-center">
-        {isEditing ? (
+        {readOnly ? (
+          <div className="text-xs text-neutral-400 italic">Read-only</div>
+        ) : isEditing ? (
           <div className="flex gap-2 w-full">
             <Button size="sm" variant="secondary" className="flex-1" onClick={() => { setContent(post.contentBody); setIsEditing(false); }}>Cancel</Button>
             <Button size="sm" className="flex-1 bg-violet-600 hover:bg-violet-700" onClick={() => updateMutation.mutate()} disabled={updateMutation.isPending || !!overLimit}>
@@ -554,7 +713,7 @@ function PostCard({ post, planId }: { post: any; planId: string }) {
                     try {
                       await api.contentPlanner.uploadMedia(post.id, fd);
                       toast.success('Uploaded!', { id: `upload-${post.id}` });
-                      queryClient.invalidateQueries({ queryKey: ['content-plan'] });
+                      queryClient.invalidateQueries({ queryKey: ['content-plan', planId] });
                     } catch {
                       toast.error('Upload failed', { id: `upload-${post.id}` });
                     }
@@ -563,7 +722,6 @@ function PostCard({ post, planId }: { post: any; planId: string }) {
               </label>
               <button
                 title="Design in Editor"
-                // Bug fix #11: use navigate() instead of window.location.href
                 onClick={() => navigate(`/editor?contentPlanPostId=${post.id}&platform=${post.platform}`)}
                 className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 transition-colors"
               ><Palette className="w-4 h-4" /></button>
@@ -591,7 +749,7 @@ const STATUS_BADGE: Record<string, string> = {
   draft: 'bg-slate-50 text-slate-500',
 };
 
-function PlanHistory() {
+function PlanHistory({ onViewPlan }: { onViewPlan: (planId: string) => void }) {
   const queryClient = useQueryClient();
   // Bug fix #4: destructure .data from the API response
   const { data: response, isLoading } = useQuery({
@@ -644,7 +802,7 @@ function PlanHistory() {
             </p>
           </div>
           <div className="flex gap-2">
-            <Button size="sm" variant="secondary" onClick={() => window.location.href = `/planner?planId=${plan.id}`}>
+            <Button size="sm" variant="secondary" onClick={() => onViewPlan(plan.id)}>
               View Plan
             </Button>
             {['ready', 'draft', 'generating'].includes(plan.status) && (

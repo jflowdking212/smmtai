@@ -34,7 +34,7 @@ function inferFileExtension(mimeType: string, originalName: string): string {
 // 1. Generate Plan
 contentPlannerRouter.post('/generate', authenticate, checkContentPlannerAccess(1), async (req: AuthRequest, res: Response) => {
   try {
-    const { prompt, platforms } = req.body;
+    const { prompt, platforms, tone, durationDays } = req.body;
     const workspaceId = req.workspaceId!;
     const userId = req.userId!;
 
@@ -44,12 +44,16 @@ contentPlannerRouter.post('/generate', authenticate, checkContentPlannerAccess(1
       return res.status(400).json({ error: 'Could not parse intent', clarification: parseResult.clarification });
     }
 
-    // Determine tone from step 2 requirement
-    // Only Step 2 users can set custom tone, else default professional
     const intent = parseResult.data;
+
+    // User-supplied wizard values override AI-inferred ones
+    if (tone) intent.tone = tone;
+    if (durationDays && durationDays > 0) intent.durationDays = durationDays;
+    if (platforms?.length > 0) intent.platforms = platforms;
+
+    // Step 1 users get restricted defaults
     if (req.contentPlanner!.maxStep < 2) {
       intent.tone = 'professional';
-      // Step 1 users get default 7 days, 1 platform
       intent.durationDays = 7;
     }
 
@@ -149,7 +153,8 @@ contentPlannerRouter.put('/post/:id', authenticate, async (req: AuthRequest, res
         contentBody,
         scheduledAt: scheduledAt ? new Date(scheduledAt) : undefined,
         hashtags,
-        editedByUser: true
+        editedByUser: true,
+        characterCount: contentBody ? contentBody.length : undefined
       }
     });
     res.json(updated);

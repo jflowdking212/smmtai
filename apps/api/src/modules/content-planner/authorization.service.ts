@@ -27,6 +27,16 @@ export async function authorizeContentPlan(
       continue;
     }
 
+    // Skip posts whose scheduled time has already passed
+    if (planPost.scheduledAt && new Date(planPost.scheduledAt) < new Date()) {
+      errors.push(`Post for ${planPost.platform} skipped — scheduled time (${new Date(planPost.scheduledAt).toLocaleString()}) has already passed`);
+      await prisma.contentPlanPost.update({
+        where: { id: planPost.id },
+        data: { status: 'failed' }
+      });
+      continue;
+    }
+
     try {
       // Use existing postService.createPost which handles media and scheduling
       const connection = await prisma.socialConnection.findFirst({
