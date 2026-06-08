@@ -276,7 +276,14 @@ contentPlannerRouter.post('/post/:id/upload-media', authenticate, upload.array('
       const randomName = `${randomUUID()}${ext}`;
       const objectKey = `workspaces/${req.workspaceId!}/planner/${randomName}`;
       
-      const url = await uploadPublicFile(objectKey, file.buffer, file.mimetype);
+      const result = await uploadPublicFile({
+        buffer: file.buffer,
+        key: objectKey,
+        contentType: file.mimetype,
+        baseUrl: process.env.PUBLIC_URL || 'http://localhost:3000',
+        localUploadDir: process.env.UPLOAD_DIR || './uploads'
+      });
+      const url = result.url;
       uploadedUrls.push(url);
     }
 

@@ -30,7 +30,7 @@ export async function authorizeContentPlan(
     try {
       // Use existing postService.createPost which handles media and scheduling
       const connection = await prisma.socialConnection.findFirst({
-        where: { workspaceId, platform: planPost.platform, isConnected: true }
+        where: { workspaceId, platform: planPost.platform, isActive: true }
       });
       if (!connection) throw new Error(`No active connection found for ${planPost.platform}`);
 

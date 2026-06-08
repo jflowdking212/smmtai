@@ -30,18 +30,17 @@ export function checkContentPlannerAccess(requiredStep: number) {
 
       const limits = await getEffectiveLimits(workspaceId);
       
-      // Determine what step they have access to based on feature flags
-      let allowedStep = 0;
-      if (limits.features?.contentPlannerStep3) allowedStep = 3;
-      else if (limits.features?.contentPlannerStep2) allowedStep = 2;
-      else if (limits.features?.contentPlannerStep1) allowedStep = 1;
-
       // Ensure base subscription details are passed
       const subscription = await prisma.subscription.findUnique({
         where: { workspaceId },
         select: { tier: true }
       });
       const tier = subscription?.tier || 'basic';
+
+      let allowedStep = 1;
+      if (tier === 'enterprise') allowedStep = 3;
+      else if (tier === 'business' || tier === 'pro') allowedStep = 2;
+      else allowedStep = 1;
 
       const context: ContentPlannerContext = {
         stepLevel: requiredStep,
