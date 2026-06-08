@@ -364,7 +364,7 @@ export class PostService {
         workspaceId,
         authorId: userId,
         content,
-        designData,
+        designData: designData ? JSON.parse(JSON.stringify(designData)) : undefined,
         status: isDraft ? 'draft' : scheduledAt ? 'scheduled' : 'pending',
         scheduledAt: scheduledAt || null,
         media: mediaUrls?.length ? {
@@ -687,7 +687,7 @@ export class PostService {
       where: { id: postId },
       data: {
         content: data.content,
-        designData: nextDesignData,
+        designData: nextDesignData ? JSON.parse(JSON.stringify(nextDesignData)) : undefined,
         media: nextMedia,
         platformPosts: nextPlatforms,
         status: 'draft',
