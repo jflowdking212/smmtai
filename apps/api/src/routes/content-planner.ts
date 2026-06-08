@@ -106,7 +106,7 @@ contentPlannerRouter.post('/generate', authenticate, checkContentPlannerAccess(1
 contentPlannerRouter.get('/plan/:id', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const plan = await prisma.contentPlan.findUnique({
-      where: { id: req.params.id, workspaceId: req.workspaceId! },
+      where: { id: req.params.id as string, workspaceId: req.workspaceId! },
       include: { posts: { orderBy: { scheduledAt: 'asc' } } }
     });
     if (!plan) return res.status(404).json({ error: 'Plan not found' });
@@ -134,7 +134,7 @@ contentPlannerRouter.put('/post/:id', authenticate, async (req: AuthRequest, res
   try {
     const { contentBody, scheduledAt, hashtags } = req.body;
     const post = await prisma.contentPlanPost.findUnique({
-      where: { id: req.params.id },
+      where: { id: req.params.id as string },
       include: { plan: true }
     });
 
@@ -143,7 +143,7 @@ contentPlannerRouter.put('/post/:id', authenticate, async (req: AuthRequest, res
     }
 
     const updated = await prisma.contentPlanPost.update({
-      where: { id: req.params.id },
+      where: { id: req.params.id as string },
       data: {
         contentBody,
         scheduledAt: scheduledAt ? new Date(scheduledAt) : undefined,
@@ -161,7 +161,7 @@ contentPlannerRouter.put('/post/:id', authenticate, async (req: AuthRequest, res
 contentPlannerRouter.post('/post/:id/regenerate', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const post = await prisma.contentPlanPost.findUnique({
-      where: { id: req.params.id },
+      where: { id: req.params.id as string },
       include: { plan: true }
     });
 
@@ -194,7 +194,7 @@ Your response MUST be valid JSON matching this exact schema:
     const result = JSON.parse(cleaned);
 
     const updated = await prisma.contentPlanPost.update({
-      where: { id: req.params.id },
+      where: { id: req.params.id as string },
       data: {
         contentBody: result.contentBody,
         hashtags: Array.isArray(result.hashtags) ? result.hashtags.map((t: string) => t.replace('#', '')) : [],
@@ -214,7 +214,7 @@ Your response MUST be valid JSON matching this exact schema:
 contentPlannerRouter.delete('/post/:id', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const post = await prisma.contentPlanPost.findUnique({
-      where: { id: req.params.id },
+      where: { id: req.params.id as string },
       include: { plan: true }
     });
 
@@ -222,7 +222,7 @@ contentPlannerRouter.delete('/post/:id', authenticate, async (req: AuthRequest, 
       return res.status(404).json({ error: 'Post not found' });
     }
 
-    await prisma.contentPlanPost.delete({ where: { id: req.params.id } });
+    await prisma.contentPlanPost.delete({ where: { id: req.params.id as string } });
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: 'Failed to delete post' });
@@ -233,7 +233,7 @@ contentPlannerRouter.delete('/post/:id', authenticate, async (req: AuthRequest, 
 contentPlannerRouter.post('/plan/:id/cancel', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const plan = await prisma.contentPlan.updateMany({
-      where: { id: req.params.id, workspaceId: req.workspaceId!, status: { in: ['draft', 'ready', 'generating'] } },
+      where: { id: req.params.id as string, workspaceId: req.workspaceId!, status: { in: ['draft', 'ready', 'generating'] } },
       data: { status: 'cancelled' }
     });
     if (plan.count === 0) return res.status(404).json({ error: 'Plan not found or cannot be cancelled' });
@@ -246,7 +246,7 @@ contentPlannerRouter.post('/plan/:id/cancel', authenticate, async (req: AuthRequ
 // 6. Authorize Plan
 contentPlannerRouter.post('/plan/:id/authorize', authenticate, async (req: AuthRequest, res: Response) => {
   try {
-    const result = await authorizeContentPlan(req.params.id, req.workspaceId!, req.userId!);
+    const result = await authorizeContentPlan(req.params.id as string, req.workspaceId!, req.userId!);
     res.json(result);
   } catch (error: any) {
     res.status(400).json({ error: error.message });
@@ -257,7 +257,7 @@ contentPlannerRouter.post('/plan/:id/authorize', authenticate, async (req: AuthR
 contentPlannerRouter.post('/post/:id/upload-media', authenticate, upload.array('media', 10), async (req: AuthRequest, res: Response) => {
   try {
     const post = await prisma.contentPlanPost.findUnique({
-      where: { id: req.params.id },
+      where: { id: req.params.id as string },
       include: { plan: true }
     });
 
@@ -281,7 +281,7 @@ contentPlannerRouter.post('/post/:id/upload-media', authenticate, upload.array('
     }
 
     const updatedPost = await prisma.contentPlanPost.update({
-      where: { id: req.params.id },
+      where: { id: req.params.id as string },
       data: {
         mediaUrls: { push: uploadedUrls },
         mediaSource: 'upload'
@@ -300,7 +300,7 @@ contentPlannerRouter.post('/post/:id/save-design', authenticate, async (req: Aut
     const { mediaUrl, designData } = req.body;
     
     const post = await prisma.contentPlanPost.findUnique({
-      where: { id: req.params.id },
+      where: { id: req.params.id as string },
       include: { plan: true }
     });
 
@@ -309,7 +309,7 @@ contentPlannerRouter.post('/post/:id/save-design', authenticate, async (req: Aut
     }
 
     const updatedPost = await prisma.contentPlanPost.update({
-      where: { id: req.params.id },
+      where: { id: req.params.id as string },
       data: {
         mediaUrls: [mediaUrl], // Replace existing media with the new design
         editorDesignData: designData,
