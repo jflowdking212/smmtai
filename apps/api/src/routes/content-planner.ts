@@ -1,0 +1,324 @@
+import { Router, Response } from 'express';
+import multer from 'multer';
+import { extname } from 'path';
+import { randomUUID } from 'crypto';
+import { prisma } from '@ee-postmind/db';
+import { authenticate, AuthRequest } from '../middleware/auth.js';
+import { checkContentPlannerAccess } from '../modules/content-planner/planGuard.js';
+import { parseContentPlanIntent } from '../modules/content-planner/plan-parser.service.js';
+import { generateAllContent } from '../modules/content-planner/content-generator.service.js';
+import { composeSchedule } from '../modules/content-planner/schedule-composer.service.js';
+import { authorizeContentPlan } from '../modules/content-planner/authorization.service.js';
+import { uploadPublicFile } from '../services/storage.service.js';
+
+export const contentPlannerRouter = Router();
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 250 * 1024 * 1024 }, // 250MB limit
+});
+
+function inferFileExtension(mimeType: string, originalName: string): string {
+  const fromName = extname(originalName || '').toLowerCase();
+  if (fromName) return fromName;
+  if (mimeType === 'image/jpeg') return '.jpg';
+  if (mimeType === 'image/png') return '.png';
+  if (mimeType === 'image/webp') return '.webp';
+  if (mimeType === 'image/gif') return '.gif';
+  if (mimeType === 'video/mp4') return '.mp4';
+  if (mimeType === 'video/quicktime') return '.mov';
+  if (mimeType === 'video/webm') return '.webm';
+  return '';
+}
+
+// 1. Generate Plan
+contentPlannerRouter.post('/generate', authenticate, checkContentPlannerAccess(1), async (req: AuthRequest, res: Response) => {
+  try {
+    const { prompt, platforms } = req.body;
+    const workspaceId = req.user!.workspaceId;
+    const userId = req.user!.id;
+
+    // A. Parse Intent
+    const parseResult = await parseContentPlanIntent(prompt, platforms || []);
+    if (!parseResult.success || !parseResult.data) {
+      return res.status(400).json({ error: 'Could not parse intent', clarification: parseResult.clarification });
+    }
+
+    // Determine tone from step 2 requirement
+    // Only Step 2 users can set custom tone, else default professional
+    const intent = parseResult.data;
+    if (req.contentPlanner!.maxStep < 2) {
+      intent.tone = 'professional';
+      // Step 1 users get default 7 days, 1 platform
+      intent.durationDays = 7;
+    }
+
+    // Save Draft Plan
+    const plan = await prisma.contentPlan.create({
+      data: {
+        workspaceId,
+        userId,
+        theme: intent.theme,
+        tone: intent.tone,
+        dateRangeStart: new Date(),
+        dateRangeEnd: new Date(Date.now() + intent.durationDays * 86400000),
+        parsedIntent: intent as any,
+        status: 'generating'
+      }
+    });
+
+    // B. Generate Content
+    const generatedPosts = await generateAllContent(intent);
+
+    // C. Schedule
+    const scheduledPosts = composeSchedule(generatedPosts, intent);
+
+    // Save Posts
+    for (const post of scheduledPosts) {
+      await prisma.contentPlanPost.create({
+        data: {
+          planId: plan.id,
+          platform: post.platform,
+          contentBody: post.contentBody,
+          hashtags: post.hashtags,
+          mediaSuggestion: post.mediaSuggestion,
+          characterCount: post.characterCount,
+          scheduledAt: post.scheduledAt,
+          aiModelUsed: 'gpt-4o-mini',
+          status: 'pending_review'
+        }
+      });
+    }
+
+    await prisma.contentPlan.update({
+      where: { id: plan.id },
+      data: { status: 'ready' }
+    });
+
+    res.json({ success: true, planId: plan.id });
+  } catch (error: any) {
+    console.error('[ContentPlanner] Generate error:', error);
+    res.status(500).json({ error: 'Generation failed', details: error.message });
+  }
+});
+
+// 2. Get Plan by ID
+contentPlannerRouter.get('/plan/:id', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const plan = await prisma.contentPlan.findUnique({
+      where: { id: req.params.id, workspaceId: req.user!.workspaceId },
+      include: { posts: { orderBy: { scheduledAt: 'asc' } } }
+    });
+    if (!plan) return res.status(404).json({ error: 'Plan not found' });
+    res.json(plan);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch plan' });
+  }
+});
+
+// 2.5 Get All Plans
+contentPlannerRouter.get('/plans', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const plans = await prisma.contentPlan.findMany({
+      where: { workspaceId: req.user!.workspaceId },
+      orderBy: { createdAt: 'desc' }
+    });
+    res.json(plans);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch plans' });
+  }
+});
+
+// 3. Edit Post
+contentPlannerRouter.put('/post/:id', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const { contentBody, scheduledAt, hashtags } = req.body;
+    const post = await prisma.contentPlanPost.findUnique({
+      where: { id: req.params.id },
+      include: { plan: true }
+    });
+
+    if (!post || post.plan.workspaceId !== req.user!.workspaceId) {
+      return res.status(404).json({ error: 'Post not found' });
+    }
+
+    const updated = await prisma.contentPlanPost.update({
+      where: { id: req.params.id },
+      data: {
+        contentBody,
+        scheduledAt: scheduledAt ? new Date(scheduledAt) : undefined,
+        hashtags,
+        editedByUser: true
+      }
+    });
+    res.json(updated);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to update post' });
+  }
+});
+
+// 3.5 Regenerate Post
+contentPlannerRouter.post('/post/:id/regenerate', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const post = await prisma.contentPlanPost.findUnique({
+      where: { id: req.params.id },
+      include: { plan: true }
+    });
+
+    if (!post || post.plan.workspaceId !== req.user!.workspaceId) {
+      return res.status(404).json({ error: 'Post not found' });
+    }
+
+    const intent = post.plan.parsedIntent as any;
+    
+    const prompt = `You are an expert social media manager regenerating a post for ${post.platform}.
+Campaign Theme: ${intent.theme || ''}
+Tone: ${intent.tone || ''}
+Special Instructions: ${intent.specialInstructions || 'None'}
+
+Please generate a NEW variation of the post content that is different from previous attempts.
+Include relevant hashtags (at least 2, max 5).
+Provide a brief media suggestion for an image or video that would pair well with this post.
+
+Your response MUST be valid JSON matching this exact schema:
+{
+  "contentBody": "the post text",
+  "hashtags": ["tag1", "tag2"],
+  "mediaSuggestion": "description of image/video, or null"
+}`;
+
+    // Need to import chatCompletion to use it here. I'll add the import as well.
+    const { chatCompletion } = await import('../../services/openai.service.js');
+    const resultJsonStr = await chatCompletion([{ role: 'user', content: prompt }]);
+    const cleaned = resultJsonStr.replace(/```json/g, '').replace(/```/g, '').trim();
+    const result = JSON.parse(cleaned);
+
+    const updated = await prisma.contentPlanPost.update({
+      where: { id: req.params.id },
+      data: {
+        contentBody: result.contentBody,
+        hashtags: Array.isArray(result.hashtags) ? result.hashtags.map((t: string) => t.replace('#', '')) : [],
+        mediaSuggestion: result.mediaSuggestion || null,
+        characterCount: result.contentBody.length,
+        regenerated: true
+      }
+    });
+
+    res.json(updated);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to regenerate post' });
+  }
+});
+
+// 4. Delete Post
+contentPlannerRouter.delete('/post/:id', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const post = await prisma.contentPlanPost.findUnique({
+      where: { id: req.params.id },
+      include: { plan: true }
+    });
+
+    if (!post || post.plan.workspaceId !== req.user!.workspaceId) {
+      return res.status(404).json({ error: 'Post not found' });
+    }
+
+    await prisma.contentPlanPost.delete({ where: { id: req.params.id } });
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to delete post' });
+  }
+});
+
+// 5. Cancel Plan
+contentPlannerRouter.post('/plan/:id/cancel', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const plan = await prisma.contentPlan.updateMany({
+      where: { id: req.params.id, workspaceId: req.user!.workspaceId, status: { in: ['draft', 'ready', 'generating'] } },
+      data: { status: 'cancelled' }
+    });
+    if (plan.count === 0) return res.status(404).json({ error: 'Plan not found or cannot be cancelled' });
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to cancel plan' });
+  }
+});
+
+// 6. Authorize Plan
+contentPlannerRouter.post('/plan/:id/authorize', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const result = await authorizeContentPlan(req.params.id, req.user!.workspaceId, req.user!.id);
+    res.json(result);
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// 7. Upload Media
+contentPlannerRouter.post('/post/:id/upload-media', authenticate, upload.array('media', 10), async (req: AuthRequest, res: Response) => {
+  try {
+    const post = await prisma.contentPlanPost.findUnique({
+      where: { id: req.params.id },
+      include: { plan: true }
+    });
+
+    if (!post || post.plan.workspaceId !== req.user!.workspaceId) {
+      return res.status(404).json({ error: 'Post not found' });
+    }
+
+    const files = req.files as Express.Multer.File[];
+    if (!files || files.length === 0) {
+      return res.status(400).json({ error: 'No files provided' });
+    }
+
+    const uploadedUrls: string[] = [];
+    for (const file of files) {
+      const ext = inferFileExtension(file.mimetype, file.originalname);
+      const randomName = `${randomUUID()}${ext}`;
+      const objectKey = `workspaces/${req.user!.workspaceId}/planner/${randomName}`;
+      
+      const url = await uploadPublicFile(objectKey, file.buffer, file.mimetype);
+      uploadedUrls.push(url);
+    }
+
+    const updatedPost = await prisma.contentPlanPost.update({
+      where: { id: req.params.id },
+      data: {
+        mediaUrls: { push: uploadedUrls },
+        mediaSource: 'upload'
+      }
+    });
+
+    res.json(updatedPost);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to upload media' });
+  }
+});
+
+// 8. Save Editor Design
+contentPlannerRouter.post('/post/:id/save-design', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const { mediaUrl, designData } = req.body;
+    
+    const post = await prisma.contentPlanPost.findUnique({
+      where: { id: req.params.id },
+      include: { plan: true }
+    });
+
+    if (!post || post.plan.workspaceId !== req.user!.workspaceId) {
+      return res.status(404).json({ error: 'Post not found' });
+    }
+
+    const updatedPost = await prisma.contentPlanPost.update({
+      where: { id: req.params.id },
+      data: {
+        mediaUrls: [mediaUrl], // Replace existing media with the new design
+        editorDesignData: designData,
+        mediaSource: 'editor'
+      }
+    });
+
+    res.json(updatedPost);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to save design' });
+  }
+});

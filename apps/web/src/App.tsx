@@ -27,6 +27,7 @@ import { InboxPage } from '@/pages/InboxPage';
 import { CommentsPage } from '@/pages/CommentsPage';
 import { ConversationsPage } from '@/pages/ConversationsPage';
 import { KnowledgeBasePage } from '@/pages/KnowledgeBasePage';
+import { ContentPlannerPage } from '@/pages/ContentPlannerPage';
 import { LandingPage } from '@/pages/LandingPage';
 import { TermsPage } from '@/pages/TermsPage';
 import { PrivacyPolicyPage } from '@/pages/PrivacyPolicyPage';
@@ -179,6 +180,7 @@ export default function App() {
             <Route path="/templates" element={<TemplatesPage />} />
             <Route path="/editor" element={<Suspense fallback={<div className="p-8 text-center text-neutral-400">Loading editor...</div>}><EditorPage /></Suspense>} />
             <Route path="/ai" element={<AIPage />} />
+            <Route path="/planner" element={<ContentPlannerPage />} />
             <Route path="/trends" element={<TrendPage />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/team" element={<UpgradeGate feature="team"><SettingsPage /></UpgradeGate>} />

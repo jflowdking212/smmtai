@@ -32,6 +32,7 @@ import { collaborationRouter } from './routes/collaboration.js';
 import { facebookRouter } from './routes/facebook.js';
 import { messagingRouter } from './routes/messaging.js';
 import { trendsRouter } from './routes/trends.js';
+import { contentPlannerRouter } from './routes/content-planner.js';
 import {
   scheduleAnalyticsIngestion,
   scheduleAnalyticsDigestReports,
@@ -92,6 +93,7 @@ app.use('/api/v1/collaboration', collaborationRouter);
 app.use('/api/v1/facebook', facebookRouter);
 app.use('/api/v1/messaging', messagingRouter);
 app.use('/api/v1/trends', trendsRouter);
+app.use('/api/v1/content-planner', contentPlannerRouter);
 
 // Sentry error handler (must be before custom errorHandler)
 if (config.sentry.dsn) {

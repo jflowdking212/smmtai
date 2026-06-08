@@ -307,7 +307,7 @@ class OAuthService {
     const headers = {
       Authorization: `Bearer ${tokenData.access_token}`,
       Accept: 'application/vnd.github+json',
-      'User-Agent': 'ee-postmind',
+      'User-Agent': 'smmtai',
     };
 
     const profileResponse = await fetch('https://api.github.com/user', { headers });

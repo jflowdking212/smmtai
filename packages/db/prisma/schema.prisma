@@ -274,6 +274,7 @@ model Post {
   media         Media[]
   platformPosts PlatformPost[]
   schedule      Schedule?
+  contentPlanPosts ContentPlanPost[]
 
   @@index([workspaceId, status])
   @@index([scheduledAt])
@@ -562,3 +563,55 @@ model UserTrendPreference {
   @@map("user_trend_preferences")
 }
 
+// ============================================================
+// Content Planning Engine
+// ============================================================
+
+model ContentPlan {
+  id              String   @id @default(cuid())
+  workspaceId     String
+  userId          String
+  theme           String
+  tone            String   @default("professional")
+  dateRangeStart  DateTime
+  dateRangeEnd    DateTime
+  parsedIntent    Json?    // Stores the ParsedIntent interface
+  status          String   @default("draft") // draft, generating, ready, partial, authorized, cancelled
+  authorizedAt    DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  posts           ContentPlanPost[]
+
+  @@index([workspaceId])
+  @@index([userId])
+  @@map("content_plans")
+}
+
+model ContentPlanPost {
+  id               String   @id @default(cuid())
+  planId           String
+  platform         String
+  contentBody      String   @db.Text
+  hashtags         String[] @default([])
+  mediaSuggestion  String?  @db.Text
+  mediaUrls        String[] @default([])
+  mediaSource      String?  // 'upload', 'editor', or null
+  characterCount   Int      @default(0)
+  scheduledAt      DateTime
+  status           String   @default("pending_review") // pending_review, approved, scheduled, posted, failed
+  aiModelUsed      String
+  regenerated      Boolean  @default(false)
+  editedByUser     Boolean  @default(false)
+  editorDesignData Json?
+  postId           String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  plan             ContentPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  post             Post?       @relation(fields: [postId], references: [id], onDelete: SetNull)
+
+  @@index([planId])
+  @@index([postId])
+  @@map("content_plan_posts")
+}

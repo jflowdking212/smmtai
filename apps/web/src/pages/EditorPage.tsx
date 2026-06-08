@@ -322,7 +322,8 @@ export function EditorPage() {
   const navigate = useNavigate();
   const initialTemplateId = searchParams.get('template');
   const initialDraftId = searchParams.get('draftId');
-  const [platform, setPlatform] = useState('instagram');
+  const contentPlanPostId = searchParams.get('contentPlanPostId');
+  const [platform, setPlatform] = useState(searchParams.get('platform') || 'instagram');
   const [postType, setPostType] = useState('post');
   const [showTemplates, setShowTemplates] = useState(false);
   const [templateCategory, setTemplateCategory] = useState('');
@@ -845,7 +846,8 @@ export function EditorPage() {
   async function pushDesignToCompose() {
     const dataUrl = exportImage('png');
     if (!dataUrl) {
-      if (initialDraftId) navigate(`/compose?draftId=${initialDraftId}`);
+      if (contentPlanPostId) navigate('/planner');
+      else if (initialDraftId) navigate(`/compose?draftId=${initialDraftId}`);
       else navigate('/compose');
       return;
     }
@@ -855,8 +857,20 @@ export function EditorPage() {
       const response = await fetch(dataUrl);
       const blob = await response.blob();
       const file = new File([blob], `smmtai-${platform}-${postType}.png`, { type: 'image/png' });
-      const upload = await api.posts.uploadMedia(file);
+      
+      if (contentPlanPostId) {
+        // Upload media specifically for Content Planner
+        const formData = new FormData();
+        formData.append('media', file);
+        await api.post(`/api/v1/content-planner/post/${contentPlanPostId}/upload-media`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        navigate('/planner');
+        return;
+      }
 
+      // Normal Compose Flow
+      const upload = await api.posts.uploadMedia(file);
       saveComposeSeed({
         source: 'editor',
         media: [upload.data],
@@ -864,7 +878,7 @@ export function EditorPage() {
       if (initialDraftId) navigate(`/compose?draftId=${initialDraftId}`);
       else navigate('/compose');
     } catch (err: any) {
-      window.alert(err.message || 'Failed to send design to Compose');
+      window.alert(err.message || 'Failed to send design');
     } finally {
       setSendingToCompose(false);
     }
