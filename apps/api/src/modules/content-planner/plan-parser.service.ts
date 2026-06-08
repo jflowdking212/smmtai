@@ -1,4 +1,4 @@
-import { chatCompletion } from '../../services/openai.service';
+import { chatCompletion } from '../../services/openai.service.js';
 
 export interface ParsedIntent {
   theme: string;
