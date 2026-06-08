@@ -121,9 +121,10 @@ contentPlannerRouter.get('/plans', authenticate, async (req: AuthRequest, res: R
   try {
     const plans = await prisma.contentPlan.findMany({
       where: { workspaceId: req.workspaceId! },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
+      include: { _count: { select: { posts: true } } }
     });
-    res.json(plans);
+    res.json({ success: true, data: plans });
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch plans' });
   }
@@ -247,7 +248,17 @@ contentPlannerRouter.post('/plan/:id/cancel', authenticate, async (req: AuthRequ
 contentPlannerRouter.post('/plan/:id/authorize', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const result = await authorizeContentPlan(req.params.id as string, req.workspaceId!, req.userId!);
-    res.json(result);
+    if (result.errors.length > 0) {
+      return res.status(207).json({
+        success: result.authorizedCount > 0,
+        authorizedCount: result.authorizedCount,
+        errors: result.errors,
+        message: result.authorizedCount > 0
+          ? `${result.authorizedCount} posts scheduled. ${result.errors.length} failed (missing platform connections).`
+          : 'All posts failed to authorize. Please check your connected platforms.'
+      });
+    }
+    res.json({ success: true, authorizedCount: result.authorizedCount });
   } catch (error: any) {
     res.status(400).json({ error: error.message });
   }

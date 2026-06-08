@@ -1,5 +1,5 @@
-import { GeneratedPost } from './content-generator.service';
-import { ParsedIntent } from './plan-parser.service';
+import { GeneratedPost } from './content-generator.service.js';
+import { ParsedIntent } from './plan-parser.service.js';
 
 export interface ScheduledPost extends GeneratedPost {
   scheduledAt: Date;
@@ -22,51 +22,48 @@ export function composeSchedule(
   const scheduled: ScheduledPost[] = [];
   if (posts.length === 0) return scheduled;
 
-  // We have N posts to distribute over M days.
   const startDate = new Date();
   if (startDate.getHours() >= 20) {
     // If it's late, start tomorrow
     startDate.setDate(startDate.getDate() + 1);
   }
+  startDate.setHours(0, 0, 0, 0);
 
-  // To distribute evenly, we round-robin across days.
-  // Then within a day, we space posts by 2 hours.
-  let currentDayOffset = 0;
-  
-  // Keep track of how many posts are assigned to each day to space them out
-  const dayPostCounts: Record<number, number> = {};
+  // Track per-day per-platform slot to avoid time collisions
+  // Key: `${dayOffset}-${platform}`, Value: next available hour
+  const slotTracker: Record<string, number> = {};
+
+  // Distribute posts round-robin across days
+  let dayOffset = 0;
 
   for (const post of posts) {
-    if (!dayPostCounts[currentDayOffset]) {
-      dayPostCounts[currentDayOffset] = 0;
-    }
-
     const platformKey = post.platform.toLowerCase();
     const timeWindow = PLATFORM_BEST_TIMES[platformKey] || PLATFORM_BEST_TIMES.default;
-    
-    // Spread posts starting from the optimal start time, spaced by 2 hours
-    const postCountForDay = dayPostCounts[currentDayOffset];
-    const hour = Math.min(timeWindow.start + (postCountForDay * 2), 22);
 
-    const scheduledDate = new Date(startDate);
-    scheduledDate.setDate(startDate.getDate() + currentDayOffset);
-    scheduledDate.setHours(hour, 0, 0, 0);
+    // Honour user's preferred time window
+    let baseHour = timeWindow.start;
+    if (intent.preferredTime === 'morning') baseHour = 8;
+    else if (intent.preferredTime === 'afternoon') baseHour = 14;
+    else if (intent.preferredTime === 'evening') baseHour = 18;
 
-    if (intent.preferredTime === 'morning') {
-      scheduledDate.setHours(Math.min(9 + (postCountForDay * 2), 11), 0, 0, 0);
-    } else if (intent.preferredTime === 'afternoon') {
-      scheduledDate.setHours(Math.min(14 + (postCountForDay * 2), 17), 0, 0, 0);
-    } else if (intent.preferredTime === 'evening') {
-      scheduledDate.setHours(Math.min(18 + (postCountForDay * 2), 22), 0, 0, 0);
+    const slotKey = `${dayOffset}-${platformKey}`;
+    if (!(slotKey in slotTracker)) {
+      slotTracker[slotKey] = baseHour;
     }
 
-    scheduled.push({
-      ...post,
-      scheduledAt: scheduledDate
-    });
+    // Clamp to 22:00 max
+    const hour = Math.min(slotTracker[slotKey], 22);
+    // Advance slot by 2h for next post on same platform+day
+    slotTracker[slotKey] = hour + 2;
 
-    dayPostCounts[currentDayOffset]++;
-    currentDayOffset = (currentDayOffset + 1) % intent.durationDays;
+    const scheduledDate = new Date(startDate);
+    scheduledDate.setDate(startDate.getDate() + dayOffset);
+    scheduledDate.setHours(hour, 0, 0, 0);
+
+    scheduled.push({ ...post, scheduledAt: scheduledDate });
+
+    // Advance to next day, wrapping within durationDays
+    dayOffset = (dayOffset + 1) % Math.max(1, intent.durationDays);
   }
 
   // Sort by scheduledAt

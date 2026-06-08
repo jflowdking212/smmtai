@@ -1,5 +1,5 @@
-import { chatCompletion } from '../../services/openai.service';
-import { ParsedIntent } from './plan-parser.service';
+import { chatCompletion } from '../../services/openai.service.js';
+import { ParsedIntent } from './plan-parser.service.js';
 
 export interface GeneratedPost {
   platform: string;
@@ -9,7 +9,7 @@ export interface GeneratedPost {
   characterCount: number;
 }
 
-export async function generateContentForPlatform(
+async function generateContentForPlatform(
   intent: ParsedIntent,
   platform: string,
   index: number,
@@ -54,29 +54,43 @@ Your response MUST be valid JSON matching this exact schema:
   }
 }
 
+/** Run promises in batches to avoid OpenAI rate-limit (429) on large plans */
+async function runInBatches<T>(
+  tasks: (() => Promise<T>)[],
+  batchSize = 4
+): Promise<(T | null)[]> {
+  const results: (T | null)[] = [];
+  for (let i = 0; i < tasks.length; i += batchSize) {
+    const batch = tasks.slice(i, i + batchSize);
+    const settled = await Promise.allSettled(batch.map(fn => fn()));
+    for (const r of settled) {
+      results.push(r.status === 'fulfilled' ? r.value : null);
+    }
+    // Small delay between batches to respect rate limits
+    if (i + batchSize < tasks.length) {
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+  }
+  return results;
+}
+
 export async function generateAllContent(
   intent: ParsedIntent
 ): Promise<GeneratedPost[]> {
-  const posts: GeneratedPost[] = [];
   const platforms = intent.platforms;
   const postsPerPlatform = Math.max(1, Math.floor(intent.totalPosts / platforms.length));
 
-  const promises: Promise<GeneratedPost | null>[] = [];
+  const tasks: (() => Promise<GeneratedPost | null>)[] = [];
   let index = 1;
-  
+
   for (const platform of platforms) {
     for (let i = 0; i < postsPerPlatform; i++) {
-      promises.push(generateContentForPlatform(intent, platform, index, intent.totalPosts));
+      const capturedIndex = index;
+      tasks.push(() => generateContentForPlatform(intent, platform, capturedIndex, intent.totalPosts));
       index++;
     }
   }
 
-  const results = await Promise.allSettled(promises);
-  for (const res of results) {
-    if (res.status === 'fulfilled' && res.value) {
-      posts.push(res.value);
-    }
-  }
-
-  return posts;
+  const results = await runInBatches(tasks, 4);
+  return results.filter((r): r is GeneratedPost => r !== null);
 }

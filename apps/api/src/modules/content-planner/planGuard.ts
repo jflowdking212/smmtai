@@ -1,7 +1,6 @@
-import { Request, Response, NextFunction } from 'express';
+import { Response, NextFunction } from 'express';
 import { prisma } from '../../config/database.js';
 import { AuthRequest } from '../../middleware/auth.js';
-import { getEffectiveLimits } from '../../services/admin-settings.service';
 
 export interface ContentPlannerContext {
   stepLevel: number;
@@ -17,7 +16,7 @@ declare module 'express-serve-static-core' {
 }
 
 /**
- * Middleware to gate access to the Content Planning Engine based on the user's plan.
+ * Middleware to gate access to the Content Planning Engine based on the user's subscription tier.
  * @param requiredStep The step required to access the route (1, 2, or 3)
  */
 export function checkContentPlannerAccess(requiredStep: number) {
@@ -28,9 +27,7 @@ export function checkContentPlannerAccess(requiredStep: number) {
         return res.status(401).json({ error: 'Unauthorized' });
       }
 
-      const limits = await getEffectiveLimits(workspaceId);
-      
-      // Ensure base subscription details are passed
+      // Derive allowed step from subscription tier
       const subscription = await prisma.subscription.findUnique({
         where: { workspaceId },
         select: { tier: true }
