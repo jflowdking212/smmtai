@@ -1,5 +1,6 @@
-import { prisma } from '@ee-postmind/db';
-import { createPost } from '../../services/post.service';
+import { prisma } from '../../config/database.js';
+import { postService } from '../../services/post.service.js';
+
 
 export async function authorizeContentPlan(
   planId: string, 
@@ -28,16 +29,19 @@ export async function authorizeContentPlan(
 
     try {
       // Use existing postService.createPost which handles media and scheduling
-      const newPost = await createPost({
-        workspaceId,
-        authorId,
-        content: planPost.contentBody,
-        platforms: [planPost.platform],
-        status: 'scheduled',
-        scheduledAt: planPost.scheduledAt,
-        mediaUrls: planPost.mediaUrls,
-        designData: planPost.editorDesignData ? JSON.stringify(planPost.editorDesignData) : undefined
+      const connection = await prisma.socialConnection.findFirst({
+        where: { workspaceId, platform: planPost.platform, isConnected: true }
       });
+      if (!connection) throw new Error(`No active connection found for ${planPost.platform}`);
+
+      const newPost = await postService.createPost({
+        workspaceId,
+        userId: authorId,
+        content: planPost.contentBody,
+        platforms: [{ connectionId: connection.id, platform: planPost.platform as any }],
+        scheduledAt: planPost.scheduledAt ? new Date(planPost.scheduledAt) : undefined,
+        mediaUrls: planPost.mediaUrls
+      } as any);
 
       await prisma.contentPlanPost.update({
         where: { id: planPost.id },

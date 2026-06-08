@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
-import { prisma } from '@ee-postmind/db';
+import { prisma } from '../../config/database.js';
+import { AuthRequest } from '../../middleware/auth.js';
 import { getEffectiveLimits } from '../../services/admin-settings.service';
 
 export interface ContentPlannerContext {
@@ -20,9 +21,9 @@ declare module 'express-serve-static-core' {
  * @param requiredStep The step required to access the route (1, 2, or 3)
  */
 export function checkContentPlannerAccess(requiredStep: number) {
-  return async (req: Request, res: Response, next: NextFunction) => {
+  return async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-      const workspaceId = req.user?.workspaceId;
+      const workspaceId = req.workspaceId;
       if (!workspaceId) {
         return res.status(401).json({ error: 'Unauthorized' });
       }

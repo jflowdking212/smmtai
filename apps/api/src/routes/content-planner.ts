@@ -2,7 +2,7 @@ import { Router, Response } from 'express';
 import multer from 'multer';
 import { extname } from 'path';
 import { randomUUID } from 'crypto';
-import { prisma } from '@ee-postmind/db';
+import { prisma } from '../config/database.js';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
 import { checkContentPlannerAccess } from '../modules/content-planner/planGuard.js';
 import { parseContentPlanIntent } from '../modules/content-planner/plan-parser.service.js';
@@ -35,8 +35,8 @@ function inferFileExtension(mimeType: string, originalName: string): string {
 contentPlannerRouter.post('/generate', authenticate, checkContentPlannerAccess(1), async (req: AuthRequest, res: Response) => {
   try {
     const { prompt, platforms } = req.body;
-    const workspaceId = req.user!.workspaceId;
-    const userId = req.user!.id;
+    const workspaceId = req.workspaceId!;
+    const userId = req.userId!;
 
     // A. Parse Intent
     const parseResult = await parseContentPlanIntent(prompt, platforms || []);
@@ -106,7 +106,7 @@ contentPlannerRouter.post('/generate', authenticate, checkContentPlannerAccess(1
 contentPlannerRouter.get('/plan/:id', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const plan = await prisma.contentPlan.findUnique({
-      where: { id: req.params.id, workspaceId: req.user!.workspaceId },
+      where: { id: req.params.id, workspaceId: req.workspaceId! },
       include: { posts: { orderBy: { scheduledAt: 'asc' } } }
     });
     if (!plan) return res.status(404).json({ error: 'Plan not found' });
@@ -120,7 +120,7 @@ contentPlannerRouter.get('/plan/:id', authenticate, async (req: AuthRequest, res
 contentPlannerRouter.get('/plans', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const plans = await prisma.contentPlan.findMany({
-      where: { workspaceId: req.user!.workspaceId },
+      where: { workspaceId: req.workspaceId! },
       orderBy: { createdAt: 'desc' }
     });
     res.json(plans);
@@ -138,7 +138,7 @@ contentPlannerRouter.put('/post/:id', authenticate, async (req: AuthRequest, res
       include: { plan: true }
     });
 
-    if (!post || post.plan.workspaceId !== req.user!.workspaceId) {
+    if (!post || post.plan.workspaceId !== req.workspaceId!) {
       return res.status(404).json({ error: 'Post not found' });
     }
 
@@ -165,7 +165,7 @@ contentPlannerRouter.post('/post/:id/regenerate', authenticate, async (req: Auth
       include: { plan: true }
     });
 
-    if (!post || post.plan.workspaceId !== req.user!.workspaceId) {
+    if (!post || post.plan.workspaceId !== req.workspaceId!) {
       return res.status(404).json({ error: 'Post not found' });
     }
 
@@ -188,7 +188,7 @@ Your response MUST be valid JSON matching this exact schema:
 }`;
 
     // Need to import chatCompletion to use it here. I'll add the import as well.
-    const { chatCompletion } = await import('../../services/openai.service.js');
+    const { chatCompletion } = await import('../services/openai.service.js');
     const resultJsonStr = await chatCompletion([{ role: 'user', content: prompt }]);
     const cleaned = resultJsonStr.replace(/```json/g, '').replace(/```/g, '').trim();
     const result = JSON.parse(cleaned);
@@ -218,7 +218,7 @@ contentPlannerRouter.delete('/post/:id', authenticate, async (req: AuthRequest, 
       include: { plan: true }
     });
 
-    if (!post || post.plan.workspaceId !== req.user!.workspaceId) {
+    if (!post || post.plan.workspaceId !== req.workspaceId!) {
       return res.status(404).json({ error: 'Post not found' });
     }
 
@@ -233,7 +233,7 @@ contentPlannerRouter.delete('/post/:id', authenticate, async (req: AuthRequest, 
 contentPlannerRouter.post('/plan/:id/cancel', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const plan = await prisma.contentPlan.updateMany({
-      where: { id: req.params.id, workspaceId: req.user!.workspaceId, status: { in: ['draft', 'ready', 'generating'] } },
+      where: { id: req.params.id, workspaceId: req.workspaceId!, status: { in: ['draft', 'ready', 'generating'] } },
       data: { status: 'cancelled' }
     });
     if (plan.count === 0) return res.status(404).json({ error: 'Plan not found or cannot be cancelled' });
@@ -246,7 +246,7 @@ contentPlannerRouter.post('/plan/:id/cancel', authenticate, async (req: AuthRequ
 // 6. Authorize Plan
 contentPlannerRouter.post('/plan/:id/authorize', authenticate, async (req: AuthRequest, res: Response) => {
   try {
-    const result = await authorizeContentPlan(req.params.id, req.user!.workspaceId, req.user!.id);
+    const result = await authorizeContentPlan(req.params.id, req.workspaceId!, req.userId!);
     res.json(result);
   } catch (error: any) {
     res.status(400).json({ error: error.message });
@@ -261,7 +261,7 @@ contentPlannerRouter.post('/post/:id/upload-media', authenticate, upload.array('
       include: { plan: true }
     });
 
-    if (!post || post.plan.workspaceId !== req.user!.workspaceId) {
+    if (!post || post.plan.workspaceId !== req.workspaceId!) {
       return res.status(404).json({ error: 'Post not found' });
     }
 
@@ -274,7 +274,7 @@ contentPlannerRouter.post('/post/:id/upload-media', authenticate, upload.array('
     for (const file of files) {
       const ext = inferFileExtension(file.mimetype, file.originalname);
       const randomName = `${randomUUID()}${ext}`;
-      const objectKey = `workspaces/${req.user!.workspaceId}/planner/${randomName}`;
+      const objectKey = `workspaces/${req.workspaceId!}/planner/${randomName}`;
       
       const url = await uploadPublicFile(objectKey, file.buffer, file.mimetype);
       uploadedUrls.push(url);
@@ -304,7 +304,7 @@ contentPlannerRouter.post('/post/:id/save-design', authenticate, async (req: Aut
       include: { plan: true }
     });
 
-    if (!post || post.plan.workspaceId !== req.user!.workspaceId) {
+    if (!post || post.plan.workspaceId !== req.workspaceId!) {
       return res.status(404).json({ error: 'Post not found' });
     }
 
