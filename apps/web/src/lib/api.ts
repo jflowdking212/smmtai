@@ -137,6 +137,19 @@ export class ApiError extends Error {
 
 // API methods
 export const api = {
+  contentPlanner: {
+    generate: (data: any) => request<any>('/content-planner/generate', { method: 'POST', body: JSON.stringify(data) }),
+    getPlan: (planId: string) => request<any>(`/content-planner/plan/${planId}`),
+    listPlans: () => request<any>('/content-planner/plans'),
+    editPost: (postId: string, data: any) => request<any>(`/content-planner/post/${postId}`, { method: 'PUT', body: JSON.stringify(data) }),
+    regeneratePost: (postId: string) => request<any>(`/content-planner/post/${postId}/regenerate`, { method: 'POST' }),
+    deletePost: (postId: string) => request<any>(`/content-planner/post/${postId}`, { method: 'DELETE' }),
+    cancelPlan: (planId: string) => request<any>(`/content-planner/plan/${planId}/cancel`, { method: 'POST' }),
+    authorizePlan: (planId: string) => request<any>(`/content-planner/plan/${planId}/authorize`, { method: 'POST' }),
+    uploadMedia: (postId: string, formData: FormData) => request<any>(`/content-planner/post/${postId}/upload-media`, { method: 'POST', body: formData }),
+    saveDesign: (postId: string, data: any) => request<any>(`/content-planner/post/${postId}/save-design`, { method: 'POST', body: JSON.stringify(data) }),
+  },
+
   auth: {
     oauthUrl: (provider: 'google' | 'github' | 'facebook', next = '/') =>
       `${API_BASE}/auth/oauth/${provider}?next=${encodeURIComponent(next)}`,

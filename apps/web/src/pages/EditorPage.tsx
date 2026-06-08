@@ -857,14 +857,12 @@ export function EditorPage() {
       const response = await fetch(dataUrl);
       const blob = await response.blob();
       const file = new File([blob], `smmtai-${platform}-${postType}.png`, { type: 'image/png' });
+      const blobUrl = URL.createObjectURL(blob);
+      const json = toJSON();
       
       if (contentPlanPostId) {
         // Upload media specifically for Content Planner
-        const formData = new FormData();
-        formData.append('media', file);
-        await api.post(`/api/v1/content-planner/post/${contentPlanPostId}/upload-media`, formData, {
-          headers: { 'Content-Type': 'multipart/form-data' }
-        });
+        await api.contentPlanner.saveDesign(contentPlanPostId, { mediaUrl: blobUrl, designData: json });
         navigate('/planner');
         return;
       }

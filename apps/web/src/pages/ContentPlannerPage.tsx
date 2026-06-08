@@ -46,8 +46,8 @@ function NewPlanWizard() {
 
   const generateMutation = useMutation({
     mutationFn: async () => {
-      const res = await api.post('/api/v1/content-planner/generate', { prompt, platforms });
-      return res.data;
+      const res = await api.contentPlanner.generate({ prompt, platforms });
+      return res;
     },
     onSuccess: (data) => {
       setPlanId(data.planId);
@@ -113,7 +113,7 @@ function NewPlanWizard() {
         </CardContent>
         <CardFooter className="flex justify-between border-t bg-slate-50/50 pt-6">
           {step === 2 && (
-            <Button variant="outline" onClick={() => setStep(1)}>Back</Button>
+            <Button variant="secondary" onClick={() => setStep(1)}>Back</Button>
           )}
           <div className="flex-1" />
           {step === 1 ? (
@@ -147,8 +147,8 @@ function PlanReviewDashboard({ planId }: { planId: string }) {
   const { data: plan, isLoading, refetch } = useQuery({
     queryKey: ['content-plan', planId],
     queryFn: async () => {
-      const res = await api.get(`/api/v1/content-planner/plan/${planId}`);
-      return res.data;
+      const res = await api.contentPlanner.getPlan(planId);
+      return res;
     },
     refetchInterval: (data: any) => data?.status === 'generating' ? 2000 : false
   });
@@ -167,8 +167,8 @@ function PlanReviewDashboard({ planId }: { planId: string }) {
 
   const authorizeMutation = useMutation({
     mutationFn: async () => {
-      const res = await api.post(`/api/v1/content-planner/plan/${planId}/authorize`);
-      return res.data;
+      const res = await api.contentPlanner.authorizePlan(planId);
+      return res;
     },
     onSuccess: () => {
       toast.success('Plan authorized and scheduled!');
@@ -223,8 +223,8 @@ function PlanReviewDashboard({ planId }: { planId: string }) {
             Social media posts perform better with images or videos. Do you want to add some now?
           </div>
           <DialogFooter className="flex flex-col sm:flex-row gap-2 mt-4">
-            <Button variant="outline" onClick={() => setShowMediaDialog(false)}>Skip for now</Button>
-            <Button variant="outline" className="gap-2" onClick={() => setShowMediaDialog(false)}>
+            <Button variant="secondary" onClick={() => setShowMediaDialog(false)}>Skip for now</Button>
+            <Button variant="secondary" className="gap-2" onClick={() => setShowMediaDialog(false)}>
               <Upload className="w-4 h-4" /> Upload Files
             </Button>
             <Button className="bg-violet-600 gap-2" onClick={() => setShowMediaDialog(false)}>
@@ -243,8 +243,8 @@ function PostCard({ post, onUpdate }: { post: any, onUpdate: () => void }) {
 
   const regenerateMutation = useMutation({
     mutationFn: async () => {
-      const res = await api.post(`/api/v1/content-planner/post/${post.id}/regenerate`);
-      return res.data;
+      const res = await api.contentPlanner.regeneratePost(post.id);
+      return res;
     },
     onSuccess: () => {
       toast.success('Post regenerated');
@@ -254,8 +254,8 @@ function PostCard({ post, onUpdate }: { post: any, onUpdate: () => void }) {
 
   const updateMutation = useMutation({
     mutationFn: async () => {
-      const res = await api.put(`/api/v1/content-planner/post/${post.id}`, { contentBody: content });
-      return res.data;
+      const res = await api.contentPlanner.editPost(post.id, { contentBody: content });
+      return res;
     },
     onSuccess: () => {
       toast.success('Post updated');
@@ -266,8 +266,8 @@ function PostCard({ post, onUpdate }: { post: any, onUpdate: () => void }) {
 
   const deleteMutation = useMutation({
     mutationFn: async () => {
-      const res = await api.delete(`/api/v1/content-planner/post/${post.id}`);
-      return res.data;
+      const res = await api.contentPlanner.deletePost(post.id);
+      return res;
     },
     onSuccess: () => {
       toast.success('Post removed');
@@ -317,19 +317,19 @@ function PostCard({ post, onUpdate }: { post: any, onUpdate: () => void }) {
       <CardFooter className="pt-0 justify-between">
         {isEditing ? (
           <div className="flex gap-2 w-full">
-            <Button size="sm" variant="outline" className="flex-1" onClick={() => setIsEditing(false)}>Cancel</Button>
+            <Button size="sm" variant="secondary" className="flex-1" onClick={() => setIsEditing(false)}>Cancel</Button>
             <Button size="sm" className="flex-1 bg-violet-600" onClick={() => updateMutation.mutate()}>Save</Button>
           </div>
         ) : (
           <>
             <div className="flex gap-1 flex-wrap">
-              <Button size="icon" variant="ghost" title="Edit" onClick={() => setIsEditing(true)}>
+              <Button size="sm" variant="ghost" title="Edit" onClick={() => setIsEditing(true)}>
                 <Edit className="w-4 h-4 text-slate-500" />
               </Button>
-              <Button size="icon" variant="ghost" title="Regenerate" onClick={() => regenerateMutation.mutate()} disabled={regenerateMutation.isPending}>
+              <Button size="sm" variant="ghost" title="Regenerate" onClick={() => regenerateMutation.mutate()} disabled={regenerateMutation.isPending}>
                 <RefreshCw className={`w-4 h-4 text-slate-500 ${regenerateMutation.isPending ? 'animate-spin' : ''}`} />
               </Button>
-              <Button size="icon" variant="ghost" title="Add Media" onClick={() => {
+              <Button size="sm" variant="ghost" title="Add Media" onClick={() => {
                 const input = document.createElement('input');
                 input.type = 'file';
                 input.accept = 'image/*,video/*';
@@ -341,9 +341,9 @@ function PostCard({ post, onUpdate }: { post: any, onUpdate: () => void }) {
                   for (let i = 0; i < files.length; i++) formData.append('media', files[i]);
                   toast.loading('Uploading...', { id: 'upload' });
                   try {
-                    await api.post(`/api/v1/content-planner/post/${post.id}/upload-media`, formData, {
-                      headers: { 'Content-Type': 'multipart/form-data' }
-                    });
+                    await api.contentPlanner.uploadMedia(post.id, formData);
+                      
+                ;
                     toast.success('Uploaded successfully', { id: 'upload' });
                     onUpdate();
                   } catch (err) {
@@ -354,14 +354,14 @@ function PostCard({ post, onUpdate }: { post: any, onUpdate: () => void }) {
               }}>
                 <Upload className="w-4 h-4 text-slate-500" />
               </Button>
-              <Button size="icon" variant="ghost" title="Design in Editor" onClick={() => {
+              <Button size="sm" variant="ghost" title="Design in Editor" onClick={() => {
                 // Navigate to Editor with content plan post context
                 window.location.href = `/editor?contentPlanPostId=${post.id}&platform=${post.platform}`;
               }}>
                 <Palette className="w-4 h-4 text-slate-500" />
               </Button>
             </div>
-            <Button size="icon" variant="ghost" title="Delete" className="text-red-500 hover:text-red-600 hover:bg-red-50" onClick={() => {
+            <Button size="sm" variant="ghost" title="Delete" className="text-red-500 hover:text-red-600 hover:bg-red-50" onClick={() => {
               if (confirm('Remove this post from the plan?')) deleteMutation.mutate();
             }}>
               <Trash2 className="w-4 h-4" />
@@ -378,8 +378,8 @@ function PlanHistory() {
     queryKey: ['content-plans-history'],
     queryFn: async () => {
       // NOTE: We'll need a /api/v1/content-planner/plans endpoint to fetch history
-      const res = await api.get('/api/v1/content-planner/plans');
-      return res.data;
+      const res = await api.contentPlanner.listPlans();
+      return res;
     }
   });
 

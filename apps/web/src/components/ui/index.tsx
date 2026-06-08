@@ -303,3 +303,8 @@ export function SelectContent({ children }: any) {
 export function SelectItem({ value, children }: any) {
   return <option value={value}>{children}</option>;
 }
+
+export function CardHeader({ className, children }: any) { return <div className={cn('p-6 pb-0', className)}>{children}</div>; }
+export function CardTitle({ className, children }: any) { return <h3 className={cn('font-semibold leading-none tracking-tight', className)}>{children}</h3>; }
+export function CardContent({ className, children }: any) { return <div className={cn('p-6', className)}>{children}</div>; }
+export function CardFooter({ className, children }: any) { return <div className={cn('flex items-center p-6 pt-0', className)}>{children}</div>; }
