@@ -12,13 +12,29 @@ import { MastodonAdapter } from './new.js';
 // ============================================================
 // 1. Threads (by Meta) — Graph API
 // ============================================================
+// Helper to poll Threads container processing status (required for video posts)
+async function waitForThreadsContainer(containerId: string, accessToken: string, maxRetries = 15): Promise<void> {
+  for (let i = 0; i < maxRetries; i++) {
+    await new Promise((r) => setTimeout(r, 3000)); // wait 3s between checks
+    const res = await fetch(`https://graph.threads.net/v1.0/${containerId}?fields=status_code,error_message&access_token=${accessToken}`);
+    const data = await res.json() as any;
+    const status = data.status_code;
+    console.log(`[Threads] container ${containerId} status: ${status} (attempt ${i + 1})`);
+    if (status === 'FINISHED') return;
+    if (status === 'ERROR') {
+      throw new Error(`Threads media container failed: ${data.error_message || 'Unknown processing error'}`);
+    }
+  }
+  throw new Error('Threads media container processing timed out');
+}
+
 export class ThreadsAdapter implements PlatformAdapter {
   readonly platform: PlatformType = 'threads';
 
   getAuthUrl(state: string): string {
     const clientId = process.env.THREADS_CLIENT_ID || '';
     const redirectUri = encodeURIComponent(process.env.THREADS_REDIRECT_URI || '');
-    return `https://threads.net/oauth/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&scope=threads_basic,threads_content_publish&response_type=code&state=${state}`;
+    return `https://threads.net/oauth/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&scope=threads_basic,threads_content_publish,threads_manage_insights&response_type=code&state=${state}`;
   }
 
   async exchangeCode(code: string): Promise<PlatformTokens> {
@@ -61,17 +77,49 @@ export class ThreadsAdapter implements PlatformAdapter {
   }
 
   async publishPost(accessToken: string, post: PlatformPostPayload): Promise<PlatformPostResult> {
-    const createRes = await fetch(`https://graph.threads.net/v1.0/me/threads?media_type=TEXT&text=${encodeURIComponent(post.text)}&access_token=${accessToken}`, {
+    const mediaUrl = post.mediaUrls?.[0]?.trim();
+    const hasMedia = !!mediaUrl;
+    const isVideo = hasMedia && (post.mediaType === 'video' || /\.(mp4|mov|avi|webm|m4v|mkv)(\?.*)?$/i.test(mediaUrl));
+
+    const body = new URLSearchParams();
+    if (hasMedia) {
+      if (isVideo) {
+        body.set('media_type', 'VIDEO');
+        body.set('video_url', mediaUrl);
+      } else {
+        body.set('media_type', 'IMAGE');
+        body.set('image_url', mediaUrl);
+      }
+      if (post.text) {
+        body.set('text', post.text);
+      }
+    } else {
+      body.set('media_type', 'TEXT');
+      body.set('text', post.text || '');
+    }
+
+    const createRes = await fetch(`https://graph.threads.net/v1.0/me/threads?access_token=${accessToken}`, {
       method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: body.toString(),
     });
     const createData = await createRes.json() as any;
-    if (!createRes.ok || !createData.id) throw new Error(createData.error?.message || 'Failed to create Threads container');
+    if (!createRes.ok || !createData.id) {
+      throw new Error(createData.error?.message || 'Failed to create Threads media container');
+    }
+
+    // Wait for container processing if media is attached (crucial for video encoding)
+    if (hasMedia) {
+      await waitForThreadsContainer(createData.id, accessToken);
+    }
 
     const publishRes = await fetch(`https://graph.threads.net/v1.0/me/threads_publish?creation_id=${createData.id}&access_token=${accessToken}`, {
       method: 'POST',
     });
     const publishData = await publishRes.json() as any;
-    if (!publishRes.ok || !publishData.id) throw new Error(publishData.error?.message || 'Failed to publish Threads container');
+    if (!publishRes.ok || !publishData.id) {
+      throw new Error(publishData.error?.message || 'Failed to publish Threads container');
+    }
 
     return {
       platformPostId: publishData.id,
@@ -80,7 +128,49 @@ export class ThreadsAdapter implements PlatformAdapter {
   }
 
   async getPostAnalytics(accessToken: string, platformPostId: string): Promise<PlatformAnalytics> {
-    return { impressions: 0, reach: 0, likes: 0, comments: 0, shares: 0, clicks: 0, saves: 0 };
+    try {
+      const res = await fetch(`https://graph.threads.net/v1.0/${platformPostId}/insights?metric=views,likes,replies,reposts,quotes,shares&access_token=${accessToken}`);
+      const data = await res.json() as any;
+      if (!res.ok) {
+        throw new Error(data.error?.message || 'Failed to fetch Threads post insights');
+      }
+
+      const getMetric = (metricName: string): number => {
+        const metric = data?.data?.find((item: any) => item?.name === metricName);
+        const rawValue = metric?.values?.[0]?.value ?? metric?.value ?? 0;
+        return typeof rawValue === 'number' ? rawValue : 0;
+      };
+
+      const views = getMetric('views');
+      const likes = getMetric('likes');
+      const replies = getMetric('replies');
+      const reposts = getMetric('reposts');
+      const quotes = getMetric('quotes');
+      const shares = getMetric('shares');
+
+      return {
+        impressions: views,
+        reach: views,
+        likes,
+        comments: replies,
+        shares: reposts + shares,
+        clicks: 0,
+        saves: 0,
+        metadata: data,
+      };
+    } catch (error: any) {
+      console.error(`[Threads] getPostAnalytics error:`, error);
+      return {
+        impressions: 0,
+        reach: 0,
+        likes: 0,
+        comments: 0,
+        shares: 0,
+        clicks: 0,
+        saves: 0,
+        metadata: { error: error.message },
+      };
+    }
   }
 }
 

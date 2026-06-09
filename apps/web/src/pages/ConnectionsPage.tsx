@@ -15,7 +15,7 @@ import { useSubscription } from '@/hooks/useSubscription';
 
 const allPlatforms: PlatformType[] = [...OAUTH_PLATFORMS, ...MANUAL_CONNECTION_PLATFORMS];
 
-const COMING_SOON_PLATFORMS: PlatformType[] = ['threads', 'reddit', 'tumblr', 'google_business', 'blogger'];
+const COMING_SOON_PLATFORMS: PlatformType[] = ['reddit', 'tumblr', 'google_business', 'blogger'];
 
 interface ManualField {
   key: string;
