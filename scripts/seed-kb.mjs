@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Seed the SmmtAI knowledge base with comprehensive articles.
  * Run: node scripts/seed-kb.mjs <email> <password>
  */
@@ -219,7 +219,7 @@ const coreArticles = [
   },
   {
     title: 'Contact Support',
-    content: `Need help? Contact SmmtAI support:\n\nAI Chatbot: Click chat icon (bottom-right corner) on any page for instant AI help. Answers questions, troubleshoots, guides you.\n\nEmail: support@smmt.entreprenreducation.com — response within 24 hours on business days.\n\nHelp Center: Sidebar → Help for guides, tutorials, connection guides, FAQ, troubleshooting.\n\nLive Support: Monday–Friday, 9 AM–6 PM EST.\n\nEnterprise: Dedicated support rep via direct email/phone.\n\nWhen contacting include: account email, issue description, screenshots, error messages, affected platform/feature, steps to reproduce.`,
+    content: `Need help? Contact SmmtAI support:\n\nAI Chatbot: Click chat icon (bottom-right corner) on any page for instant AI help. Answers questions, troubleshoots, guides you.\n\nEmail: support@smmtai.com — response within 24 hours on business days.\n\nHelp Center: Sidebar → Help for guides, tutorials, connection guides, FAQ, troubleshooting.\n\nLive Support: Monday–Friday, 9 AM–6 PM EST.\n\nEnterprise: Dedicated support rep via direct email/phone.\n\nWhen contacting include: account email, issue description, screenshots, error messages, affected platform/feature, steps to reproduce.`,
     category: 'General',
     tags: ['support', 'help', 'contact', 'email', 'chat', 'customer service', 'issue', 'problem', 'question', 'talk to someone', 'human', 'agent', 'reach out', 'phone'],
     priority: 9,

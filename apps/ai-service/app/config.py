@@ -1,4 +1,4 @@
-"""Application configuration from environment variables."""
+﻿"""Application configuration from environment variables."""
 
 from functools import lru_cache
 import os
@@ -64,7 +64,7 @@ class Settings(BaseSettings):
         "http://localhost:3016",
         "http://localhost:5173",
         "http://localhost:4016",
-        "https://smmt.entreprenreducation.com",
+        "https://smmtai.com",
     ]
 
 @lru_cache

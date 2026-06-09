@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+﻿import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TikTokAdapter } from '../services/platforms/major.js';
 
 describe('TikTokAdapter publishing', () => {
@@ -287,7 +287,7 @@ describe('TikTokAdapter publishing', () => {
 
   it('wraps media URLs through the TikTok proxy endpoint when enabled', async () => {
     process.env.TIKTOK_MEDIA_PROXY_ENABLED = 'true';
-    process.env.TIKTOK_MEDIA_PROXY_BASE_URL = 'https://smmt.entreprenreducation.com';
+    process.env.TIKTOK_MEDIA_PROXY_BASE_URL = 'https://smmtai.com';
     process.env.TIKTOK_MEDIA_PROXY_SECRET = 'proxy-test-secret';
     process.env.TIKTOK_MEDIA_PROXY_TTL_SECONDS = '3600';
 
@@ -326,7 +326,7 @@ describe('TikTokAdapter publishing', () => {
     const payload = JSON.parse((fetchMock.mock.calls[1]?.[1] as { body?: string })?.body || '{}');
     const proxiedUrl = payload?.source_info?.photo_images?.[0];
     expect(typeof proxiedUrl).toBe('string');
-    expect(proxiedUrl).toContain('https://smmt.entreprenreducation.com/api/v1/posts/media/tiktok-proxy?');
+    expect(proxiedUrl).toContain('https://smmtai.com/api/v1/posts/media/tiktok-proxy?');
     expect(proxiedUrl).toContain('url=https%3A%2F%2Fee-smmt.sfo3.digitaloceanspaces.com%2Fexample.png');
     expect(proxiedUrl).toContain('expires=');
     expect(proxiedUrl).toContain('sig=');

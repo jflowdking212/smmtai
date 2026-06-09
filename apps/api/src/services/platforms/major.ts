@@ -377,7 +377,7 @@ export class FacebookAdapter implements PlatformAdapter {
   }
 
   private get redirectUri(): string {
-    return getEnvValue('FACEBOOK_REDIRECT_URI', 'FACEBOOK_CALLBACK_URL') || 'http://localhost:4016/api/v1/connections/facebook/callback';
+    return getEnvValue('FACEBOOK_REDIRECT_URI', 'FACEBOOK_CALLBACK_URL') || 'https://smmtai.com/api/v1/connections/facebook/callback';
   }
 
   getAuthUrl(state: string): string {
@@ -568,7 +568,7 @@ export class InstagramAdapter implements PlatformAdapter {
   }
 
   private get redirectUri(): string {
-    return getEnvValue('INSTAGRAM_REDIRECT_URI', 'INSTAGRAM_CALLBACK_URL') || 'http://localhost:4016/api/v1/connections/instagram/callback';
+    return getEnvValue('INSTAGRAM_REDIRECT_URI', 'INSTAGRAM_CALLBACK_URL') || 'https://smmtai.com/api/v1/connections/instagram/callback';
   }
 
   getAuthUrl(state: string): string {
@@ -817,7 +817,7 @@ export class InstagramDirectAdapter implements PlatformAdapter {
     return getEnvValue('INSTAGRAM_DIRECT_APP_SECRET');
   }
   private get redirectUri(): string {
-    const uri = getEnvValue('INSTAGRAM_DIRECT_REDIRECT_URI', 'INSTAGRAM_REDIRECT_URI') || 'http://localhost:4016/api/v1/connections/instagram/callback';
+    const uri = getEnvValue('INSTAGRAM_DIRECT_REDIRECT_URI', 'INSTAGRAM_REDIRECT_URI') || 'https://smmtai.com/api/v1/connections/instagram/callback';
     console.log('[Instagram Direct] Using redirect URI:', uri);
     return uri;
   }
@@ -1040,7 +1040,7 @@ export class TwitterAdapter implements PlatformAdapter {
   readonly platform: PlatformType = 'twitter';
   private clientId = process.env.TWITTER_CLIENT_ID || '';
   private clientSecret = process.env.TWITTER_CLIENT_SECRET || '';
-  private redirectUri = process.env.TWITTER_REDIRECT_URI || 'http://localhost:4016/api/v1/connections/twitter/callback';
+  private redirectUri = process.env.TWITTER_REDIRECT_URI || 'https://smmtai.com/api/v1/connections/twitter/callback';
   private authBaseUrl = 'https://x.com';
   private apiBaseUrl = 'https://api.x.com/2';
   private legacyApiBaseUrl = 'https://api.twitter.com/2';
@@ -1239,7 +1239,7 @@ export class LinkedInAdapter implements PlatformAdapter {
   readonly platform: PlatformType = 'linkedin';
   private clientId = getEnvValue('LINKEDIN_CLIENT_ID', 'LINKEDIN_APP_ID');
   private clientSecret = getEnvValue('LINKEDIN_CLIENT_SECRET', 'LINKEDIN_APP_SECRET');
-  private redirectUri = getEnvValue('LINKEDIN_REDIRECT_URI', 'LINKEDIN_CALLBACK_URL') || 'http://localhost:4016/api/v1/connections/linkedin/callback';
+  private redirectUri = getEnvValue('LINKEDIN_REDIRECT_URI', 'LINKEDIN_CALLBACK_URL') || 'https://smmtai.com/api/v1/connections/linkedin/callback';
   private analyticsApiVersion = resolveLinkedInApiVersion();
 
   getAuthUrl(state: string): string {
@@ -1469,7 +1469,7 @@ export class TikTokAdapter implements PlatformAdapter {
   readonly platform: PlatformType = 'tiktok';
   private clientKey = getEnvValue('TIKTOK_CLIENT_KEY', 'TIKTOK_CLIENT_ID');
   private clientSecret = getEnvValue('TIKTOK_CLIENT_SECRET', 'TIKTOK_APP_SECRET');
-  private redirectUri = (getEnvValue('TIKTOK_REDIRECT_URI', 'TIKTOK_CALLBACK_URL') || 'http://localhost:4016/api/v1/connections/tiktok/callback').replace(/\/+$/, '');
+  private redirectUri = (getEnvValue('TIKTOK_REDIRECT_URI', 'TIKTOK_CALLBACK_URL') || 'https://smmtai.com/api/v1/connections/tiktok/callback').replace(/\/+$/, '');
   private authScope = resolveTikTokAuthScope();
   private mediaUploadFallbackEnabled = resolveTikTokMediaUploadFallbackEnabled();
   private mediaProxyEnabled = resolveTikTokMediaProxyEnabled();
@@ -1956,7 +1956,7 @@ export class YouTubeAdapter implements PlatformAdapter {
   readonly platform: PlatformType = 'youtube';
   private clientId = getEnvValue('YOUTUBE_CLIENT_ID', 'GOOGLE_CLIENT_ID');
   private clientSecret = getEnvValue('YOUTUBE_CLIENT_SECRET', 'GOOGLE_CLIENT_SECRET');
-  private redirectUri = getEnvValue('YOUTUBE_REDIRECT_URI', 'YOUTUBE_CALLBACK_URL', 'GOOGLE_CALLBACK_URL') || 'http://localhost:4016/api/v1/connections/youtube/callback';
+  private redirectUri = getEnvValue('YOUTUBE_REDIRECT_URI', 'YOUTUBE_CALLBACK_URL', 'GOOGLE_CALLBACK_URL') || 'https://smmtai.com/api/v1/connections/youtube/callback';
 
   getAuthUrl(state: string): string {
     const scopes = [
@@ -2181,7 +2181,7 @@ export class PinterestAdapter implements PlatformAdapter {
   readonly platform: PlatformType = 'pinterest';
   private clientId = getEnvValue('PINTEREST_CLIENT_ID', 'PINTEREST_APP_ID');
   private clientSecret = getEnvValue('PINTEREST_CLIENT_SECRET', 'PINTEREST_APP_SECRET');
-  private redirectUri = getEnvValue('PINTEREST_REDIRECT_URI', 'PINTEREST_CALLBACK_URL') || 'http://localhost:4016/api/v1/connections/pinterest/callback';
+  private redirectUri = getEnvValue('PINTEREST_REDIRECT_URI', 'PINTEREST_CALLBACK_URL') || 'https://smmtai.com/api/v1/connections/pinterest/callback';
   private apiBaseUrl = (getEnvValue('PINTEREST_API_BASE_URL') || 'https://api.pinterest.com').replace(/\/+$/, '');
   private sandboxApiBaseUrl = 'https://api-sandbox.pinterest.com';
 

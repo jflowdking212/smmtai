@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { Card, Badge, Button } from '@/components/ui';
 import { api } from '@/lib/api';
 import {
@@ -289,7 +289,7 @@ export function HelpPage() {
         <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">Our support team is available Monday–Friday, 9 AM–6 PM EST.</p>
         <div className="flex justify-center gap-3 mt-3">
           <Button size="sm" onClick={() => window.dispatchEvent(new Event('open-chatbot'))}><MessageSquare className="w-3.5 h-3.5" /> Chat with Us</Button>
-          <a href="mailto:support@smmt.entreprenreducation.com">
+          <a href="mailto:support@smmtai.com">
             <Button variant="secondary" size="sm"><ExternalLink className="w-3.5 h-3.5" /> Email Support</Button>
           </a>
         </div>

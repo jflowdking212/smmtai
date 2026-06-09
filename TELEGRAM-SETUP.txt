@@ -1,4 +1,4 @@
-Telegram Setup for SmmtAI (Step by Step)
+﻿Telegram Setup for SmmtAI (Step by Step)
 
 1) Create bot with BotFather
 - Open Telegram and search for @BotFather.
@@ -61,7 +61,7 @@ Pinterest Setup for SmmtAI (Step by Step)
 
 3) Configure Redirect URI (must match exactly)
 - Add this Redirect URI in Pinterest app settings:
-  https://smmt.entreprenreducation.com/api/v1/connections/pinterest/callback
+  https://smmtai.com/api/v1/connections/pinterest/callback
 
 4) Configure required scopes
 - Ensure the app is allowed to request:

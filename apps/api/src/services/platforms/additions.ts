@@ -33,14 +33,14 @@ export class ThreadsAdapter implements PlatformAdapter {
 
   getAuthUrl(state: string): string {
     const clientId = process.env.THREADS_CLIENT_ID || '';
-    const redirectUri = encodeURIComponent(process.env.THREADS_REDIRECT_URI || '');
+    const redirectUri = encodeURIComponent(process.env.THREADS_REDIRECT_URI || 'https://smmtai.com/api/v1/connections/threads/callback');
     return `https://threads.net/oauth/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&scope=threads_basic,threads_content_publish,threads_manage_insights&response_type=code&state=${state}`;
   }
 
   async exchangeCode(code: string): Promise<PlatformTokens> {
     const clientId = process.env.THREADS_CLIENT_ID || '';
     const clientSecret = process.env.THREADS_CLIENT_SECRET || '';
-    const redirectUri = process.env.THREADS_REDIRECT_URI || '';
+    const redirectUri = process.env.THREADS_REDIRECT_URI || 'https://smmtai.com/api/v1/connections/threads/callback';
     
     const res = await fetch('https://graph.threads.net/oauth/access_token', {
       method: 'POST',
