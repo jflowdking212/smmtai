@@ -1166,36 +1166,6 @@ export const userTools: Record<string, { definition: ToolDefinition; handler: To
     }
   },
 
-  get_templates: {
-    definition: {
-      type: 'function',
-      function: {
-        name: 'get_templates',
-        description: "Get the user's saved post templates in their workspace.",
-        parameters: {
-          type: 'object',
-          properties: {
-            limit: { type: 'number', description: 'Number of templates to return (default 10, max 20).' }
-          },
-          required: []
-        },
-      },
-    },
-    handler: async (args, context) => {
-      const limit = Math.min(args.limit || 10, 20);
-      const templates = await prisma.template.findMany({
-        where: { workspaceId: context.workspaceId },
-        take: limit,
-        orderBy: { createdAt: 'desc' },
-        select: { id: true, name: true, category: true, platforms: true, createdAt: true }
-      });
-      if (!templates.length) return 'You have no saved templates yet. Create one from the Templates section.';
-      const lines = templates.map((t, i) =>
-        `${i + 1}. **${t.name}** (${t.category || 'Uncategorized'}) — Platforms: ${(t.platforms as string[]).join(', ') || 'any'}`
-      );
-      return `📋 **Your Saved Templates (${templates.length} shown):**\n\n${lines.join('\n')}`;
-    }
-  },
 
   get_platform_analytics: {
     definition: {
@@ -1723,13 +1693,13 @@ export const userTools: Record<string, { definition: ToolDefinition; handler: To
           where: { userId: context.userId },
           orderBy: { weekStart: 'desc' },
           take: 4,
-          select: { weekStart: true, avgEngRate: true, totalReach: true, totalImpressions: true }
+          select: { weekStart: true, avgEngRate: true, totalReach: true, totalPosts: true }
         });
 
         if (snapshots.length) {
           const lines = snapshots.map(s => {
             const week = new Date(s.weekStart).toLocaleDateString();
-            return `  • Week of ${week}: Avg Eng Rate **${s.avgEngRate.toFixed(1)}%** | Reach: ${(s.totalReach || 0).toLocaleString()} | Impressions: ${(s.totalImpressions || 0).toLocaleString()}`;
+            return `  • Week of ${week}: Avg Eng Rate **${s.avgEngRate.toFixed(1)}%** | Reach: ${(s.totalReach || 0).toLocaleString()} | Posts: ${s.totalPosts}`;
           });
           parts.push(`📊 **Weekly Engagement Snapshots:**\n${lines.join('\n')}`);
         }
@@ -1745,13 +1715,13 @@ export const userTools: Record<string, { definition: ToolDefinition; handler: To
           },
           orderBy: { priority: 'desc' },
           take: 5,
-          select: { title: true, description: true, priority: true, type: true }
+          select: { title: true, body: true, priority: true, type: true }
         });
 
         if (recs.length) {
           const lines = recs.map((r, i) => {
             const priorityEmoji = r.priority >= 8 ? '🔴' : r.priority >= 5 ? '🟡' : '🟢';
-            return `  ${i + 1}. ${priorityEmoji} **${r.title}**${r.description ? `\n     ${r.description}` : ''}`;
+            return `  ${i + 1}. ${priorityEmoji} **${r.title}**${r.body ? `\n     ${r.body}` : ''}`;
           });
           parts.push(`💡 **Strategy Recommendations:**\n${lines.join('\n')}`);
         } else {
@@ -1821,7 +1791,7 @@ export const userTools: Record<string, { definition: ToolDefinition; handler: To
         where,
         orderBy: { priority: 'desc' },
         take: 8,
-        select: { id: true, title: true, description: true, type: true, priority: true, expectedImpact: true }
+        select: { id: true, title: true, body: true, type: true, priority: true }
       });
 
       if (!recs.length) {
@@ -1835,8 +1805,7 @@ export const userTools: Record<string, { definition: ToolDefinition; handler: To
       const lines = recs.map((r, i) => {
         const emoji = typeEmoji[r.type] || '💡';
         const priorityLabel = r.priority >= 8 ? '🔴 High' : r.priority >= 5 ? '🟡 Medium' : '🟢 Low';
-        const impact = r.expectedImpact ? ` | Expected impact: ${r.expectedImpact}` : '';
-        return `${i + 1}. ${emoji} **${r.title}** [${priorityLabel}]${impact}\n   ${r.description || ''}`;
+        return `${i + 1}. ${emoji} **${r.title}** [${priorityLabel}]\n   ${r.body || ''}`;
       });
 
       return `💡 **Strategy Recommendations (${recs.length} active):**\n\n${lines.join('\n\n')}\n\n👉 [Performance Intelligence](/performance) to act on these insights.`;
