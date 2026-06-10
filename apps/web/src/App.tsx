@@ -51,11 +51,22 @@ import { AdminMessagesPage } from '@/pages/admin/AdminMessagesPage';
 import { AdminSettingsPage } from '@/pages/admin/AdminSettingsPage';
 import { AdminBillingPage } from '@/pages/admin/AdminBillingPage';
 
-// Lazy-load heavy pages
-const EditorPage = lazy(() => import('@/pages/EditorPage').then((m) => ({ default: m.EditorPage })));
-const AnalyticsPage = lazy(() => import('@/pages/AnalyticsPage').then((m) => ({ default: m.AnalyticsPage })));
-const AIProfilePage = lazy(() => import('@/pages/AIProfilePage'));
-const PerformanceIntelligencePage = lazy(() => import('@/pages/PerformanceIntelligencePage'));
+// Retry helper: retries a lazy import up to `retries` times before failing
+// This handles transient network blips without showing errors to the user
+function retryLazy<T>(fn: () => Promise<T>, retries = 2, delay = 800): Promise<T> {
+  return fn().catch((err) => {
+    if (retries <= 0) throw err;
+    return new Promise((resolve) => setTimeout(resolve, delay)).then(() =>
+      retryLazy(fn, retries - 1, delay * 1.5)
+    );
+  });
+}
+
+// Lazy-load heavy pages (with network-retry)
+const EditorPage = lazy(() => retryLazy(() => import('@/pages/EditorPage').then((m) => ({ default: m.EditorPage }))));
+const AnalyticsPage = lazy(() => retryLazy(() => import('@/pages/AnalyticsPage').then((m) => ({ default: m.AnalyticsPage }))));
+const AIProfilePage = lazy(() => retryLazy(() => import('@/pages/AIProfilePage')));
+const PerformanceIntelligencePage = lazy(() => retryLazy(() => import('@/pages/PerformanceIntelligencePage')));
 
 const queryClient = new QueryClient({
   defaultOptions: {
