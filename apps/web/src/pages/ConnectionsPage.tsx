@@ -10,12 +10,16 @@ import {
   isPlatformType,
   type PlatformType,
 } from '@ee-postmind/shared';
-import { Plus, Unplug, RefreshCw, CheckCircle2, AlertCircle, Lock } from 'lucide-react';
+import { Plus, Unplug, RefreshCw, CheckCircle2, AlertCircle, Lock, ExternalLink, Clock } from 'lucide-react';
 import { useSubscription } from '@/hooks/useSubscription';
 
 const allPlatforms: PlatformType[] = [...OAUTH_PLATFORMS, ...MANUAL_CONNECTION_PLATFORMS];
 
 const COMING_SOON_PLATFORMS: PlatformType[] = ['reddit', 'tumblr', 'google_business', 'blogger'];
+
+// Platforms that need Meta App Review before general public can connect.
+// Users can only connect if they are added as a Tester in the Meta Developer dashboard.
+const PENDING_APP_REVIEW: PlatformType[] = ['threads'];
 
 interface ManualField {
   key: string;
@@ -239,6 +243,15 @@ function getInitialForm(platform: PlatformType): Record<string, string> {
 function formatCallbackError(error: string, reason?: string | null): string {
   const normalizedReason = typeof reason === 'string' ? reason.trim() : '';
 
+  // Detect Meta threads_basic permission error specifically
+  if (
+    normalizedReason.toLowerCase().includes('threads_basic') ||
+    normalizedReason.toLowerCase().includes('app review') ||
+    normalizedReason.toLowerCase().includes('threads testers')
+  ) {
+    return 'THREADS_APP_REVIEW';
+  }
+
   switch (error) {
     case 'invalid_platform':
       return 'That platform is not supported for connection.';
@@ -294,7 +307,9 @@ export function ConnectionsPage() {
       setMessage({ type: 'success', text: `${PLATFORMS[connected].name} connected successfully.` });
       fetchConnections();
     } else if (error) {
-      setMessage({ type: 'error', text: formatCallbackError(error, reason) });
+      const formatted = formatCallbackError(error, reason);
+      // THREADS_APP_REVIEW is a sentinel — we display a special card via message.text check
+      setMessage({ type: 'error', text: formatted });
     }
 
     if (connected || error) {
@@ -475,11 +490,42 @@ export function ConnectionsPage() {
           <RefreshCw className="w-4 h-4" /> Refresh
         </Button>
       </div>
-      {message && (
+      {message && message.text === 'THREADS_APP_REVIEW' ? (
+        <Card className="p-4 border-amber-200 bg-amber-50">
+          <div className="flex items-start gap-3">
+            <Clock className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
+            <div>
+              <p className="text-sm font-semibold text-amber-800">Threads App Review Required</p>
+              <p className="text-sm text-amber-700 mt-1">
+                The Threads connection requires Meta App Review approval before general users can connect.
+                Until then, only users added as <strong>Threads Testers</strong> in the Meta Developer dashboard can connect.
+              </p>
+              <div className="mt-3 space-y-1 text-xs text-amber-700">
+                <p className="font-semibold">To connect your Threads account right now:</p>
+                <ol className="list-decimal ml-4 space-y-1">
+                  <li>Go to <a href="https://developers.facebook.com/apps" target="_blank" rel="noreferrer" className="underline font-medium">developers.facebook.com/apps</a></li>
+                  <li>Select your Threads app → <strong>Roles → Testers</strong></li>
+                  <li>Add your Threads/Instagram account as a Tester</li>
+                  <li>Accept the tester invite in your Instagram app</li>
+                  <li>Come back here and try connecting again</li>
+                </ol>
+              </div>
+              <a
+                href="https://developers.facebook.com/apps"
+                target="_blank"
+                rel="noreferrer"
+                className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-amber-800 hover:text-amber-900"
+              >
+                Open Meta Developer Dashboard <ExternalLink className="w-3 h-3" />
+              </a>
+            </div>
+          </div>
+        </Card>
+      ) : message ? (
         <Card className={`p-3 ${message.type === 'error' ? 'border-red-200 bg-red-50/50' : 'border-emerald-200 bg-emerald-50/50'}`}>
           <p className={`text-sm ${message.type === 'error' ? 'text-red-700' : 'text-emerald-700'}`}>{message.text}</p>
         </Card>
-      )}
+      ) : null}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {allPlatforms.map((platformId) => {
@@ -523,6 +569,10 @@ export function ConnectionsPage() {
                       <CheckCircle2 className="w-3 h-3 mr-1" /> Connected
                     </Badge>
                   )
+                ) : PENDING_APP_REVIEW.includes(platformId) ? (
+                  <Badge variant="default" className="bg-orange-50 text-orange-700 border-orange-200">
+                    <Clock className="w-3 h-3 mr-1" /> App Review
+                  </Badge>
                 ) : COMING_SOON_PLATFORMS.includes(platformId) ? (
                   <Badge variant="default" className="bg-amber-50 text-amber-700 border-amber-200">
                     Coming Soon
@@ -589,6 +639,21 @@ export function ConnectionsPage() {
                 >
                   <Lock className="w-4 h-4" /> Upgrade to Connect
                 </Button>
+              ) : PENDING_APP_REVIEW.includes(platformId) ? (
+                <div className="space-y-2">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="w-full"
+                    loading={loading === platformId}
+                    onClick={() => handleConnect(platformId)}
+                  >
+                    <Plus className="w-4 h-4" /> Connect (Testers Only)
+                  </Button>
+                  <p className="text-xs text-orange-600 text-center leading-tight">
+                    Requires Meta App Review or <a href="https://developers.facebook.com/apps" target="_blank" rel="noreferrer" className="underline font-medium">Tester access</a>
+                  </p>
+                </div>
               ) : COMING_SOON_PLATFORMS.includes(platformId) ? (
                 <Button
                   variant="secondary"
