@@ -969,13 +969,13 @@ export function EditorPage() {
     try {
       const res = await api.ai.generateImage({ prompt, style });
       if (res.data?.imageUrl) {
-        await placeImage(res.data.imageUrl);
+        placeImage(res.data.imageUrl);
         if (res.data.quota) setAiImageQuota(res.data.quota);
         setShowAiImageModal(false);
       }
     } catch (err: any) {
-      const msg = err?.response?.error?.message || err?.message || 'Image generation failed';
-      const code = err?.response?.error?.code;
+      const msg = err?.message || 'Image generation failed';
+      const code = err?.code;
       if (code === 'PLAN_UPGRADE_REQUIRED') {
         alert('AI image generation requires a Pro plan or higher. Upgrade to access this feature.');
       } else if (code === 'QUOTA_EXCEEDED') {
@@ -1052,7 +1052,7 @@ export function EditorPage() {
       c.remove(obj);
       c.requestRenderAll();
     } catch (err: any) {
-      const errMsg = err?.response?.error?.message || err?.message || 'Background removal failed';
+      const errMsg = err?.message || 'Background removal failed';
       if (errMsg.includes('NOT_CONFIGURED') || errMsg.includes('not configured')) {
         alert('Background removal is not configured on this server. Please contact support.');
       } else {
