@@ -38,15 +38,21 @@ contentPlannerRouter.post('/generate', authenticate, checkContentPlannerAccess(1
     const workspaceId = req.workspaceId!;
     const userId = req.userId!;
 
-    // A. Parse Intent
-    const parseResult = await parseContentPlanIntent(prompt, platforms || []);
+    // A. Parse Intent — pass wizard values so fallback can use them
+    const parseResult = await parseContentPlanIntent(
+      prompt,
+      platforms || [],
+      tone || 'professional',
+      platforms || [],
+      durationDays || 7
+    );
     if (!parseResult.success || !parseResult.data) {
       return res.status(400).json({ error: 'Could not parse intent', clarification: parseResult.clarification });
     }
 
     const intent = parseResult.data;
 
-    // User-supplied wizard values override AI-inferred ones
+    // User-supplied wizard values always override AI-inferred ones
     if (tone) intent.tone = tone;
     if (durationDays && durationDays > 0) intent.durationDays = durationDays;
     if (platforms?.length > 0) intent.platforms = platforms;
