@@ -22,18 +22,21 @@ export function composeSchedule(
   const scheduled: ScheduledPost[] = [];
   if (posts.length === 0) return scheduled;
 
-  const startDate = new Date();
-  if (startDate.getHours() >= 20) {
-    // If it's late, start tomorrow
+  // Start from the next full hour that is at least 15 minutes away
+  const now = new Date();
+  const startDate = new Date(now);
+  startDate.setMinutes(0, 0, 0);
+  startDate.setHours(startDate.getHours() + 1); // next full hour
+
+  // If it's already past 20:00 today, start from tomorrow morning
+  if (now.getHours() >= 20) {
     startDate.setDate(startDate.getDate() + 1);
+    startDate.setHours(8, 0, 0, 0);
   }
-  startDate.setHours(0, 0, 0, 0);
 
   // Track per-day per-platform slot to avoid time collisions
-  // Key: `${dayOffset}-${platform}`, Value: next available hour
   const slotTracker: Record<string, number> = {};
 
-  // Distribute posts round-robin across days
   let dayOffset = 0;
 
   for (const post of posts) {
@@ -42,7 +45,8 @@ export function composeSchedule(
 
     // Honour user's preferred time window
     let baseHour = timeWindow.start;
-    if (intent.preferredTime === 'morning') baseHour = 8;
+    if (intent.preferredTime === 'morning') baseHour = 9;
+    else if (intent.preferredTime === 'midday') baseHour = 12;
     else if (intent.preferredTime === 'afternoon') baseHour = 14;
     else if (intent.preferredTime === 'evening') baseHour = 18;
 
@@ -60,6 +64,11 @@ export function composeSchedule(
     scheduledDate.setDate(startDate.getDate() + dayOffset);
     scheduledDate.setHours(hour, 0, 0, 0);
 
+    // Safety guard: never in the past
+    if (scheduledDate <= now) {
+      scheduledDate.setTime(now.getTime() + 15 * 60 * 1000 + dayOffset * 86400000);
+    }
+
     scheduled.push({ ...post, scheduledAt: scheduledDate });
 
     // Advance to next day, wrapping within durationDays
@@ -71,3 +80,4 @@ export function composeSchedule(
 
   return scheduled;
 }
+

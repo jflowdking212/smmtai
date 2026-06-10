@@ -148,6 +148,7 @@ export const api = {
     deletePost: (postId: string) => request<any>(`/content-planner/post/${postId}`, { method: 'DELETE' }),
     cancelPlan: (planId: string) => request<any>(`/content-planner/plan/${planId}/cancel`, { method: 'POST' }),
     authorizePlan: (planId: string) => request<any>(`/content-planner/plan/${planId}/authorize`, { method: 'POST' }),
+    reauthorizePlan: (planId: string) => request<any>(`/content-planner/plan/${planId}/reauthorize`, { method: 'POST' }),
     uploadMedia: (postId: string, formData: FormData) => request<any>(`/content-planner/post/${postId}/upload-media`, { method: 'POST', body: formData }),
     saveDesign: (postId: string, data: any) => request<any>(`/content-planner/post/${postId}/save-design`, { method: 'POST', body: JSON.stringify(data) }),
   },

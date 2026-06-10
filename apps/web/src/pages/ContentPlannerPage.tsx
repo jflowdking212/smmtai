@@ -1,7 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui';
-import { Sparkles, CalendarDays, Upload, Image as ImageIcon, Send, RefreshCw, Trash2, Edit, Palette, X, AlertCircle, CheckCircle2, MessageSquare, Lock } from 'lucide-react';
+import {
+  Sparkles, CalendarDays, Upload, Image as ImageIcon, Send, RefreshCw,
+  Trash2, Edit, Palette, X, AlertCircle, CheckCircle2, MessageSquare, Lock,
+  Clock, ThumbsUp, ThumbsDown, RotateCcw, ExternalLink, WifiOff, PlusCircle
+} from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { api } from '@/lib/api';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -16,12 +20,8 @@ const PLATFORM_COLOURS: Record<string, string> = {
   youtube: 'bg-red-100 text-red-700',
 };
 
-const STATUS_ICONS: Record<string, React.ReactNode> = {
-  authorized: <CheckCircle2 className="w-4 h-4 text-emerald-500" />,
-  partial: <AlertCircle className="w-4 h-4 text-amber-500" />,
-};
+const TONES = ['Professional', 'Casual', 'Hype', 'Educational', 'Inspirational'];
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
 function PlatformBadge({ platform }: { platform: string }) {
   const cls = PLATFORM_COLOURS[platform.toLowerCase()] || 'bg-slate-100 text-slate-700';
   return (
@@ -35,22 +35,18 @@ function PlatformBadge({ platform }: { platform: string }) {
 export function ContentPlannerPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const urlPlanId = searchParams.get('planId');
-  const [activeTab, setActiveTab] = useState<'new' | 'history'>(urlPlanId ? 'new' : 'new');
+  const [activeTab, setActiveTab] = useState<'new' | 'history'>('new');
   const [viewingPlanId, setViewingPlanId] = useState<string | null>(urlPlanId);
 
-  // When "View Plan" is clicked from history, show the review dashboard
   const handleViewPlan = (planId: string) => {
     setViewingPlanId(planId);
     setActiveTab('new');
     setSearchParams({ planId });
   };
 
-  // Reset when switching to "New Plan" tab without a plan
   const handleTabChange = (tab: 'new' | 'history') => {
     setActiveTab(tab);
-    if (tab === 'new' && !viewingPlanId) {
-      setSearchParams({});
-    }
+    if (tab !== 'new') setViewingPlanId(null);
   };
 
   const handleNewPlan = () => {
@@ -70,7 +66,7 @@ export function ContentPlannerPage() {
         </div>
         {viewingPlanId && (
           <Button size="sm" variant="secondary" onClick={handleNewPlan}>
-            <Sparkles className="w-4 h-4 mr-1" /> New Plan
+            <PlusCircle className="w-4 h-4 mr-1" /> New Plan
           </Button>
         )}
       </div>
@@ -91,7 +87,7 @@ export function ContentPlannerPage() {
 
       {activeTab === 'new'
         ? (viewingPlanId
-            ? <PlanReviewDashboard planId={viewingPlanId} pendingFiles={[]} />
+            ? <PlanReviewDashboard planId={viewingPlanId} onNewPlan={handleNewPlan} />
             : <NewPlanWizard onPlanCreated={(id) => { setViewingPlanId(id); setSearchParams({ planId: id }); }} />
           )
         : <PlanHistory onViewPlan={handleViewPlan} />
@@ -101,21 +97,43 @@ export function ContentPlannerPage() {
 }
 
 // ── Step Wizard ──────────────────────────────────────────────────────────────
-const ALL_PLATFORMS = ['Instagram', 'Facebook', 'Twitter', 'LinkedIn', 'TikTok'];
-const TONES = ['Professional', 'Casual', 'Hype', 'Educational', 'Inspirational'];
-
 function NewPlanWizard({ onPlanCreated }: { onPlanCreated: (planId: string) => void }) {
+  const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [prompt, setPrompt] = useState('');
-  const [platforms, setPlatforms] = useState<string[]>(['Instagram']);
+  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([]);
   const [tone, setTone] = useState('Professional');
-  const [duration, setDuration] = useState(7);
+  const [duration, setDuration] = useState(5);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [clarification, setClarification] = useState<string | null>(null);
 
+  // Fetch real connected platforms
+  const { data: connectionsData, isLoading: loadingConnections } = useQuery({
+    queryKey: ['connections-list'],
+    queryFn: () => api.connections.list(),
+    staleTime: 60000
+  });
+
+  const connectedPlatforms: string[] = React.useMemo(() => {
+    const conns = (connectionsData as any)?.data || [];
+    return [...new Set<string>(conns.filter((c: any) => c.isActive).map((c: any) => c.platform as string))];
+  }, [connectionsData]);
+
+  // Default-select all connected platforms once loaded
+  useEffect(() => {
+    if (connectedPlatforms.length > 0 && selectedPlatforms.length === 0) {
+      setSelectedPlatforms(connectedPlatforms);
+    }
+  }, [connectedPlatforms]);
+
   const generateMutation = useMutation({
     mutationFn: async () => {
-      const res = await api.contentPlanner.generate({ prompt, platforms, tone, durationDays: duration });
+      const res = await api.contentPlanner.generate({
+        prompt,
+        platforms: selectedPlatforms,
+        tone,
+        durationDays: duration
+      });
       return res;
     },
     onSuccess: (data: any) => {
@@ -123,8 +141,7 @@ function NewPlanWizard({ onPlanCreated }: { onPlanCreated: (planId: string) => v
       onPlanCreated(data.planId);
     },
     onError: (err: any) => {
-      // E5: Extract and display clarification from parser
-      const clarificationMsg = err?.clarification || err?.response?.clarification;
+      const clarificationMsg = (err as any)?.clarification || err?.response?.clarification;
       if (clarificationMsg) {
         setClarification(clarificationMsg);
       } else {
@@ -134,6 +151,7 @@ function NewPlanWizard({ onPlanCreated }: { onPlanCreated: (planId: string) => v
   });
 
   const isPending = generateMutation.isPending;
+  const wordCount = prompt.trim().split(/\s+/).filter(Boolean).length;
 
   return (
     <div className="max-w-3xl mx-auto">
@@ -157,16 +175,16 @@ function NewPlanWizard({ onPlanCreated }: { onPlanCreated: (planId: string) => v
             <h2 className="text-xl font-bold flex items-center gap-2">
               <Sparkles className="w-5 h-5 text-violet-500" /> Describe Your Goal
             </h2>
-            <p className="text-sm text-neutral-500">What do you want to achieve with your upcoming social media posts? <span className="text-violet-500 font-medium">(Min 20 words for best results)</span></p>
+            <p className="text-sm text-neutral-500">What do you want to achieve? <span className="text-violet-500 font-medium">(Min 15 words for best results)</span></p>
             <textarea
               value={prompt}
               onChange={e => setPrompt(e.target.value)}
-              placeholder="e.g. Promote our Spring Sale for 7 days. Focus on FOMO-driven content targeting young professionals."
+              placeholder="e.g. I want to grow my software agency's brand awareness for the next 5 days. Post educational content about AI tools every morning at 9am. Keep the tone professional but approachable."
               className="w-full min-h-[160px] px-4 py-3 rounded-xl border border-neutral-200 text-sm focus:ring-2 focus:ring-violet-500 focus:outline-none resize-none"
             />
             <div className="flex justify-between text-xs text-neutral-400">
-              <span>{prompt.trim().split(/\s+/).filter(Boolean).length} words</span>
-              {prompt.trim().split(/\s+/).filter(Boolean).length < 20 && prompt.trim().length > 0 && (
+              <span>{wordCount} words</span>
+              {wordCount < 15 && wordCount > 0 && (
                 <span className="text-amber-500">Add more detail for better results</span>
               )}
             </div>
@@ -179,27 +197,47 @@ function NewPlanWizard({ onPlanCreated }: { onPlanCreated: (planId: string) => v
               <CalendarDays className="w-5 h-5 text-violet-500" /> Configure Your Plan
             </h2>
 
-            {/* Platforms */}
+            {/* Connected Platforms */}
             <div>
-              <h3 className="text-sm font-semibold mb-2 text-neutral-700">Target Platforms</h3>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                {ALL_PLATFORMS.map(p => (
-                  <label key={p} className={`flex items-center gap-2 border rounded-lg p-3 cursor-pointer text-sm transition-all ${
-                    platforms.includes(p) ? 'border-violet-500 bg-violet-50' : 'border-neutral-200 hover:bg-slate-50'
-                  }`}>
-                    <input
-                      type="checkbox"
-                      className="accent-violet-600"
-                      checked={platforms.includes(p)}
-                      onChange={e => {
-                        if (e.target.checked) setPlatforms(prev => [...prev, p]);
-                        else setPlatforms(prev => prev.filter(x => x !== p));
-                      }}
-                    />
-                    {p}
-                  </label>
-                ))}
-              </div>
+              <h3 className="text-sm font-semibold mb-2 text-neutral-700">Target Platforms
+                <span className="text-xs text-neutral-400 font-normal ml-2">(your connected accounts)</span>
+              </h3>
+              {loadingConnections ? (
+                <div className="text-sm text-neutral-400 animate-pulse">Loading your connected platforms…</div>
+              ) : connectedPlatforms.length === 0 ? (
+                <div className="flex items-start gap-3 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+                  <WifiOff className="w-5 h-5 text-amber-500 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="text-sm font-semibold text-amber-800">No connected platforms</p>
+                    <p className="text-xs text-amber-600 mt-1">Connect at least one social account before creating a plan.</p>
+                    <button
+                      onClick={() => navigate('/connections')}
+                      className="mt-2 text-xs text-violet-600 font-semibold hover:underline flex items-center gap-1"
+                    >
+                      Connect platforms <ExternalLink className="w-3 h-3" />
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {connectedPlatforms.map(p => (
+                    <label key={p} className={`flex items-center gap-2 border rounded-lg p-3 cursor-pointer text-sm transition-all capitalize ${
+                      selectedPlatforms.includes(p) ? 'border-violet-500 bg-violet-50' : 'border-neutral-200 hover:bg-slate-50'
+                    }`}>
+                      <input
+                        type="checkbox"
+                        className="accent-violet-600"
+                        checked={selectedPlatforms.includes(p)}
+                        onChange={e => {
+                          if (e.target.checked) setSelectedPlatforms(prev => [...prev, p]);
+                          else setSelectedPlatforms(prev => prev.filter(x => x !== p));
+                        }}
+                      />
+                      {p}
+                    </label>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Tone */}
@@ -220,7 +258,9 @@ function NewPlanWizard({ onPlanCreated }: { onPlanCreated: (planId: string) => v
 
             {/* Duration */}
             <div>
-              <h3 className="text-sm font-semibold mb-2 text-neutral-700">Plan Duration: <span className="text-violet-600">{duration} days</span></h3>
+              <h3 className="text-sm font-semibold mb-2 text-neutral-700">Plan Duration: <span className="text-violet-600">{duration} days</span>
+                <span className="text-xs text-neutral-400 font-normal ml-2">({duration * selectedPlatforms.length} posts total)</span>
+              </h3>
               <input
                 type="range" min={3} max={30} step={1}
                 value={duration}
@@ -258,7 +298,7 @@ function NewPlanWizard({ onPlanCreated }: { onPlanCreated: (planId: string) => v
           </div>
         )}
 
-        {/* E5: Clarification dialog */}
+        {/* Clarification dialog */}
         {clarification && (
           <div className="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-xl">
             <div className="flex items-start gap-3">
@@ -287,10 +327,10 @@ function NewPlanWizard({ onPlanCreated }: { onPlanCreated: (planId: string) => v
           ) : (
             <Button
               onClick={() => generateMutation.mutate()}
-              disabled={isPending || platforms.length === 0}
+              disabled={isPending || selectedPlatforms.length === 0 || connectedPlatforms.length === 0}
               className="bg-violet-600 hover:bg-violet-700 min-w-[160px]"
             >
-              {isPending ? <><RefreshCw className="w-4 h-4 mr-2 animate-spin" /> Generating...</> : <><Sparkles className="w-4 h-4 mr-2" /> Generate Plan</>}
+              {isPending ? <><RefreshCw className="w-4 h-4 mr-2 animate-spin" />Generating...</> : <><Sparkles className="w-4 h-4 mr-2" />Generate Plan</>}
             </Button>
           )}
         </div>
@@ -303,7 +343,7 @@ function NewPlanWizard({ onPlanCreated }: { onPlanCreated: (planId: string) => v
             <span className="animate-pulse" style={{ animationDelay: '0.5s' }}>→ Generating content...</span>
             <span className="animate-pulse" style={{ animationDelay: '1s' }}>→ Composing schedule...</span>
           </div>
-          <p className="text-xs text-neutral-400">This takes ~15-30 seconds depending on how many posts are requested.</p>
+          <p className="text-xs text-neutral-400">This takes ~15-30 seconds. Hang tight!</p>
         </div>
       )}
     </div>
@@ -311,12 +351,13 @@ function NewPlanWizard({ onPlanCreated }: { onPlanCreated: (planId: string) => v
 }
 
 // ── Plan Review Dashboard ────────────────────────────────────────────────────
-function PlanReviewDashboard({ planId, pendingFiles }: { planId: string; pendingFiles: File[] }) {
+function PlanReviewDashboard({ planId, onNewPlan }: { planId: string; onNewPlan: () => void }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [showMediaDialog, setShowMediaDialog] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [hasUploadedInitialMedia, setHasUploadedInitialMedia] = useState(false);
+  const [authResult, setAuthResult] = useState<{ authorizedCount: number; errors: string[] } | null>(null);
 
   const { data: plan, isLoading } = useQuery({
     queryKey: ['content-plan', planId],
@@ -335,32 +376,17 @@ function PlanReviewDashboard({ planId, pendingFiles }: { planId: string; pending
     }
   }, [plan?.status]);
 
-  // Auto-upload pending files from wizard to the first post
-  useEffect(() => {
-    if (plan?.status === 'ready' && pendingFiles.length > 0 && !hasUploadedInitialMedia && plan.posts?.length > 0) {
-      setHasUploadedInitialMedia(true);
-      const firstPost = plan.posts[0];
-      const formData = new FormData();
-      pendingFiles.forEach(f => formData.append('media', f));
-      api.contentPlanner.uploadMedia(firstPost.id, formData)
-        .then(() => {
-          toast.success(`${pendingFiles.length} file(s) attached to the plan`);
-          queryClient.invalidateQueries({ queryKey: ['content-plan', planId] });
-        })
-        .catch(() => toast.error('Failed to attach uploaded files'));
-    }
-  }, [plan?.status]);
-
   const authorizeMutation = useMutation({
     mutationFn: async () => api.contentPlanner.authorizePlan(planId),
     onSuccess: (data: any) => {
       setShowConfirmModal(false);
-      if (data.errors?.length > 0) {
-        toast(data.message, { icon: '⚠️' });
-      } else {
-        toast.success('🎉 Plan authorized! All posts have been scheduled.');
-      }
+      setAuthResult({ authorizedCount: data.authorizedCount || 0, errors: data.errors || [] });
       queryClient.invalidateQueries({ queryKey: ['content-plan', planId] });
+      if (!data.errors?.length) {
+        toast.success('🎉 Plan authorized! All posts have been scheduled.');
+      } else {
+        toast(data.message, { icon: '⚠️' });
+      }
     },
     onError: (err: any) => {
       setShowConfirmModal(false);
@@ -368,12 +394,22 @@ function PlanReviewDashboard({ planId, pendingFiles }: { planId: string; pending
     }
   });
 
+  const reauthorizeMutation = useMutation({
+    mutationFn: async () => api.contentPlanner.reauthorizePlan(planId),
+    onSuccess: (data: any) => {
+      setAuthResult({ authorizedCount: data.authorizedCount || 0, errors: data.errors || [] });
+      queryClient.invalidateQueries({ queryKey: ['content-plan', planId] });
+      toast(data.message, { icon: data.errors?.length ? '⚠️' : '✅' });
+    },
+    onError: (err: any) => toast.error(err?.message || 'Retry failed')
+  });
+
   const cancelMutation = useMutation({
     mutationFn: async () => api.contentPlanner.cancelPlan(planId),
     onSuccess: () => {
       toast.success('Plan cancelled');
       queryClient.invalidateQueries({ queryKey: ['content-plans-history'] });
-      navigate('/planner');
+      onNewPlan();
     },
     onError: () => toast.error('Could not cancel plan')
   });
@@ -390,23 +426,23 @@ function PlanReviewDashboard({ planId, pendingFiles }: { planId: string; pending
 
   if (!plan) return null;
 
-  const isAuthorized = plan.status === 'authorized' || plan.status === 'partial' || plan.status === 'cancelled';
-  const isReadOnly = isAuthorized;
+  const isAuthorized = ['authorized', 'partial', 'cancelled'].includes(plan.status);
   const activePosts = plan.posts?.filter((p: any) => p.status !== 'deleted') || [];
+  const failedPosts = activePosts.filter((p: any) => p.status === 'failed');
+  const scheduledPosts = activePosts.filter((p: any) => p.status === 'scheduled');
+  const pendingPosts = activePosts.filter((p: any) => ['pending_review', 'approved'].includes(p.status));
   const platformsCovered = [...new Set(activePosts.map((p: any) => p.platform))];
+  const approvedCount = activePosts.filter((p: any) => p.status === 'approved').length;
 
   return (
     <div className="space-y-6">
       {/* Header bar */}
       <div className="bg-white border border-neutral-200 rounded-xl p-6 shadow-sm flex flex-col sm:flex-row sm:items-center gap-4 justify-between">
         <div>
-          <h2 className="text-lg font-bold">{isReadOnly ? 'Plan Overview' : 'Review Your Plan'}</h2>
+          <h2 className="text-lg font-bold">{isAuthorized ? 'Plan Overview' : 'Review Your Plan'}</h2>
           <p className="text-sm text-neutral-500">
             {activePosts.length} posts across {platformsCovered.length} platform{platformsCovered.length !== 1 ? 's' : ''} for{' '}
             <span className="font-medium text-neutral-700">{plan.theme}</span>
-            {STATUS_ICONS[plan.status] && (
-              <span className="ml-2 inline-flex items-center gap-1">{STATUS_ICONS[plan.status]}</span>
-            )}
           </p>
           {plan.dateRangeStart && plan.dateRangeEnd && (
             <p className="text-xs text-neutral-400 mt-1">
@@ -415,8 +451,8 @@ function PlanReviewDashboard({ planId, pendingFiles }: { planId: string; pending
             </p>
           )}
         </div>
-        <div className="flex gap-2 flex-wrap">
-          {!isReadOnly && (
+        <div className="flex gap-2 flex-wrap items-center">
+          {!isAuthorized && (
             <Button
               variant="secondary" size="sm"
               onClick={() => { if (confirm('Cancel this plan?')) cancelMutation.mutate(); }}
@@ -425,12 +461,12 @@ function PlanReviewDashboard({ planId, pendingFiles }: { planId: string; pending
               <X className="w-4 h-4 mr-1" /> Cancel Plan
             </Button>
           )}
-          {!isReadOnly && (
+          {!isAuthorized && (
             <Button
               size="sm"
               className="bg-violet-600 hover:bg-violet-700 shadow-sm"
               onClick={() => setShowConfirmModal(true)}
-              disabled={authorizeMutation.isPending}
+              disabled={authorizeMutation.isPending || activePosts.length === 0}
             >
               <Send className="w-4 h-4 mr-2" /> Authorize & Schedule All
             </Button>
@@ -442,7 +478,7 @@ function PlanReviewDashboard({ planId, pendingFiles }: { planId: string; pending
           )}
           {plan.status === 'partial' && (
             <div className="flex items-center gap-2 text-amber-600 font-medium text-sm">
-              <AlertCircle className="w-5 h-5" /> Some posts failed — check below
+              <AlertCircle className="w-5 h-5" /> Some posts failed
             </div>
           )}
           {plan.status === 'cancelled' && (
@@ -453,20 +489,118 @@ function PlanReviewDashboard({ planId, pendingFiles }: { planId: string; pending
         </div>
       </div>
 
+      {/* Pre-authorize approval helper */}
+      {!isAuthorized && activePosts.length > 0 && (
+        <div className="flex items-center justify-between px-4 py-3 bg-violet-50 border border-violet-200 rounded-xl text-sm">
+          <div className="flex items-center gap-2 text-violet-700">
+            <ThumbsUp className="w-4 h-4" />
+            <span><strong>{approvedCount}</strong> approved · <strong>{pendingPosts.length - approvedCount}</strong> pending review</span>
+            <span className="text-violet-400 text-xs">(Approve posts you want scheduled, or skip to authorize all)</span>
+          </div>
+        </div>
+      )}
+
+      {/* Post-authorization result panel */}
+      {authResult && (
+        <div className={`rounded-xl border p-5 ${authResult.errors.length === 0 ? 'bg-emerald-50 border-emerald-200' : 'bg-amber-50 border-amber-200'}`}>
+          <div className="flex items-start justify-between">
+            <div className="flex items-start gap-3">
+              {authResult.errors.length === 0
+                ? <CheckCircle2 className="w-5 h-5 text-emerald-600 mt-0.5" />
+                : <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5" />}
+              <div>
+                <p className="font-semibold text-sm">
+                  {authResult.errors.length === 0
+                    ? `✅ ${authResult.authorizedCount} post${authResult.authorizedCount !== 1 ? 's' : ''} successfully scheduled!`
+                    : `⚠️ ${authResult.authorizedCount} scheduled · ${authResult.errors.length} failed`}
+                </p>
+                {authResult.errors.length > 0 && (
+                  <ul className="mt-2 space-y-1">
+                    {authResult.errors.map((e, i) => (
+                      <li key={i} className="text-xs text-amber-700 flex items-start gap-1">
+                        <span className="mt-0.5">•</span> {e}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+            <button onClick={() => setAuthResult(null)} className="text-neutral-400 hover:text-neutral-600 ml-4">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          <div className="flex gap-2 mt-4 flex-wrap">
+            {scheduledPosts.length > 0 && (
+              <Button size="sm" variant="secondary" onClick={() => navigate('/calendar')}>
+                <ExternalLink className="w-3.5 h-3.5 mr-1" /> View in Calendar
+              </Button>
+            )}
+            {authResult.errors.length > 0 && (
+              <Button
+                size="sm"
+                className="bg-amber-600 hover:bg-amber-700 text-white"
+                onClick={() => reauthorizeMutation.mutate()}
+                disabled={reauthorizeMutation.isPending}
+              >
+                {reauthorizeMutation.isPending ? <RefreshCw className="w-3.5 h-3.5 animate-spin mr-1" /> : <RotateCcw className="w-3.5 h-3.5 mr-1" />}
+                Retry Failed Posts
+              </Button>
+            )}
+            <Button size="sm" variant="secondary" onClick={onNewPlan}>
+              <PlusCircle className="w-3.5 h-3.5 mr-1" /> New Plan
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Read-only banner */}
-      {isReadOnly && (
-        <div className="flex items-center gap-2 p-3 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-600">
-          <Lock className="w-4 h-4" />
-          This plan has been {plan.status === 'cancelled' ? 'cancelled' : 'authorized'}. Posts are in read-only mode.
+      {isAuthorized && (
+        <div className="flex items-center justify-between p-3 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-600">
+          <div className="flex items-center gap-2">
+            <Lock className="w-4 h-4" />
+            {plan.status === 'cancelled' ? 'Plan cancelled.' : `${scheduledPosts.length} posts scheduled · ${failedPosts.length} failed.`}
+          </div>
+          <div className="flex gap-2">
+            {scheduledPosts.length > 0 && (
+              <button onClick={() => navigate('/calendar')} className="text-xs text-violet-600 font-semibold flex items-center gap-1 hover:underline">
+                View in Calendar <ExternalLink className="w-3 h-3" />
+              </button>
+            )}
+            {plan.status === 'partial' && failedPosts.length > 0 && (
+              <button
+                onClick={() => reauthorizeMutation.mutate()}
+                disabled={reauthorizeMutation.isPending}
+                className="text-xs text-amber-600 font-semibold flex items-center gap-1 hover:underline"
+              >
+                <RotateCcw className="w-3 h-3" /> Retry {failedPosts.length} failed
+              </button>
+            )}
+          </div>
         </div>
       )}
 
       {/* Post grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-        {plan.posts?.map((post: any) => (
-          <PostCard key={post.id} post={post} planId={planId} readOnly={isReadOnly} />
-        ))}
-      </div>
+      {activePosts.length === 0 ? (
+        <div className="text-center py-16 bg-slate-50 rounded-2xl border-2 border-dashed border-neutral-200">
+          <Sparkles className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+          <p className="text-neutral-500 font-medium">No posts in this plan.</p>
+          <p className="text-neutral-400 text-sm mt-1">Something went wrong during generation. Try creating a new plan.</p>
+          <Button size="sm" className="mt-4 bg-violet-600 hover:bg-violet-700" onClick={onNewPlan}>
+            New Plan
+          </Button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          {activePosts.map((post: any) => (
+            <PostCard
+              key={post.id}
+              post={post}
+              planId={planId}
+              readOnly={isAuthorized && post.status !== 'failed'}
+            />
+          ))}
+        </div>
+      )}
 
       {/* Media check dialog */}
       {showMediaDialog && (
@@ -474,7 +608,7 @@ function PlanReviewDashboard({ planId, pendingFiles }: { planId: string; pending
           <div className="bg-white rounded-2xl w-full max-w-md shadow-xl p-6 relative">
             <button onClick={() => setShowMediaDialog(false)} className="absolute top-4 right-4 text-neutral-400 hover:text-black"><X className="w-5 h-5" /></button>
             <h2 className="text-xl font-bold mb-2">Add Media to Your Posts?</h2>
-            <p className="text-sm text-neutral-500 mb-6">Posts with images or videos get 2-3× more engagement. Would you like to add some?</p>
+            <p className="text-sm text-neutral-500 mb-6">Posts with images or videos get 2-3× more engagement.</p>
             <div className="flex flex-col gap-2">
               <label className="flex items-center gap-3 border border-neutral-200 rounded-xl p-4 cursor-pointer hover:bg-slate-50 transition-all">
                 <Upload className="w-5 h-5 text-violet-500" />
@@ -510,7 +644,7 @@ function PlanReviewDashboard({ planId, pendingFiles }: { planId: string; pending
               >
                 <Palette className="w-5 h-5 text-violet-500" />
                 <div>
-                  <p className="text-sm font-medium">Design with the Template Editor</p>
+                  <p className="text-sm font-medium">Design with Template Editor</p>
                   <p className="text-xs text-neutral-400">Use pre-made templates and brand elements</p>
                 </div>
               </button>
@@ -532,29 +666,29 @@ function PlanReviewDashboard({ planId, pendingFiles }: { planId: string; pending
                 <Send className="w-7 h-7 text-violet-600" />
               </div>
               <h2 className="text-xl font-bold mb-2">Authorize & Schedule?</h2>
-              <p className="text-sm text-neutral-500 mb-6">
+              <p className="text-sm text-neutral-500 mb-2">
                 You're about to schedule <strong>{activePosts.length} posts</strong> across{' '}
                 <strong>{platformsCovered.length} platform{platformsCovered.length !== 1 ? 's' : ''}</strong>.
-                {plan.dateRangeStart && plan.dateRangeEnd && (
-                  <> From{' '}
-                    <strong>{new Date(plan.dateRangeStart).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</strong> to{' '}
-                    <strong>{new Date(plan.dateRangeEnd).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</strong>.
-                  </>
-                )}
-                <br /><br />
-                <span className="text-amber-600 text-xs">Authorized posts will be queued for publishing and cannot be edited.</span>
+              </p>
+              {plan.dateRangeStart && plan.dateRangeEnd && (
+                <p className="text-sm text-neutral-500 mb-4">
+                  From{' '}
+                  <strong>{new Date(plan.dateRangeStart).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</strong> to{' '}
+                  <strong>{new Date(plan.dateRangeEnd).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</strong>.
+                </p>
+              )}
+              <p className="text-xs text-amber-600 mb-6">
+                ⚠️ Posts without a connected platform will be skipped. You can retry them after.
               </p>
               <div className="flex gap-3">
-                <Button variant="secondary" className="flex-1" onClick={() => setShowConfirmModal(false)}>
-                  Cancel
-                </Button>
+                <Button variant="secondary" className="flex-1" onClick={() => setShowConfirmModal(false)}>Cancel</Button>
                 <Button
                   className="flex-1 bg-violet-600 hover:bg-violet-700"
                   onClick={() => authorizeMutation.mutate()}
                   disabled={authorizeMutation.isPending}
                 >
                   {authorizeMutation.isPending
-                    ? <><RefreshCw className="w-4 h-4 mr-2 animate-spin" /> Scheduling...</>
+                    ? <><RefreshCw className="w-4 h-4 mr-2 animate-spin" />Scheduling...</>
                     : 'Confirm & Schedule'}
                 </Button>
               </div>
@@ -572,11 +706,14 @@ function PostCard({ post, planId, readOnly }: { post: any; planId: string; readO
   const queryClient = useQueryClient();
   const [isEditing, setIsEditing] = useState(false);
   const [content, setContent] = useState(post.contentBody);
+  const [scheduledAt, setScheduledAt] = useState(
+    post.scheduledAt ? new Date(post.scheduledAt).toISOString().slice(0, 16) : ''
+  );
 
-  // Sync content when post data changes (e.g., after regeneration)
   useEffect(() => {
     setContent(post.contentBody);
-  }, [post.contentBody]);
+    setScheduledAt(post.scheduledAt ? new Date(post.scheduledAt).toISOString().slice(0, 16) : '');
+  }, [post.contentBody, post.scheduledAt]);
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['content-plan', planId] });
 
@@ -587,9 +724,23 @@ function PostCard({ post, planId, readOnly }: { post: any; planId: string; readO
   });
 
   const updateMutation = useMutation({
-    mutationFn: () => api.contentPlanner.editPost(post.id, { contentBody: content }),
+    mutationFn: () => api.contentPlanner.editPost(post.id, {
+      contentBody: content,
+      scheduledAt: scheduledAt ? new Date(scheduledAt).toISOString() : undefined
+    }),
     onSuccess: () => { toast.success('Post updated'); setIsEditing(false); invalidate(); },
     onError: () => toast.error('Failed to update post')
+  });
+
+  const approveMutation = useMutation({
+    mutationFn: () => api.contentPlanner.editPost(post.id, { status: 'approved' } as any),
+    onSuccess: () => { invalidate(); },
+    onError: () => toast.error('Failed to approve post')
+  });
+
+  const unapproveMutation = useMutation({
+    mutationFn: () => api.contentPlanner.editPost(post.id, { status: 'pending_review' } as any),
+    onSuccess: () => { invalidate(); },
   });
 
   const deleteMutation = useMutation({
@@ -600,14 +751,19 @@ function PostCard({ post, planId, readOnly }: { post: any; planId: string; readO
 
   const charCount = content.length;
   const charLimit: Record<string, number> = { twitter: 280, linkedin: 3000, instagram: 2200, facebook: 63206, tiktok: 2200 };
-  const limit = charLimit[post.platform.toLowerCase()];
+  const limit = charLimit[post.platform?.toLowerCase()];
   const overLimit = limit && charCount > limit;
 
-  // Visual state borders
-  const borderAccent = post.status === 'failed'
+  const isApproved = post.status === 'approved';
+  const isFailed = post.status === 'failed';
+  const isScheduled = post.status === 'scheduled';
+
+  const borderAccent = isFailed
     ? 'border-l-4 border-l-red-400'
-    : post.status === 'scheduled'
+    : isScheduled
     ? 'border-l-4 border-l-emerald-400'
+    : isApproved
+    ? 'border-l-4 border-l-violet-400'
     : post.regenerated
     ? 'border-l-4 border-l-purple-400'
     : post.editedByUser
@@ -618,24 +774,20 @@ function PostCard({ post, planId, readOnly }: { post: any; planId: string; readO
     <div className={`bg-white border border-neutral-200 rounded-2xl shadow-sm flex flex-col hover:shadow-md transition-shadow overflow-hidden ${borderAccent}`}>
       {/* Card header */}
       <div className="px-4 py-3 border-b border-neutral-100 bg-slate-50/60 flex items-center justify-between">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <PlatformBadge platform={post.platform} />
-          {post.status === 'failed' && (
-            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-50 text-red-600">Failed</span>
-          )}
-          {post.status === 'scheduled' && (
-            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600">Scheduled</span>
-          )}
-          {post.regenerated && (
-            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-purple-50 text-purple-600">Regenerated</span>
-          )}
-          {post.editedByUser && (
-            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-600">Edited</span>
-          )}
+          {isFailed && <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-50 text-red-600">Failed</span>}
+          {isScheduled && <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600">Scheduled</span>}
+          {isApproved && !isScheduled && <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-violet-50 text-violet-600">Approved</span>}
+          {post.regenerated && <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-purple-50 text-purple-600">Regenerated</span>}
+          {post.editedByUser && <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-600">Edited</span>}
         </div>
-        <span className="text-xs text-neutral-400 font-medium">
-          {new Date(post.scheduledAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-        </span>
+        <div className="flex items-center gap-1 text-xs text-neutral-400">
+          <Clock className="w-3 h-3" />
+          {post.scheduledAt
+            ? new Date(post.scheduledAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+            : 'Not scheduled'}
+        </div>
       </div>
 
       {/* Content */}
@@ -652,12 +804,27 @@ function PostCard({ post, planId, readOnly }: { post: any; planId: string; readO
             <div className={`text-xs text-right ${overLimit ? 'text-red-500' : 'text-neutral-400'}`}>
               {charCount}{limit ? `/${limit}` : ''}
             </div>
+            <div>
+              <label className="text-xs text-neutral-500 font-medium block mb-1">Schedule time</label>
+              <input
+                type="datetime-local"
+                value={scheduledAt}
+                onChange={e => setScheduledAt(e.target.value)}
+                className="w-full text-sm rounded-lg border border-neutral-200 p-2 focus:ring-2 focus:ring-violet-500 focus:outline-none"
+              />
+            </div>
           </div>
         ) : (
           <div className="space-y-3">
             <p className="text-sm text-neutral-700 whitespace-pre-wrap leading-relaxed">{post.contentBody}</p>
             {post.hashtags?.length > 0 && (
               <p className="text-xs text-violet-600 font-medium">{post.hashtags.map((t: string) => `#${t}`).join(' ')}</p>
+            )}
+            {isFailed && (
+              <div className="flex items-start gap-2 p-2 bg-red-50 rounded-lg border border-red-100">
+                <AlertCircle className="w-4 h-4 text-red-400 mt-0.5 flex-shrink-0" />
+                <p className="text-xs text-red-600">Failed to schedule — platform may not be connected or time passed. Edit the schedule time and retry.</p>
+              </div>
             )}
             {post.mediaSuggestion && !post.mediaUrls?.length && (
               <div className="flex items-start gap-2 p-2 bg-slate-50 rounded-lg border border-slate-100">
@@ -681,8 +848,8 @@ function PostCard({ post, planId, readOnly }: { post: any; planId: string; readO
 
       {/* Footer actions */}
       <div className="px-4 py-3 border-t border-neutral-100 flex justify-between items-center">
-        {readOnly ? (
-          <div className="text-xs text-neutral-400 italic">Read-only</div>
+        {readOnly && !isFailed ? (
+          <div className="text-xs text-neutral-400 italic flex items-center gap-1"><Lock className="w-3 h-3" /> Read-only</div>
         ) : isEditing ? (
           <div className="flex gap-2 w-full">
             <Button size="sm" variant="secondary" className="flex-1" onClick={() => { setContent(post.contentBody); setIsEditing(false); }}>Cancel</Button>
@@ -694,7 +861,7 @@ function PostCard({ post, planId, readOnly }: { post: any; planId: string; readO
           <>
             <div className="flex gap-1">
               <button
-                title="Edit" onClick={() => setIsEditing(true)}
+                title="Edit content & time" onClick={() => setIsEditing(true)}
                 className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 transition-colors"
               ><Edit className="w-4 h-4" /></button>
               <button
@@ -726,12 +893,23 @@ function PostCard({ post, planId, readOnly }: { post: any; planId: string; readO
                 className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 transition-colors"
               ><Palette className="w-4 h-4" /></button>
             </div>
-            <button
-              title="Delete post"
-              onClick={() => { if (confirm('Remove this post from the plan?')) deleteMutation.mutate(); }}
-              disabled={deleteMutation.isPending}
-              className="p-1.5 rounded-lg hover:bg-red-50 text-red-400 hover:text-red-600 transition-colors"
-            ><Trash2 className="w-4 h-4" /></button>
+            <div className="flex gap-1 items-center">
+              {!isScheduled && (
+                <button
+                  title={isApproved ? 'Un-approve' : 'Approve this post'}
+                  onClick={() => isApproved ? unapproveMutation.mutate() : approveMutation.mutate()}
+                  className={`p-1.5 rounded-lg transition-colors ${isApproved ? 'bg-violet-100 text-violet-600' : 'hover:bg-violet-50 text-slate-400 hover:text-violet-600'}`}
+                >
+                  <ThumbsUp className="w-4 h-4" />
+                </button>
+              )}
+              <button
+                title="Delete post"
+                onClick={() => { if (confirm('Remove this post from the plan?')) deleteMutation.mutate(); }}
+                disabled={deleteMutation.isPending}
+                className="p-1.5 rounded-lg hover:bg-red-50 text-red-400 hover:text-red-600 transition-colors"
+              ><Trash2 className="w-4 h-4" /></button>
+            </div>
           </>
         )}
       </div>
@@ -751,7 +929,6 @@ const STATUS_BADGE: Record<string, string> = {
 
 function PlanHistory({ onViewPlan }: { onViewPlan: (planId: string) => void }) {
   const queryClient = useQueryClient();
-  // Bug fix #4: destructure .data from the API response
   const { data: response, isLoading } = useQuery({
     queryKey: ['content-plans-history'],
     queryFn: () => api.contentPlanner.listPlans()
@@ -805,7 +982,7 @@ function PlanHistory({ onViewPlan }: { onViewPlan: (planId: string) => void }) {
             <Button size="sm" variant="secondary" onClick={() => onViewPlan(plan.id)}>
               View Plan
             </Button>
-            {['ready', 'draft', 'generating'].includes(plan.status) && (
+            {['ready', 'draft', 'generating', 'partial'].includes(plan.status) && (
               <Button
                 size="sm" variant="ghost"
                 onClick={() => { if (confirm('Cancel this plan?')) cancelMutation.mutate(plan.id); }}

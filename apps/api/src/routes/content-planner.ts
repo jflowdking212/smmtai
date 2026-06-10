@@ -34,16 +34,39 @@ function inferFileExtension(mimeType: string, originalName: string): string {
 // 1. Generate Plan
 contentPlannerRouter.post('/generate', authenticate, checkContentPlannerAccess(1), async (req: AuthRequest, res: Response) => {
   try {
-    const { prompt, platforms, tone, durationDays } = req.body;
+    const { prompt, platforms: requestedPlatforms, tone, durationDays } = req.body;
     const workspaceId = req.workspaceId!;
     const userId = req.userId!;
 
-    // A. Parse Intent — pass wizard values so fallback can use them
+    // Load REAL connected platforms from DB — this is the source of truth
+    const connections = await prisma.socialConnection.findMany({
+      where: { workspaceId, isActive: true },
+      select: { platform: true }
+    });
+    const connectedPlatforms = [...new Set(connections.map((c: any) => c.platform))];
+
+    if (connectedPlatforms.length === 0) {
+      return res.status(400).json({
+        error: 'No connected platforms',
+        clarification: 'You have no connected social accounts. Please connect at least one platform in the Connections page before generating a content plan.'
+      });
+    }
+
+    // Use wizard-selected platforms if provided and valid, otherwise use all connected
+    let activePlatforms = connectedPlatforms;
+    if (requestedPlatforms && requestedPlatforms.length > 0) {
+      const filtered = requestedPlatforms
+        .map((p: string) => connectedPlatforms.find((c: string) => c.toLowerCase() === p.toLowerCase()))
+        .filter(Boolean) as string[];
+      activePlatforms = filtered.length > 0 ? filtered : connectedPlatforms;
+    }
+
+    // A. Parse Intent — pass connected platforms so AI knows what's available
     const parseResult = await parseContentPlanIntent(
       prompt,
-      platforms || [],
+      activePlatforms,
       tone || 'professional',
-      platforms || [],
+      activePlatforms,
       durationDays || 7
     );
     if (!parseResult.success || !parseResult.data) {
@@ -55,7 +78,10 @@ contentPlannerRouter.post('/generate', authenticate, checkContentPlannerAccess(1
     // User-supplied wizard values always override AI-inferred ones
     if (tone) intent.tone = tone;
     if (durationDays && durationDays > 0) intent.durationDays = durationDays;
-    if (platforms?.length > 0) intent.platforms = platforms;
+    // Always use the resolved active platforms (connected & selected)
+    intent.platforms = activePlatforms;
+    // Recompute totalPosts from final values
+    intent.totalPosts = intent.durationDays * intent.platforms.length;
 
     // Step 1 users get restricted defaults
     if (req.contentPlanner!.maxStep < 2) {
@@ -79,6 +105,11 @@ contentPlannerRouter.post('/generate', authenticate, checkContentPlannerAccess(1
 
     // B. Generate Content
     const generatedPosts = await generateAllContent(intent);
+
+    if (generatedPosts.length === 0) {
+      await prisma.contentPlan.update({ where: { id: plan.id }, data: { status: 'cancelled' } });
+      return res.status(500).json({ error: 'Content generation failed. No posts were created. Please try again.' });
+    }
 
     // C. Schedule
     const scheduledPosts = composeSchedule(generatedPosts, intent);
@@ -112,6 +143,7 @@ contentPlannerRouter.post('/generate', authenticate, checkContentPlannerAccess(1
   }
 });
 
+
 // 2. Get Plan by ID
 contentPlannerRouter.get('/plan/:id', authenticate, async (req: AuthRequest, res: Response) => {
   try {
@@ -143,7 +175,7 @@ contentPlannerRouter.get('/plans', authenticate, async (req: AuthRequest, res: R
 // 3. Edit Post
 contentPlannerRouter.put('/post/:id', authenticate, async (req: AuthRequest, res: Response) => {
   try {
-    const { contentBody, scheduledAt, hashtags } = req.body;
+    const { contentBody, scheduledAt, hashtags, status } = req.body;
     const post = await prisma.contentPlanPost.findUnique({
       where: { id: req.params.id as string },
       include: { plan: true }
@@ -153,14 +185,17 @@ contentPlannerRouter.put('/post/:id', authenticate, async (req: AuthRequest, res
       return res.status(404).json({ error: 'Post not found' });
     }
 
+    // Only allow specific status transitions from the client
+    const allowedStatuses = ['pending_review', 'approved'];
+    const newStatus = status && allowedStatuses.includes(status) ? status : undefined;
+
     const updated = await prisma.contentPlanPost.update({
       where: { id: req.params.id as string },
       data: {
-        contentBody,
-        scheduledAt: scheduledAt ? new Date(scheduledAt) : undefined,
-        hashtags,
-        editedByUser: true,
-        characterCount: contentBody ? contentBody.length : undefined
+        ...(contentBody !== undefined ? { contentBody, characterCount: contentBody.length, editedByUser: true } : {}),
+        ...(scheduledAt !== undefined ? { scheduledAt: new Date(scheduledAt) } : {}),
+        ...(hashtags !== undefined ? { hashtags } : {}),
+        ...(newStatus !== undefined ? { status: newStatus } : {}),
       }
     });
     res.json(updated);
@@ -168,6 +203,7 @@ contentPlannerRouter.put('/post/:id', authenticate, async (req: AuthRequest, res
     res.status(500).json({ error: 'Failed to update post' });
   }
 });
+
 
 // 3.5 Regenerate Post
 contentPlannerRouter.post('/post/:id/regenerate', authenticate, async (req: AuthRequest, res: Response) => {
@@ -265,11 +301,44 @@ contentPlannerRouter.post('/plan/:id/authorize', authenticate, async (req: AuthR
         authorizedCount: result.authorizedCount,
         errors: result.errors,
         message: result.authorizedCount > 0
-          ? `${result.authorizedCount} posts scheduled. ${result.errors.length} failed (missing platform connections).`
+          ? `${result.authorizedCount} posts scheduled. ${result.errors.length} failed.`
           : 'All posts failed to authorize. Please check your connected platforms.'
       });
     }
     res.json({ success: true, authorizedCount: result.authorizedCount });
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// 6.5. Reauthorize Plan — retry only failed posts (for partial plans)
+contentPlannerRouter.post('/plan/:id/reauthorize', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const planId = req.params.id as string;
+    const workspaceId = req.workspaceId!;
+
+    // Reset failed posts to pending_review so authorizeContentPlan can pick them up
+    await prisma.contentPlanPost.updateMany({
+      where: { planId, status: 'failed' },
+      data: { status: 'pending_review' }
+    });
+
+    // Re-open plan status to allow re-authorization
+    await prisma.contentPlan.updateMany({
+      where: { id: planId, workspaceId },
+      data: { status: 'ready' }
+    });
+
+    const result = await authorizeContentPlan(planId, workspaceId, req.userId!);
+
+    res.status(result.errors.length > 0 ? 207 : 200).json({
+      success: result.authorizedCount > 0,
+      authorizedCount: result.authorizedCount,
+      errors: result.errors,
+      message: result.authorizedCount > 0
+        ? `${result.authorizedCount} posts retried successfully. ${result.errors.length} still failing.`
+        : 'Retry failed. Please check your connected platforms and post times.'
+    });
   } catch (error: any) {
     res.status(400).json({ error: error.message });
   }
