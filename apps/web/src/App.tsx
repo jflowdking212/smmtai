@@ -54,6 +54,8 @@ import { AdminBillingPage } from '@/pages/admin/AdminBillingPage';
 // Lazy-load heavy pages
 const EditorPage = lazy(() => import('@/pages/EditorPage').then((m) => ({ default: m.EditorPage })));
 const AnalyticsPage = lazy(() => import('@/pages/AnalyticsPage').then((m) => ({ default: m.AnalyticsPage })));
+const AIProfilePage = lazy(() => import('@/pages/AIProfilePage'));
+const PerformanceIntelligencePage = lazy(() => import('@/pages/PerformanceIntelligencePage'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -182,6 +184,8 @@ export default function App() {
             <Route path="/ai" element={<AIPage />} />
             <Route path="/planner" element={<ContentPlannerPage />} />
             <Route path="/trends" element={<TrendPage />} />
+            <Route path="/ai-profile" element={<Suspense fallback={<div className="p-8 text-center text-neutral-400">Loading AI Profile...</div>}><AIProfilePage /></Suspense>} />
+            <Route path="/performance" element={<UpgradeGate feature="ai_performance_dashboard"><Suspense fallback={<div className="p-8 text-center text-neutral-400">Loading Performance Intelligence...</div>}><PerformanceIntelligencePage /></Suspense></UpgradeGate>} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/team" element={<UpgradeGate feature="team"><SettingsPage /></UpgradeGate>} />
             <Route path="/billing" element={<BillingPage />} />

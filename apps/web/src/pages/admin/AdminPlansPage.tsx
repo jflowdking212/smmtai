@@ -320,6 +320,56 @@ export function AdminPlansPage() {
                   </div>
                 </div>
 
+                {/* AI Intelligence & Engagement Loop */}
+                <div className="pt-3 border-t border-neutral-200 dark:border-neutral-800">
+                  <label className="block text-xs text-neutral-500 dark:text-neutral-400 mb-2">🤖 AI Intelligence & Engagement Loop</label>
+                  <div className="space-y-3 bg-neutral-950/40 p-3 rounded-lg border border-neutral-200 dark:border-neutral-200 dark:border-neutral-800/60 max-h-60 overflow-y-auto custom-scrollbar">
+                    {[
+                      { id: 'aiIntelligenceBasic', name: 'AI Intelligence Profile', description: 'User intelligence profile + context injection into all AI calls' },
+                      { id: 'aiVoiceModel', name: 'Brand Voice Learning', description: 'Learn user writing style from post edits and apply to all content generation' },
+                      { id: 'aiEngagementMonitor', name: 'Engagement Intelligence', description: 'Auto-collect engagement metrics at 2h, 24h, 7d intervals from connected platforms' },
+                      { id: 'aiPatternAnalysis', name: 'Pattern Analysis & A/B Testing', description: 'Identify best posting times, content types, topics and detect natural A/B tests' },
+                      { id: 'aiStrategyRecommendations', name: 'AI Strategy Recommendations', description: 'Proactive insight cards: timing, content type, topic suggestions, competitor benchmarks' },
+                      { id: 'aiPerformanceDashboard', name: 'Performance Intelligence Dashboard', description: 'Engagement heatmaps, topic charts, trend visualization, and competitor comparison' },
+                    ].map((f) => {
+                      const isEnterprise = tier === 'enterprise';
+
+                      // Resolve defaults: basic gets intelligence profile, business gets most, enterprise gets all
+                      let defaultValue = false;
+                      if (f.id === 'aiIntelligenceBasic') {
+                        defaultValue = true; // all plans
+                      } else if (tier === 'business') {
+                        defaultValue = ['aiVoiceModel', 'aiEngagementMonitor', 'aiPerformanceDashboard'].includes(f.id);
+                      } else if (isEnterprise) {
+                        defaultValue = true; // all features
+                      }
+
+                      const checked = isEnterprise ? true : (config[f.id] ?? defaultValue);
+                      const disabled = isEnterprise;
+
+                      return (
+                        <label key={f.id} className={`flex items-start gap-2.5 ${disabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'} group`}>
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            disabled={disabled}
+                            onChange={(e) => updatePlan(tier, f.id, e.target.checked)}
+                            className="w-4 h-4 rounded accent-red-500 mt-0.5 cursor-pointer disabled:cursor-not-allowed"
+                          />
+                          <div className="text-left">
+                            <p className="text-xs font-semibold text-neutral-600 dark:text-neutral-300 group-hover:text-neutral-900 dark:text-white transition-colors">
+                              {f.name}
+                            </p>
+                            <p className="text-[10px] text-neutral-500 leading-normal">
+                              {f.description}
+                            </p>
+                          </div>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+
                 {/* Platform Assignment */}
                 <div className="pt-3 border-t border-neutral-200 dark:border-neutral-800">
                   <div className="flex items-center justify-between mb-2">

@@ -3,6 +3,7 @@ import { Router, Response, NextFunction } from 'express';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
 import { checkUsage, incrementUsage } from '../middleware/usage.js';
 import { chatWithRetry } from '../services/openai.service.js';
+import { buildUserContextBlock, formatContextForPrompt } from '../services/context-injector.service.js';
 
 const PLATFORM_LIMITS: Record<string, number> = {
   facebook: 63000,
@@ -364,10 +365,23 @@ CRITICAL: The entire post text (caption + call to action) MUST NOT exceed the pl
 
 Respond ONLY with valid JSON:
 {"caption": "full caption text", "hashtags": ["#tag1", "#tag2"], "cta": "call to action text"}`;
+
+    // Inject user intelligence context into prompt if available
+    let intelligenceBlock = '';
+    try {
+      if (req.userId && req.workspaceId) {
+        const ctx = await buildUserContextBlock(req.userId, req.workspaceId);
+        if (ctx.profile || ctx.voice) {
+          intelligenceBlock = '\n\n' + formatContextForPrompt(ctx);
+        }
+      }
+    } catch { /* non-fatal */ }
+
+    const finalPrompt = intelligenceBlock ? prompt + intelligenceBlock : prompt;
     
     const aiOptions = await getAiOptions(600);
     try {
-      const raw = await chatWithRetry([{ role: 'user', content: prompt }], aiOptions);
+      const raw = await chatWithRetry([{ role: 'user', content: finalPrompt }], aiOptions);
       const match = raw.match(/\{[\s\S]+\}/);
       return JSON.parse(match ? match[0] : raw);
     } catch (err: any) {

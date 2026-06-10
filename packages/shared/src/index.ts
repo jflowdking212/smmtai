@@ -459,6 +459,118 @@ export interface PlatformPost {
 }
 
 // ============================================================
+// User Intelligence & Engagement Loop Types
+// ============================================================
+
+export interface UserIntelligenceProfile {
+  id: string;
+  userId: string;
+  niche: string | null;
+  targetAudience: {
+    demographics?: string;
+    painPoints?: string[];
+    aspirations?: string[];
+  } | null;
+  contentPillars: string[];
+  tonePreference: string | null;
+  avoidedTopics: string[];
+  goals: {
+    primary?: string;
+    secondary?: string;
+    metrics?: string[];
+  } | null;
+  postingPreferences: {
+    preferredDays?: number[];
+    preferredTimes?: string[];
+    frequency?: string;
+  } | null;
+  brandKeywords: string[];
+  completenessScore: number;
+}
+
+export interface UserVoiceModel {
+  id: string;
+  userId: string;
+  formalityScore: number;
+  energyScore: number;
+  avgSentenceLength: number | null;
+  vocabularySamples: {
+    preferredWords?: string[];
+    avoidedWords?: string[];
+  } | null;
+  emojiUsageRate: number;
+  ctaStyle: string | null;
+  hashtagPatterns: {
+    avgCount?: number;
+    preferred?: string[];
+  } | null;
+  confidenceScore: number;
+  samplesAnalyzed: number;
+}
+
+export interface UserEngagementRecord {
+  id: string;
+  userId: string;
+  postId: string | null;
+  platform: string;
+  contentType: string | null;
+  topic: string | null;
+  postingHour: number | null;
+  postingDay: number | null;
+  likes: number;
+  comments: number;
+  shares: number;
+  saves: number;
+  reach: number;
+  impressions: number;
+  clickThroughs: number;
+  engagementRate: number;
+  snapshotType: string;
+  collectedAt: Date;
+}
+
+export interface StrategyRecommendation {
+  id: string;
+  userId: string;
+  type: 'timing' | 'content_type' | 'topic' | 'audience' | 'profile_nudge' | 'ab_test' | 'growth';
+  title: string;
+  body: string;
+  priority: number;
+  status: 'pending' | 'acted' | 'dismissed';
+  actionedAt: Date | null;
+  expiresAt: Date | null;
+  metadata: Record<string, unknown> | null;
+  createdAt: Date;
+}
+
+export interface CompetitorAccountData {
+  id: string;
+  userId: string;
+  platform: string;
+  handle: string;
+  displayName: string | null;
+  followerCount: number | null;
+  avgEngRate: number | null;
+  lastCheckedAt: Date | null;
+}
+
+/** The context block injected into every AI prompt when intelligence is available */
+export interface AIUserContextBlock {
+  profile: UserIntelligenceProfile | null;
+  voice: UserVoiceModel | null;
+  topPerformingContent?: {
+    contentType: string;
+    topic: string;
+    engagementRate: number;
+  }[];
+  recommendations?: string[];
+  competitorBenchmark?: {
+    avgEngRate: number;
+    userEngRate: number;
+  } | null;
+}
+
+// ============================================================
 // Analytics Types
 // ============================================================
 
@@ -549,7 +661,14 @@ export type AppFeature =
   | 'billing'
   | 'settings'
   | 'editor'
-  | 'admin_dashboard';
+  | 'admin_dashboard'
+  // User Intelligence & Engagement Loop features
+  | 'ai_intelligence_basic'
+  | 'ai_voice_model'
+  | 'ai_engagement_monitor'
+  | 'ai_pattern_analysis'
+  | 'ai_strategy_recommendations'
+  | 'ai_performance_dashboard';
 
 export const PLAN_FEATURES: Record<AppFeature, SubscriptionTier> = {
   dashboard: 'basic',
@@ -567,6 +686,13 @@ export const PLAN_FEATURES: Record<AppFeature, SubscriptionTier> = {
   knowledge_base: 'pro',
   team: 'pro',
   admin_dashboard: 'basic',
+  // User Intelligence & Engagement Loop defaults
+  ai_intelligence_basic: 'basic',         // All plans
+  ai_voice_model: 'business',            // Business + Enterprise
+  ai_engagement_monitor: 'business',     // Business + Enterprise
+  ai_pattern_analysis: 'enterprise',     // Enterprise only
+  ai_strategy_recommendations: 'enterprise', // Enterprise only
+  ai_performance_dashboard: 'business',  // Business + Enterprise
 };
 
 const TIER_ORDER: Record<SubscriptionTier, number> = { basic: 0, pro: 1, business: 2, enterprise: 3 };

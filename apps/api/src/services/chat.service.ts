@@ -4,6 +4,7 @@ import * as knowledgeBaseService from './knowledge-base.service.js';
 import * as conversationService from './conversation.service.js';
 import { adminTools, userTools } from './chat-tools.service.js';
 import { tryRouteLocally, tryStaticRoute, logSuccessfulRoute, logRoutingOutcome, calculateSimilarity } from './nlp-router.service.js';
+import { buildUserContextBlock, formatContextForPrompt } from './context-injector.service.js';
 
 interface QaCacheRecord {
   phrase: string;
@@ -334,6 +335,19 @@ Collaboration (2): Discord, Slack
 Total = 25. NEVER say 13, NEVER add platforms that are not in this list.
 === END VERIFIED FACTS ===`;
 
+    // ⚡ AI INTELLIGENCE CONTEXT INJECTION
+    let intelligenceContext = '';
+    if (userId && workspaceId) {
+      try {
+        const userCtx = await buildUserContextBlock(userId, workspaceId);
+        if (userCtx.profile || userCtx.voice) {
+          intelligenceContext = '\n\n' + formatContextForPrompt(userCtx);
+        }
+      } catch (err) {
+        console.error('[Chat Service] Failed to build intelligence context:', err);
+      }
+    }
+
     const defaultSystemPrompt = `ROLE: You are a helpful AI assistant for SmmtAI, a social media management platform.
 
 CRITICAL ANTI-HALLUCINATION RULES (MUST FOLLOW):
@@ -355,11 +369,12 @@ RULES:
 ${hasKBMatch
   ? '\nYou HAVE knowledge base information below. ANSWER ONLY USING THAT INFORMATION.'
   : '\nOnly answer from your verified facts and general social media knowledge. If uncertain, say so.'}
+${intelligenceContext}
 ${contextInfo}`;
 
     const systemPrompt = chatConfig.systemPrompt?.trim() || defaultSystemPrompt;
     const finalPrompt = chatConfig.systemPrompt?.trim()
-      ? systemPrompt + VERIFIED_FACTS + contextInfo + (hasKBMatch ? '\nIMPORTANT: Answer ONLY using the knowledge base above. Do not make up information.' : '')
+      ? systemPrompt + VERIFIED_FACTS + intelligenceContext + contextInfo + (hasKBMatch ? '\nIMPORTANT: Answer ONLY using the knowledge base above. Do not make up information.' : '')
       : systemPrompt;
 
     const toolExecutor = async (name: string, args: any) => {
@@ -394,18 +409,19 @@ CRITICAL ANTI-HALLUCINATION RULES (NON-NEGOTIABLE):
 1. NEVER state platform names, user counts, post data, billing amounts, or any metric without calling a tool first.
 2. The ONLY social platforms SmmtAI supports are these exact 25: Facebook, Instagram, Twitter/X, LinkedIn, TikTok, YouTube, Pinterest, Entreprenrs, Chrxstians, Iohah, Bluesky, Mastodon, Telegram, Truth Social, Lemmy, Pleroma, Threads, Reddit, Tumblr, WordPress, Medium, Blogger, Google Business Profile, Discord, Slack. NO others exist in this system.
 3. If a user asks what platforms they have connected: call get_connected_platforms. NEVER guess.
-4. If you cannot answer something with a tool or the verified facts: say "I don't have access to that information" ??? NEVER fabricate.
-5. Do NOT add platforms from your training data (Snapchat, WhatsApp, Vimeo, etc.) ??? they are NOT in SmmtAI.
+4. If you cannot answer something with a tool or the verified facts: say "I don't have access to that information" — NEVER fabricate.
+5. Do NOT add platforms from your training data (Snapchat, WhatsApp, Vimeo, etc.) — they are NOT in SmmtAI.
 
 PERSONA:
 You are highly capable, concise, and action-oriented. You proactively use your tools to answer questions with real data.
 
 RULES:
 - CRITICAL: If you have a tool that can answer the user's question, YOU MUST CALL IT. Live tools ALWAYS take precedence over the Knowledge Base!
-- Be concise but thorough ??? do not truncate lists the user asked for.
+- Be concise but thorough — do not truncate lists the user asked for.
 - For destructive actions, ALWAYS confirm with the user first.
 - You can handle multiple steps: look up data then act on it.
 ${agentRoleContext}
+${intelligenceContext}
 ${contextInfo}`
       : null;
 

@@ -40,6 +40,15 @@ model User {
   createdCoupons Coupon[] @relation("CouponCreator")
   couponRedemptions CouponRedemption[]
 
+  // User Intelligence & Engagement Loop
+  intelligenceProfile     UserIntelligenceProfile?
+  voiceModel              UserVoiceModel?
+  editHistory             UserEditHistory[]
+  engagementHistory       UserEngagementHistory[]
+  engagementSnapshots     UserEngagementSnapshot[]
+  strategyRecommendations UserStrategyRecommendation[]
+  competitorAccounts      CompetitorAccount[]
+
   @@map("users")
 }
 
@@ -614,4 +623,154 @@ model ContentPlanPost {
   @@index([planId])
   @@index([postId])
   @@map("content_plan_posts")
+}
+
+// ============================================================
+// User Intelligence & Engagement Loop
+// ============================================================
+
+model UserIntelligenceProfile {
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  niche              String?                // e.g. "fitness coaching", "SaaS marketing"
+  targetAudience     Json?                  // { demographics, painPoints, aspirations }
+  contentPillars     String[] @default([])  // ["motivation", "tips", "behind-the-scenes"]
+  tonePreference     String?                // "professional", "casual", "inspirational"
+  avoidedTopics      String[] @default([])  // topics the user never wants
+  goals              Json?                  // { primary: "grow followers", secondary: "drive traffic" }
+  postingPreferences Json?                  // { preferredDays: [], preferredTimes: [], frequency: "daily" }
+  brandKeywords      String[] @default([])  // branded hashtags, key phrases
+  completenessScore  Int      @default(0)   // 0–100
+  sourceData         Json?                  // tracks which fields came from onboarding vs progressive
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_intelligence_profiles")
+}
+
+model UserVoiceModel {
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  formalityScore     Float    @default(0.5)  // 0 = very casual, 1 = very formal
+  energyScore        Float    @default(0.5)  // 0 = calm, 1 = high energy
+  avgSentenceLength  Float?                  // words per sentence
+  vocabularySamples  Json?                   // { preferredWords: [], avoidedWords: [] }
+  emojiUsageRate     Float    @default(0)    // emojis per 100 words
+  ctaStyle           String?                 // "direct", "soft", "question-based"
+  hashtagPatterns    Json?                   // { avgCount: 5, preferred: ["#fitness", "#mindset"] }
+  confidenceScore    Float    @default(0)    // 0–1, how mature the voice model is
+  samplesAnalyzed    Int      @default(0)    // number of edits processed
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_voice_models")
+}
+
+model UserEditHistory {
+  id              String   @id @default(cuid())
+  userId          String
+  postId          String?
+  originalContent String   @db.Text     // AI-generated original
+  editedContent   String   @db.Text     // User's final version
+  diffSummary     Json?                 // { additions: [], removals: [], toneShift: "more casual" }
+  createdAt       DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("user_edit_history")
+}
+
+model UserEngagementHistory {
+  id              String   @id @default(cuid())
+  userId          String
+  postId          String?
+  platform        String                    // "facebook", "instagram", etc.
+  contentType     String?                   // "carousel", "reel", "text", "image", "video"
+  topic           String?                   // extracted topic/pillar
+  postingHour     Int?                      // 0–23, hour posted
+  postingDay      Int?                      // 0–6, day of week
+  likes           Int      @default(0)
+  comments        Int      @default(0)
+  shares          Int      @default(0)
+  saves           Int      @default(0)
+  reach           Int      @default(0)
+  impressions     Int      @default(0)
+  clickThroughs   Int      @default(0)
+  engagementRate  Float    @default(0)      // (likes+comments+shares+saves)/reach*100
+  collectedAt     DateTime @default(now())
+  snapshotType    String   @default("2h")   // "2h", "24h", "7d"
+  createdAt       DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, platform])
+  @@index([userId, createdAt])
+  @@map("user_engagement_history")
+}
+
+model UserEngagementSnapshot {
+  id              String   @id @default(cuid())
+  userId          String
+  weekStart       DateTime
+  platform        String
+  avgEngRate      Float    @default(0)
+  totalReach      Int      @default(0)
+  totalPosts      Int      @default(0)
+  topContentType  String?
+  topTopic        String?
+  topPostingHour  Int?
+  metadata        Json?                   // analysis results from pattern analyzer
+  createdAt       DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, weekStart, platform])
+  @@index([userId])
+  @@map("user_engagement_snapshots")
+}
+
+model UserStrategyRecommendation {
+  id              String    @id @default(cuid())
+  userId          String
+  type            String                    // "timing", "content_type", "topic", "audience", "profile_nudge", "ab_test", "growth"
+  title           String                    // "Your carousels get 3x more saves"
+  body            String    @db.Text        // Full recommendation text
+  priority        Int       @default(0)     // 0=normal, 1=high, 2=critical
+  status          String    @default("pending") // "pending", "acted", "dismissed"
+  actionedAt      DateTime?
+  expiresAt       DateTime?
+  metadata        Json?                     // { metric: "saves", value: 3.2, comparison: "vs image posts" }
+  createdAt       DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@index([userId, createdAt])
+  @@map("user_strategy_recommendations")
+}
+
+// Enhancement 1: Competitor Benchmarking
+model CompetitorAccount {
+  id              String   @id @default(cuid())
+  userId          String
+  platform        String                    // "instagram", "twitter", etc.
+  handle          String                    // @competitor_handle
+  displayName     String?
+  followerCount   Int?                      // last known follower count
+  avgEngRate      Float?                    // estimated avg engagement rate
+  lastCheckedAt   DateTime?
+  metadata        Json?                     // historical snapshots, growth rate
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, platform, handle])
+  @@index([userId])
+  @@map("competitor_accounts")
 }

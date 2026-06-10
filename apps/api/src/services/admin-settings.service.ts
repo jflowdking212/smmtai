@@ -589,13 +589,39 @@ export async function getEffectiveLimits(tier: string): Promise<{
   trendSavedTrends: boolean;
   trendAdvancedAnalytics: boolean;
   trendDailyLimit: number;
+  // AI Intelligence & Engagement Loop
+  aiIntelligenceBasic: boolean;
+  aiVoiceModel: boolean;
+  aiEngagementMonitor: boolean;
+  aiPatternAnalysis: boolean;
+  aiStrategyRecommendations: boolean;
+  aiPerformanceDashboard: boolean;
 }> {
   const { SUBSCRIPTION_LIMITS } = await import('@ee-postmind/shared');
   const defaults = SUBSCRIPTION_LIMITS[tier as keyof typeof SUBSCRIPTION_LIMITS] as any;
   const config = await getPlanConfig();
   const overrides = config[tier];
   const _isPaidTier = ['pro', 'business', 'enterprise'].includes(tier);
-  if (!overrides) return { ...defaults, trendEngineAccess: _isPaidTier, trendOpportunityDetection: _isPaidTier, trendForecasting: _isPaidTier, trendCampaignGeneration: _isPaidTier, trendViralScore: _isPaidTier, trendGeoIntelligence: _isPaidTier, trendPersonalization: _isPaidTier, trendSavedTrends: _isPaidTier, trendAdvancedAnalytics: _isPaidTier, trendDailyLimit: 0, ...(defaults as any) } as any;
+  const _isBusinessPlus = ['business', 'enterprise'].includes(tier);
+  const _isEnterprise = tier === 'enterprise';
+
+  // AI Intelligence default gating:
+  // ai_intelligence_basic → all plans
+  // ai_voice_model → business + enterprise
+  // ai_engagement_monitor → business + enterprise
+  // ai_pattern_analysis → enterprise only
+  // ai_strategy_recommendations → enterprise only
+  // ai_performance_dashboard → business + enterprise
+  const aiDefaults = {
+    aiIntelligenceBasic: true,              // all plans
+    aiVoiceModel: _isBusinessPlus,          // business + enterprise
+    aiEngagementMonitor: _isBusinessPlus,   // business + enterprise
+    aiPatternAnalysis: _isEnterprise,       // enterprise only
+    aiStrategyRecommendations: _isEnterprise, // enterprise only
+    aiPerformanceDashboard: _isBusinessPlus,  // business + enterprise
+  };
+
+  if (!overrides) return { ...defaults, trendEngineAccess: _isPaidTier, trendOpportunityDetection: _isPaidTier, trendForecasting: _isPaidTier, trendCampaignGeneration: _isPaidTier, trendViralScore: _isPaidTier, trendGeoIntelligence: _isPaidTier, trendPersonalization: _isPaidTier, trendSavedTrends: _isPaidTier, trendAdvancedAnalytics: _isPaidTier, trendDailyLimit: 0, ...aiDefaults, ...(defaults as any) } as any;
 
   return {
     socialAccounts: overrides.socialAccounts ?? defaults.socialAccounts,
@@ -614,5 +640,12 @@ export async function getEffectiveLimits(tier: string): Promise<{
     trendSavedTrends: (overrides as any).trendSavedTrends ?? (defaults as any).trendSavedTrends ?? _isPaidTier,
     trendAdvancedAnalytics: (overrides as any).trendAdvancedAnalytics ?? (defaults as any).trendAdvancedAnalytics ?? _isPaidTier,
     trendDailyLimit: (overrides as any).trendDailyLimit ?? (defaults as any).trendDailyLimit ?? 0,
+    // AI Intelligence: enterprise always true (locked on), others use admin overrides or defaults
+    aiIntelligenceBasic: _isEnterprise ? true : ((overrides as any).aiIntelligenceBasic ?? aiDefaults.aiIntelligenceBasic),
+    aiVoiceModel: _isEnterprise ? true : ((overrides as any).aiVoiceModel ?? aiDefaults.aiVoiceModel),
+    aiEngagementMonitor: _isEnterprise ? true : ((overrides as any).aiEngagementMonitor ?? aiDefaults.aiEngagementMonitor),
+    aiPatternAnalysis: _isEnterprise ? true : ((overrides as any).aiPatternAnalysis ?? aiDefaults.aiPatternAnalysis),
+    aiStrategyRecommendations: _isEnterprise ? true : ((overrides as any).aiStrategyRecommendations ?? aiDefaults.aiStrategyRecommendations),
+    aiPerformanceDashboard: _isEnterprise ? true : ((overrides as any).aiPerformanceDashboard ?? aiDefaults.aiPerformanceDashboard),
   };
 }

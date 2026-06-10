@@ -42,6 +42,7 @@ import {
   MailWarning,
   CheckCircle2,
   AlertCircle,
+  Brain,
 } from 'lucide-react';
 
 const navigation: { name: string; href: string; icon: typeof LayoutDashboard; feature: AppFeature }[] = [
@@ -58,6 +59,8 @@ const navigation: { name: string; href: string; icon: typeof LayoutDashboard; fe
   { name: 'AI Assistant', href: '/ai', icon: Sparkles, feature: 'ai_assistant' },
   { name: 'Content Planner', href: '/planner', icon: CalendarDays, feature: 'ai_assistant' },
   { name: 'Trend Engine', href: '/trends', icon: TrendingUp, feature: 'ai_assistant' },
+  { name: 'AI Profile', href: '/ai-profile', icon: Brain, feature: 'ai_intelligence_basic' },
+  { name: 'Performance', href: '/performance', icon: BarChart3, feature: 'ai_performance_dashboard' },
 ];
 
 const bottomNav: { name: string; href: string; icon: typeof Users; feature: AppFeature; ownerOnly?: boolean }[] = [
