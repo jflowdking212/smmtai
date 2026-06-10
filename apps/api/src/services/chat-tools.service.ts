@@ -1239,4 +1239,608 @@ export const userTools: Record<string, { definition: ToolDefinition; handler: To
       return `📊 **Per-Platform Analytics Breakdown:**\n\n${lines.join('\n')}`;
     }
   },
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // TEMPLATES
+  // ─────────────────────────────────────────────────────────────────────────
+
+  get_templates: {
+    definition: {
+      type: 'function',
+      function: {
+        name: 'get_templates',
+        description: "Get the user's saved post templates (custom workspace templates + system templates). Optionally filter by category or search by name keyword.",
+        parameters: {
+          type: 'object',
+          properties: {
+            category: { type: 'string', description: 'Filter templates by category (e.g. promotional, educational, engagement, announcement).' },
+            search: { type: 'string', description: 'Keyword to search template names.' },
+            limit: { type: 'number', description: 'Number of templates to return (default 10, max 20).' }
+          },
+          required: []
+        },
+      },
+    },
+    handler: async (args, context) => {
+      const limit = Math.min(args.limit || 10, 20);
+      const where: any = {
+        OR: [
+          { isSystem: true },
+          { workspaceId: context.workspaceId },
+        ],
+      };
+      if (args.category) where.category = { contains: args.category, mode: 'insensitive' };
+      if (args.search) where.name = { contains: args.search, mode: 'insensitive' };
+
+      const templates = await prisma.template.findMany({
+        where,
+        take: limit,
+        orderBy: [{ isSystem: 'asc' }, { createdAt: 'desc' }],
+        select: { id: true, name: true, category: true, platforms: true, isSystem: true, isPremium: true, createdAt: true }
+      });
+
+      if (!templates.length) return `No templates found${args.search ? ` matching "${args.search}"` : ''}${args.category ? ` in "${args.category}" category` : ''}. Visit the **Templates** section to browse all available templates.`;
+
+      const lines = templates.map((t, i) => {
+        const badge = t.isSystem ? '🌐 System' : '✏️ Custom';
+        const premium = t.isPremium ? ' 👑' : '';
+        const platforms = Array.isArray(t.platforms) && t.platforms.length ? (t.platforms as string[]).join(', ') : 'any platform';
+        return `${i + 1}. **${t.name}**${premium} [${badge}] — Category: ${t.category || 'General'} | Platforms: ${platforms}\n   ID: \`${t.id}\``;
+      });
+
+      return `📋 **Templates (${templates.length} shown):**\n\n${lines.join('\n\n')}\n\n💡 Say "use template [name]" to create a post from a template, or visit [Templates](/templates) to browse all.`;
+    }
+  },
+
+  use_template: {
+    definition: {
+      type: 'function',
+      function: {
+        name: 'use_template',
+        description: 'Create a new post draft based on a saved template. Opens the compose view with the template pre-loaded.',
+        parameters: {
+          type: 'object',
+          properties: {
+            templateId: { type: 'string', description: 'The ID of the template to use.' },
+            platforms: { type: 'array', items: { type: 'string' }, description: 'Override the target platforms (optional, defaults to template platforms).' }
+          },
+          required: ['templateId']
+        },
+      },
+    },
+    handler: async (args, context) => {
+      const template = await prisma.template.findUnique({
+        where: { id: args.templateId },
+        select: { id: true, name: true, category: true, platforms: true, designData: true, isSystem: true }
+      });
+
+      if (!template) return `Template \`${args.templateId}\` not found. Use **get_templates** to list available templates.`;
+
+      // Create a draft post from this template
+      const targetPlatforms = args.platforms || (template.platforms as string[]) || [];
+      const activeConnections = await prisma.socialConnection.findMany({
+        where: { workspaceId: context.workspaceId, isActive: true }
+      });
+
+      const platformPostsCreate = [];
+      for (const p of targetPlatforms) {
+        const conn = activeConnections.find((c: any) => c.platform.toLowerCase() === p.toLowerCase());
+        if (conn) {
+          platformPostsCreate.push({ socialConnectionId: conn.id, platform: conn.platform, status: 'draft' });
+        }
+      }
+
+      const post = await prisma.post.create({
+        data: {
+          workspaceId: context.workspaceId,
+          authorId: context.userId,
+          content: `[Template: ${template.name}]`,
+          status: 'draft',
+          platforms: targetPlatforms,
+          designData: template.designData as any,
+          platformPosts: platformPostsCreate.length > 0 ? { create: platformPostsCreate } : undefined,
+        }
+      });
+
+      return `✅ **Draft created from template "${template.name}"!**\n\n**Post ID:** \`${post.id}\`\n**Platforms:** ${targetPlatforms.join(', ') || 'not set yet'}\n\n👉 [Open in Visual Editor](/compose?draftId=${post.id}) to customise and publish.\n\nOr ask me to **schedule it** or **publish it now**!`;
+    }
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // CONTENT PLANNER
+  // ─────────────────────────────────────────────────────────────────────────
+
+  get_content_plans: {
+    definition: {
+      type: 'function',
+      function: {
+        name: 'get_content_plans',
+        description: "List the user's content plans (AI-generated multi-day social media schedules). Shows status, date range, and post count for each plan.",
+        parameters: {
+          type: 'object',
+          properties: {
+            status: { type: 'string', enum: ['generating', 'ready', 'active', 'cancelled', 'completed'], description: 'Filter by plan status.' },
+            limit: { type: 'number', description: 'Number of plans to return (default 5, max 10).' }
+          },
+          required: []
+        },
+      },
+    },
+    handler: async (args, context) => {
+      const limit = Math.min(args.limit || 5, 10);
+      const where: any = { workspaceId: context.workspaceId };
+      if (args.status) where.status = args.status;
+
+      const plans = await prisma.contentPlan.findMany({
+        where,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: { _count: { select: { posts: true } } }
+      });
+
+      if (!plans.length) return `You have no content plans${args.status ? ` with status "${args.status}"` : ''} yet.\n\n💡 Go to [Content Planner](/content-planner) or ask me: *"Create a content plan for my brand for the next 7 days"*.`;
+
+      const statusEmoji: Record<string, string> = {
+        ready: '✅', active: '🟢', generating: '⏳', cancelled: '❌', completed: '🏁'
+      };
+
+      const lines = plans.map((plan, i) => {
+        const emoji = statusEmoji[plan.status] || '📋';
+        const start = plan.dateRangeStart ? new Date(plan.dateRangeStart).toLocaleDateString() : '—';
+        const end = plan.dateRangeEnd ? new Date(plan.dateRangeEnd).toLocaleDateString() : '—';
+        return `${i + 1}. ${emoji} **${plan.theme || 'Content Plan'}** — ${plan._count.posts} posts | ${start} → ${end} | Status: **${plan.status}**\n   ID: \`${plan.id}\``;
+      });
+
+      return `📅 **Your Content Plans (${plans.length} shown):**\n\n${lines.join('\n\n')}\n\n💡 Say "show me plan [ID]" to see all posts in a specific plan, or "create a content plan" to generate a new one.`;
+    }
+  },
+
+  get_content_plan_posts: {
+    definition: {
+      type: 'function',
+      function: {
+        name: 'get_content_plan_posts',
+        description: "Get all scheduled posts inside a specific content plan. Shows content, platform, scheduled time, and review status.",
+        parameters: {
+          type: 'object',
+          properties: {
+            planId: { type: 'string', description: 'The content plan ID.' },
+            limit: { type: 'number', description: 'Number of posts to show (default 10).' }
+          },
+          required: ['planId']
+        },
+      },
+    },
+    handler: async (args, context) => {
+      const limit = Math.min(args.limit || 10, 30);
+      const plan = await prisma.contentPlan.findUnique({
+        where: { id: args.planId, workspaceId: context.workspaceId },
+        include: {
+          posts: {
+            orderBy: { scheduledAt: 'asc' },
+            take: limit,
+            select: { id: true, platform: true, contentBody: true, scheduledAt: true, status: true, hashtags: true }
+          }
+        }
+      });
+
+      if (!plan) return `Content plan \`${args.planId}\` not found. Use **get_content_plans** to list your plans.`;
+
+      if (!plan.posts.length) return `Content plan "${plan.theme}" has no posts yet. It may still be generating.`;
+
+      const lines = plan.posts.map((p, i) => {
+        const preview = p.contentBody.length > 80 ? p.contentBody.substring(0, 80) + '…' : p.contentBody;
+        const time = p.scheduledAt ? new Date(p.scheduledAt).toLocaleString() : 'Not scheduled';
+        const tags = Array.isArray(p.hashtags) && p.hashtags.length ? `#${(p.hashtags as string[]).slice(0, 3).join(' #')}` : '';
+        return `${i + 1}. **[${p.platform.toUpperCase()}]** ${preview}\n   📅 ${time} | Status: ${p.status} ${tags}`;
+      });
+
+      return `📅 **"${plan.theme}" — ${plan.posts.length} Posts:**\n\n${lines.join('\n\n')}\n\n👉 [View Full Plan](/content-planner) to approve and publish.`;
+    }
+  },
+
+  create_content_plan: {
+    definition: {
+      type: 'function',
+      function: {
+        name: 'create_content_plan',
+        description: "Generate a complete AI-powered multi-day content plan for the user's connected platforms. The AI schedules posts at the preferred time across all selected platforms.",
+        parameters: {
+          type: 'object',
+          properties: {
+            prompt: { type: 'string', description: 'The user\'s content goal or campaign description (e.g. "Grow brand awareness with educational AI content for 7 days posting daily at 9am").' },
+            durationDays: { type: 'number', description: 'Number of days to plan (default 7, max 30).' },
+            tone: { type: 'string', enum: ['professional', 'casual', 'educational', 'inspirational', 'hype'], description: 'Content tone.' }
+          },
+          required: ['prompt']
+        },
+      },
+    },
+    handler: async (args, context) => {
+      const connections = await prisma.socialConnection.findMany({
+        where: { workspaceId: context.workspaceId, isActive: true },
+        select: { platform: true }
+      });
+
+      if (!connections.length) {
+        return `⚠️ You have no connected social accounts. Please [connect your platforms](/connections) first before generating a content plan.`;
+      }
+
+      const platforms = [...new Set(connections.map((c: any) => c.platform))];
+      const durationDays = Math.min(args.durationDays || 7, 30);
+
+      return `🚀 **Ready to generate your content plan!**\n\n**Your prompt:** "${args.prompt}"\n**Duration:** ${durationDays} days\n**Tone:** ${args.tone || 'professional'}\n**Platforms:** ${platforms.join(', ')}\n\n👉 [Open Content Planner](/content-planner) to generate this plan. Copy and paste your prompt there to get started.\n\n💡 The Content Planner will generate ${durationDays * platforms.length} posts, scheduled at your preferred times across all your platforms!`;
+    }
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // TREND ENGINE
+  // ─────────────────────────────────────────────────────────────────────────
+
+  get_trending_topics: {
+    definition: {
+      type: 'function',
+      function: {
+        name: 'get_trending_topics',
+        description: 'Get current trending topics from the Trend Engine. Optionally filter by platform or category. Returns hot topics with engagement scores and viral probability.',
+        parameters: {
+          type: 'object',
+          properties: {
+            platform: { type: 'string', description: 'Filter by platform (e.g. twitter, instagram, tiktok, linkedin, youtube, reddit). Omit for all platforms.' },
+            category: { type: 'string', description: 'Filter by topic category (e.g. Technology, Business, Entertainment, Sports, Health, Politics).' },
+            status: { type: 'string', enum: ['Viral', 'Hot', 'Rising', 'Emerging'], description: 'Filter by trend status.' },
+            limit: { type: 'number', description: 'Number of trends to return (default 10, max 20).' }
+          },
+          required: []
+        },
+      },
+    },
+    handler: async (args, context) => {
+      const limit = Math.min(args.limit || 10, 20);
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - 7);
+
+      const where: any = {
+        isNsfw: false, isBlacklisted: false, isFlagged: false,
+        createdAt: { gte: cutoff }
+      };
+      if (args.platform) where.platform = args.platform.toLowerCase();
+      if (args.category) where.category = { contains: args.category, mode: 'insensitive' };
+      if (args.status) where.trendStatus = args.status;
+
+      const trends = await (prisma as any).trend.findMany({
+        where,
+        orderBy: [{ score: 'desc' }, { viralProbability: 'desc' }],
+        take: limit,
+        select: { id: true, topic: true, platform: true, category: true, trendStatus: true, score: true, viralProbability: true, growthRate: true, sentiment: true, country: true }
+      });
+
+      if (!trends.length) {
+        return `No trending topics found${args.platform ? ` for ${args.platform}` : ''}${args.category ? ` in ${args.category}` : ''}.\n\n💡 Visit [Trend Engine](/trends) to refresh trends or adjust filters.`;
+      }
+
+      const statusEmoji: Record<string, string> = { Viral: '🔥🔥', Hot: '🔥', Rising: '📈', Emerging: '🌱' };
+
+      const lines = trends.map((t: any, i: number) => {
+        const emoji = statusEmoji[t.trendStatus] || '📊';
+        const loc = t.country && t.country !== 'Global' ? ` 📍${t.country}` : '';
+        return `${i + 1}. ${emoji} **${t.topic}** [${t.platform.toUpperCase()}]\n   Score: ${t.score} | Viral Probability: ${t.viralProbability?.toFixed(0) || 0}% | Status: **${t.trendStatus}** | Category: ${t.category || 'General'}${loc}`;
+      });
+
+      const filterDesc = [
+        args.platform ? `Platform: ${args.platform.toUpperCase()}` : '',
+        args.category ? `Category: ${args.category}` : '',
+        args.status ? `Status: ${args.status}` : ''
+      ].filter(Boolean).join(' | ');
+
+      return `📈 **Trending Topics${filterDesc ? ` (${filterDesc})` : ''}:**\n\n${lines.join('\n\n')}\n\n💡 Say "create a post about [topic]" to generate content for any trending topic! Or visit [Trend Engine](/trends) for full analysis.`;
+    }
+  },
+
+  get_trend_opportunities: {
+    definition: {
+      type: 'function',
+      function: {
+        name: 'get_trend_opportunities',
+        description: 'Get trending topics with high viral probability AND low competition — the best opportunities to jump on right now. These are emerging trends before they peak.',
+        parameters: { type: 'object', properties: {}, required: [] },
+      },
+    },
+    handler: async (args, context) => {
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - 3);
+
+      const trends = await (prisma as any).trend.findMany({
+        where: {
+          isNsfw: false, isBlacklisted: false, isFlagged: false,
+          viralProbability: { gte: 40 },
+          competitionLevel: { lte: 0.45 },
+          trendStatus: { in: ['Emerging', 'Rising', 'Hot'] },
+          createdAt: { gte: cutoff },
+        },
+        orderBy: [{ viralProbability: 'desc' }, { competitionLevel: 'asc' }],
+        take: 8,
+        select: { id: true, topic: true, platform: true, category: true, trendStatus: true, viralProbability: true, competitionLevel: true, growthRate: true }
+      });
+
+      if (!trends.length) return '🌱 No high-opportunity trends found right now. Check back soon or visit [Trend Engine](/trends) to refresh.';
+
+      const lines = trends.map((t: any, i: number) => {
+        const competition = t.competitionLevel < 0.2 ? '🟢 Very Low' : t.competitionLevel < 0.35 ? '🟡 Low' : '🟠 Moderate';
+        return `${i + 1}. 🎯 **${t.topic}** [${t.platform.toUpperCase()}]\n   Viral Probability: **${t.viralProbability?.toFixed(0) || 0}%** | Competition: ${competition} | Status: ${t.trendStatus} | Category: ${t.category || 'General'}`;
+      });
+
+      return `🎯 **Top Trend Opportunities (High Viral, Low Competition):**\n\n${lines.join('\n\n')}\n\n💡 These are the best trends to create content on RIGHT NOW before they peak. Ask me to create a post for any of these!`;
+    }
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // AI PROFILE (Intelligence Profile)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  get_ai_profile: {
+    definition: {
+      type: 'function',
+      function: {
+        name: 'get_ai_profile',
+        description: "Get the user's AI Intelligence Profile — their niche, target audience, content pillars, tone preference, goals, avoided topics, brand keywords, and profile completeness score.",
+        parameters: { type: 'object', properties: {}, required: [] },
+      },
+    },
+    handler: async (args, context) => {
+      const profile = await prisma.userIntelligenceProfile.findUnique({
+        where: { userId: context.userId }
+      });
+
+      if (!profile) {
+        return `🤖 You don't have an AI Profile set up yet.\n\n👉 Go to [AI Profile](/ai-profile) to build your profile. The AI will use it to personalize ALL content it creates for you — matching your voice, targeting your audience, and aligning with your goals.\n\nOnce set up, I'll know exactly how to write for your brand!`;
+      }
+
+      const ta = profile.targetAudience as any;
+      const goals = profile.goals as any;
+      const pp = profile.postingPreferences as any;
+
+      const sections = [
+        `🤖 **Your AI Intelligence Profile** (Completeness: **${profile.completenessScore || 0}%**)`,
+        '',
+        profile.niche ? `🎯 **Niche/Industry:** ${profile.niche}` : '',
+        ta?.demographics ? `👥 **Target Audience:** ${ta.demographics}` : '',
+        ta?.painPoints?.length ? `😓 **Audience Pain Points:** ${ta.painPoints.join(', ')}` : '',
+        ta?.aspirations?.length ? `✨ **Audience Aspirations:** ${ta.aspirations.join(', ')}` : '',
+        profile.contentPillars?.length ? `📌 **Content Pillars:** ${profile.contentPillars.join(', ')}` : '',
+        profile.tonePreference ? `🎙️ **Preferred Tone:** ${profile.tonePreference}` : '',
+        goals?.primary ? `🎯 **Primary Goal:** ${goals.primary}` : '',
+        goals?.secondary ? `🔄 **Secondary Goal:** ${goals.secondary}` : '',
+        profile.avoidedTopics?.length ? `⚠️ **Avoided Topics:** ${profile.avoidedTopics.join(', ')}` : '',
+        profile.brandKeywords?.length ? `🏷️ **Brand Keywords:** ${profile.brandKeywords.join(', ')}` : '',
+        pp?.frequency ? `📅 **Posting Frequency:** ${pp.frequency}` : '',
+      ].filter(Boolean);
+
+      const completeness = profile.completenessScore || 0;
+      const tip = completeness < 50
+        ? '\n\n⚠️ Your profile is incomplete. Visit [AI Profile](/ai-profile) to fill it out — the more complete it is, the better I can personalize your content!'
+        : completeness < 80
+        ? '\n\n💡 Good progress! Fill in more details in [AI Profile](/ai-profile) to get even better personalized content.'
+        : '\n\n✅ Great profile! I\'ll use this to personalize all content I create for you.';
+
+      return sections.join('\n') + tip;
+    }
+  },
+
+  get_voice_model: {
+    definition: {
+      type: 'function',
+      function: {
+        name: 'get_voice_model',
+        description: "Get the user's AI Voice Model — the brand voice characteristics learned from analyzing their past content (formality, energy, emoji usage, CTA style, hashtag patterns).",
+        parameters: { type: 'object', properties: {}, required: [] },
+      },
+    },
+    handler: async (args, context) => {
+      const voice = await prisma.userVoiceModel.findUnique({
+        where: { userId: context.userId }
+      });
+
+      if (!voice) {
+        return `🎙️ You don't have an AI Voice Model yet.\n\n👉 Go to [AI Profile](/ai-profile) → Voice Model section to train the AI on your writing style. Once trained, I'll mirror your brand voice in every post I create!`;
+      }
+
+      if (voice.confidenceScore < 0.2) {
+        return `🎙️ Your Voice Model exists but has low confidence (**${(voice.confidenceScore * 100).toFixed(0)}%**) — only ${voice.samplesAnalyzed} samples analyzed. Go to [AI Profile](/ai-profile) and add more content samples for better voice learning.`;
+      }
+
+      const formalityLabel = voice.formalityScore < 0.3 ? 'Very Casual' : voice.formalityScore < 0.5 ? 'Casual' : voice.formalityScore < 0.7 ? 'Professional' : 'Formal';
+      const energyLabel = voice.energyScore < 0.3 ? 'Calm & Measured' : voice.energyScore < 0.5 ? 'Moderate' : voice.energyScore < 0.7 ? 'Energetic' : 'High Energy';
+      const hp = voice.hashtagPatterns as any;
+      const vs = voice.vocabularySamples as any;
+
+      const lines = [
+        `🎙️ **Your Brand Voice Model** (Confidence: **${(voice.confidenceScore * 100).toFixed(0)}%** from ${voice.samplesAnalyzed} samples)`,
+        '',
+        `🎭 **Formality:** ${formalityLabel} (${(voice.formalityScore * 100).toFixed(0)}%)`,
+        `⚡ **Energy:** ${energyLabel} (${(voice.energyScore * 100).toFixed(0)}%)`,
+        voice.avgSentenceLength ? `📝 **Avg Sentence Length:** ~${Math.round(voice.avgSentenceLength)} words` : '',
+        voice.emojiUsageRate ? `😊 **Emoji Usage:** ~${voice.emojiUsageRate.toFixed(1)} per 100 words` : '',
+        voice.ctaStyle ? `📣 **CTA Style:** ${voice.ctaStyle}` : '',
+        hp?.avgCount ? `#️⃣ **Hashtag Usage:** ~${hp.avgCount} per post` : '',
+        hp?.preferred?.length ? `🏷️ **Preferred Hashtags:** ${hp.preferred.slice(0, 5).join(', ')}` : '',
+        vs?.preferredWords?.length ? `💬 **Signature Vocabulary:** "${vs.preferredWords.slice(0, 5).join('", "')}"` : '',
+      ].filter(Boolean);
+
+      return lines.join('\n') + '\n\n✅ I\'ll match this voice in all content I create for you!';
+    }
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // PERFORMANCE INTELLIGENCE
+  // ─────────────────────────────────────────────────────────────────────────
+
+  get_performance_intelligence: {
+    definition: {
+      type: 'function',
+      function: {
+        name: 'get_performance_intelligence',
+        description: "Get the user's performance intelligence summary — top performing content types, engagement snapshots, strategy recommendations, and competitor benchmarks.",
+        parameters: {
+          type: 'object',
+          properties: {
+            section: {
+              type: 'string',
+              enum: ['overview', 'top_content', 'recommendations', 'competitors', 'snapshots'],
+              description: 'Which section to retrieve. Defaults to overview (all sections).'
+            }
+          },
+          required: []
+        },
+      },
+    },
+    handler: async (args, context) => {
+      const section = args.section || 'overview';
+      const parts: string[] = [];
+
+      // Top Performing Content
+      if (section === 'overview' || section === 'top_content') {
+        const topContent = await prisma.userEngagementHistory.findMany({
+          where: { userId: context.userId, snapshotType: '7d', reach: { gt: 0 } },
+          orderBy: { engagementRate: 'desc' },
+          take: 5,
+          select: { contentType: true, topic: true, engagementRate: true, reach: true }
+        });
+
+        if (topContent.length) {
+          const lines = topContent.map((c, i) =>
+            `  ${i + 1}. **${c.contentType || 'Content'}** about "${c.topic || 'general'}" → **${c.engagementRate.toFixed(1)}%** engagement | ${(c.reach || 0).toLocaleString()} reach`
+          );
+          parts.push(`🏆 **Top Performing Content (Last 7 Days):**\n${lines.join('\n')}`);
+        } else {
+          parts.push('🏆 **Top Performing Content:** No engagement data yet. Publish posts and allow time for analytics to populate.');
+        }
+      }
+
+      // Weekly Snapshots
+      if (section === 'overview' || section === 'snapshots') {
+        const snapshots = await prisma.userEngagementSnapshot.findMany({
+          where: { userId: context.userId },
+          orderBy: { weekStart: 'desc' },
+          take: 4,
+          select: { weekStart: true, avgEngRate: true, totalReach: true, totalImpressions: true }
+        });
+
+        if (snapshots.length) {
+          const lines = snapshots.map(s => {
+            const week = new Date(s.weekStart).toLocaleDateString();
+            return `  • Week of ${week}: Avg Eng Rate **${s.avgEngRate.toFixed(1)}%** | Reach: ${(s.totalReach || 0).toLocaleString()} | Impressions: ${(s.totalImpressions || 0).toLocaleString()}`;
+          });
+          parts.push(`📊 **Weekly Engagement Snapshots:**\n${lines.join('\n')}`);
+        }
+      }
+
+      // Recommendations
+      if (section === 'overview' || section === 'recommendations') {
+        const recs = await prisma.userStrategyRecommendation.findMany({
+          where: {
+            userId: context.userId,
+            status: 'pending',
+            OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }]
+          },
+          orderBy: { priority: 'desc' },
+          take: 5,
+          select: { title: true, description: true, priority: true, type: true }
+        });
+
+        if (recs.length) {
+          const lines = recs.map((r, i) => {
+            const priorityEmoji = r.priority >= 8 ? '🔴' : r.priority >= 5 ? '🟡' : '🟢';
+            return `  ${i + 1}. ${priorityEmoji} **${r.title}**${r.description ? `\n     ${r.description}` : ''}`;
+          });
+          parts.push(`💡 **Strategy Recommendations:**\n${lines.join('\n')}`);
+        } else {
+          parts.push('💡 **Strategy Recommendations:** No active recommendations. Post more content to get AI-powered strategy insights.');
+        }
+      }
+
+      // Competitor Benchmarks
+      if (section === 'overview' || section === 'competitors') {
+        const competitors = await prisma.competitorAccount.findMany({
+          where: { userId: context.userId },
+          select: { handle: true, platform: true, avgEngRate: true, followerCount: true }
+        });
+
+        if (competitors.length) {
+          const competitorAvg = competitors.reduce((sum, c) => sum + (c.avgEngRate || 0), 0) / competitors.length;
+          const userSnapshots = await prisma.userEngagementSnapshot.findMany({
+            where: { userId: context.userId },
+            orderBy: { weekStart: 'desc' },
+            take: 4,
+            select: { avgEngRate: true }
+          });
+          const userAvg = userSnapshots.length > 0
+            ? userSnapshots.reduce((sum, s) => sum + s.avgEngRate, 0) / userSnapshots.length
+            : 0;
+
+          const comparison = userAvg > competitorAvg ? `✅ ${(userAvg - competitorAvg).toFixed(1)}% ABOVE` : `⚠️ ${(competitorAvg - userAvg).toFixed(1)}% BELOW`;
+          const compLines = competitors.map(c =>
+            `  • @${c.handle} [${c.platform.toUpperCase()}] — ${(c.avgEngRate || 0).toFixed(1)}% avg eng rate | ${(c.followerCount || 0).toLocaleString()} followers`
+          );
+          parts.push(`🏆 **Competitor Benchmarks:**\nYour avg engagement (**${userAvg.toFixed(1)}%**) is ${comparison} competitor average (**${competitorAvg.toFixed(1)}%**).\n\nTracked competitors:\n${compLines.join('\n')}`);
+        } else {
+          parts.push('🏆 **Competitor Benchmarks:** No competitors tracked yet. Visit [Performance Intelligence](/performance) to add competitors to benchmark against.');
+        }
+      }
+
+      if (!parts.length) return 'No performance data available yet. Publish posts and return here as your analytics grow!';
+
+      return parts.join('\n\n') + '\n\n👉 Visit [Performance Intelligence](/performance) for full charts and detailed analysis.';
+    }
+  },
+
+  get_strategy_recommendations: {
+    definition: {
+      type: 'function',
+      function: {
+        name: 'get_strategy_recommendations',
+        description: "Get AI-generated strategy recommendations for improving the user's social media performance — posting frequency, content type mix, best times to post, etc.",
+        parameters: {
+          type: 'object',
+          properties: {
+            type: { type: 'string', enum: ['posting_time', 'content_mix', 'engagement', 'growth', 'platform'], description: 'Filter by recommendation type.' }
+          },
+          required: []
+        },
+      },
+    },
+    handler: async (args, context) => {
+      const where: any = {
+        userId: context.userId,
+        status: 'pending',
+        OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }]
+      };
+      if (args.type) where.type = args.type;
+
+      const recs = await prisma.userStrategyRecommendation.findMany({
+        where,
+        orderBy: { priority: 'desc' },
+        take: 8,
+        select: { id: true, title: true, description: true, type: true, priority: true, expectedImpact: true }
+      });
+
+      if (!recs.length) {
+        return `💡 No strategy recommendations available right now${args.type ? ` for "${args.type}"` : ''}.\n\nVisit [Performance Intelligence](/performance) to run an analysis and generate fresh recommendations based on your recent content performance.`;
+      }
+
+      const typeEmoji: Record<string, string> = {
+        posting_time: '⏰', content_mix: '🎨', engagement: '💬', growth: '📈', platform: '📱'
+      };
+
+      const lines = recs.map((r, i) => {
+        const emoji = typeEmoji[r.type] || '💡';
+        const priorityLabel = r.priority >= 8 ? '🔴 High' : r.priority >= 5 ? '🟡 Medium' : '🟢 Low';
+        const impact = r.expectedImpact ? ` | Expected impact: ${r.expectedImpact}` : '';
+        return `${i + 1}. ${emoji} **${r.title}** [${priorityLabel}]${impact}\n   ${r.description || ''}`;
+      });
+
+      return `💡 **Strategy Recommendations (${recs.length} active):**\n\n${lines.join('\n\n')}\n\n👉 [Performance Intelligence](/performance) to act on these insights.`;
+    }
+  },
 };
+
