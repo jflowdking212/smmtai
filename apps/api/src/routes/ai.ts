@@ -447,15 +447,14 @@ Respond ONLY with valid JSON: {"hashtags": ["#tag1", "#tag2", ...]}`;
   });
 });
 
-// ── POST /ai/image-prompt ──────────────────────────────────────
+// ── POST /ai/image-prompt — kept for backwards compat (text prompt helper) ──
 aiRouter.post('/image-prompt', ...aiMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
   await callAI(req, res, next, async () => {
-    const { content, platform, style } = req.body as any;
-    if (!content) throw new Error('content is required');
-    const prompt = `Create a detailed image generation prompt for this ${platform || 'social media'} post.
-Post content: ${content}
+    const { description, content, platform, style } = req.body as any;
+    const text = description || content;
+    if (!text) throw new Error('description is required');
+    const prompt = `Create a detailed image generation prompt for a ${platform || 'social media'} post about: ${text}
 ${style ? `Visual style: ${style}` : ''}
-
 Respond ONLY with valid JSON: {"imagePrompt": "detailed prompt here", "style": "art style", "mood": "mood description"}`;
     const aiOptions = await getAiOptions(400);
     const raw = await chatWithRetry([{ role: 'user', content: prompt }], aiOptions);
@@ -464,6 +463,162 @@ Respond ONLY with valid JSON: {"imagePrompt": "detailed prompt here", "style": "
     catch { return { imagePrompt: raw.trim(), style: style || 'photorealistic', mood: 'professional' }; }
   });
 });
+
+// ── Image generation quotas per plan ─────────────────────────────
+const IMAGE_GEN_LIMITS: Record<string, number> = {
+  basic: 0,
+  pro: 10,
+  business: 50,
+  enterprise: 120,
+};
+
+async function checkImageGenQuota(workspaceId: string): Promise<{ allowed: boolean; used: number; limit: number; tier: string; subscriptionId?: string }> {
+  const subscription = await prisma.subscription.findUnique({ where: { workspaceId } });
+  if (!subscription) return { allowed: false, used: 0, limit: 0, tier: 'basic' };
+
+  const tier = subscription.tier as string;
+  const limit = IMAGE_GEN_LIMITS[tier] ?? 0;
+
+  if (limit === 0) return { allowed: false, used: 0, limit: 0, tier, subscriptionId: subscription.id };
+
+  const periodStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+  const usageRecord = await prisma.usageRecord.findUnique({
+    where: {
+      subscriptionId_metric_periodStart: {
+        subscriptionId: subscription.id,
+        metric: 'image_generation',
+        periodStart,
+      },
+    },
+  }).catch(() => null);
+
+  const used = usageRecord?.count ?? 0;
+  return { allowed: used < limit, used, limit, tier, subscriptionId: subscription.id };
+}
+
+async function incrementImageGenUsage(subscriptionId: string): Promise<void> {
+  const periodStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+  const periodEnd = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1);
+  await prisma.usageRecord.upsert({
+    where: { subscriptionId_metric_periodStart: { subscriptionId, metric: 'image_generation', periodStart } },
+    create: { subscriptionId, metric: 'image_generation', count: 1, periodStart, periodEnd },
+    update: { count: { increment: 1 } },
+  }).catch(() => {});
+}
+
+// ── POST /ai/generate-image — DALL-E 3 image generation ──────────
+aiRouter.post('/generate-image', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const workspaceId = req.workspaceId!;
+    const { prompt, style = 'photorealistic', size = '1024x1024' } = req.body as any;
+
+    if (!prompt?.trim()) {
+      return res.status(400).json({ success: false, error: { code: 'MISSING_PROMPT', message: 'Prompt is required' } });
+    }
+
+    // Check plan quota
+    const quota = await checkImageGenQuota(workspaceId);
+    if (!quota.allowed) {
+      if (quota.limit === 0) {
+        return res.status(403).json({
+          success: false,
+          error: {
+            code: 'PLAN_UPGRADE_REQUIRED',
+            message: 'AI image generation is not available on the Basic plan. Upgrade to Pro to generate up to 10 images per month.',
+            quota
+          }
+        });
+      }
+      return res.status(429).json({
+        success: false,
+        error: {
+          code: 'QUOTA_EXCEEDED',
+          message: `You've used all ${quota.limit} image generations for this month. Upgrade your plan for more.`,
+          quota
+        }
+      });
+    }
+
+    // Get OpenAI API key
+    const aiOptions = await getAiOptions(0);
+    const apiKey = aiOptions.apiKey || process.env.OPENAI_API_KEY || '';
+    if (!apiKey) {
+      return res.status(501).json({ success: false, error: { code: 'NOT_CONFIGURED', message: 'Image generation is not configured. Contact support.' } });
+    }
+
+    // Build a style-enhanced prompt
+    const styleGuide: Record<string, string> = {
+      photorealistic: 'ultra-photorealistic, high-resolution, professional photography, studio lighting',
+      illustration: 'digital illustration, vibrant colors, clean vector art style',
+      '3d_render': 'professional 3D render, octane render, high quality, studio lighting',
+      cinematic: 'cinematic photography, dramatic lighting, film grain, widescreen composition',
+      minimalist: 'minimalist design, clean white background, simple shapes, professional',
+      abstract: 'abstract art, colorful, creative, modern design, artistic',
+    };
+    const styleEnhancement = styleGuide[style] || styleGuide.photorealistic;
+    const enhancedPrompt = `${prompt}. ${styleEnhancement}. Social media ready, high quality.`;
+
+    // Call DALL-E 3
+    const dalleRes = await fetch('https://api.openai.com/v1/images/generations', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'dall-e-3',
+        prompt: enhancedPrompt,
+        n: 1,
+        size: ['1024x1024', '1792x1024', '1024x1792'].includes(size) ? size : '1024x1024',
+        quality: 'standard',
+        response_format: 'url',
+      }),
+    });
+
+    const dalleData = await dalleRes.json() as any;
+
+    if (!dalleRes.ok) {
+      const errMsg = dalleData.error?.message || 'Image generation failed';
+      return res.status(502).json({ success: false, error: { code: 'DALLE_ERROR', message: errMsg } });
+    }
+
+    const imageUrl = dalleData.data?.[0]?.url;
+    const revisedPrompt = dalleData.data?.[0]?.revised_prompt;
+
+    if (!imageUrl) {
+      return res.status(502).json({ success: false, error: { code: 'NO_IMAGE', message: 'No image returned from DALL-E' } });
+    }
+
+    // Record usage using the correct pattern
+    if (quota.subscriptionId) {
+      await incrementImageGenUsage(quota.subscriptionId);
+    }
+
+    res.json({
+      success: true,
+      data: {
+        imageUrl,
+        revisedPrompt,
+        quota: { used: quota.used + 1, limit: quota.limit, tier: quota.tier, remaining: quota.limit - quota.used - 1 }
+      }
+    });
+  } catch (err: any) {
+    console.error('[AI Image Gen]', err);
+    res.status(500).json({ success: false, error: { code: 'SERVER_ERROR', message: err.message } });
+  }
+});
+
+// ── GET /ai/image-gen-quota — check remaining quota ──────────────
+aiRouter.get('/image-gen-quota', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const quota = await checkImageGenQuota(req.workspaceId!);
+    res.json({ success: true, data: quota });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: { code: 'SERVER_ERROR', message: err.message } });
+  }
+});
+
+
 
 // ── POST /ai/rewrite ───────────────────────────────────────────
 aiRouter.post('/rewrite', ...aiMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {

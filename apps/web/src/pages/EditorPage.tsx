@@ -335,6 +335,8 @@ export function EditorPage() {
   const [imageSearchLoading, setImageSearchLoading] = useState(false);
   const [aiImagePrompt, setAiImagePrompt] = useState('');
   const [aiImageLoading, setAiImageLoading] = useState(false);
+  const [showAiImageModal, setShowAiImageModal] = useState(false);
+  const [aiImageQuota, setAiImageQuota] = useState<{ used: number; limit: number; tier: string } | null>(null);
   const [showSaveTemplate, setShowSaveTemplate] = useState(false);
   const [saveTemplateName, setSaveTemplateName] = useState('');
   const [saveTemplateCategory, setSaveTemplateCategory] = useState('Business & Corporate');
@@ -961,20 +963,26 @@ export function EditorPage() {
     }
   }
 
-  async function handleAiImageGenerate() {
-    if (!aiImagePrompt.trim()) return;
+  async function handleAiImageGenerate(prompt: string, style: string) {
+    if (!prompt.trim()) return;
     setAiImageLoading(true);
     try {
-      const res = await api.ai.imagePrompt({
-        description: aiImagePrompt,
-        platform,
-        style: 'photorealistic',
-      });
-      if (res.data?.prompt) {
-        addText(res.data.prompt, { fontSize: 16, fill: '#6B7280', fontStyle: 'italic' } as any);
+      const res = await api.ai.generateImage({ prompt, style });
+      if (res.data?.imageUrl) {
+        await placeImage(res.data.imageUrl);
+        if (res.data.quota) setAiImageQuota(res.data.quota);
+        setShowAiImageModal(false);
       }
-    } catch {
-      // Silently fail
+    } catch (err: any) {
+      const msg = err?.response?.error?.message || err?.message || 'Image generation failed';
+      const code = err?.response?.error?.code;
+      if (code === 'PLAN_UPGRADE_REQUIRED') {
+        alert('AI image generation requires a Pro plan or higher. Upgrade to access this feature.');
+      } else if (code === 'QUOTA_EXCEEDED') {
+        alert(msg);
+      } else {
+        alert(`Generation failed: ${msg}`);
+      }
     } finally {
       setAiImageLoading(false);
     }
@@ -1043,8 +1051,13 @@ export function EditorPage() {
       addImage(url);
       c.remove(obj);
       c.requestRenderAll();
-    } catch {
-      // Silently fail
+    } catch (err: any) {
+      const errMsg = err?.response?.error?.message || err?.message || 'Background removal failed';
+      if (errMsg.includes('NOT_CONFIGURED') || errMsg.includes('not configured')) {
+        alert('Background removal is not configured on this server. Please contact support.');
+      } else {
+        alert(`Remove background failed: ${errMsg}. Make sure you have an image selected.`);
+      }
     } finally {
       setBgRemovalLoading(false);
     }
@@ -1166,13 +1179,7 @@ export function EditorPage() {
           <Button
             variant="secondary"
             size="sm"
-            onClick={() => {
-              const promptValue = prompt('Describe the image to generate:');
-              if (promptValue) {
-                setAiImagePrompt(promptValue);
-                void handleAiImageGenerate();
-              }
-            }}
+            onClick={() => setShowAiImageModal(true)}
             loading={aiImageLoading}
           >
             <Sparkles className="w-4 h-4" /> AI Image
@@ -1219,7 +1226,7 @@ export function EditorPage() {
           <TBtn onClick={() => fileInputRef.current?.click()} title="Upload Image"><ImageIcon className="w-5 h-5 text-neutral-600" /></TBtn>
           <TBtn onClick={() => setShowImageSearch(!showImageSearch)} title="Search Images"><Search className="w-5 h-5 text-neutral-600" /></TBtn>
           <TBtn onClick={() => setShowIconLibrary(true)} title="Icon Library"><Smile className="w-5 h-5 text-neutral-600" /></TBtn>
-          <TBtn onClick={() => { const p = prompt('Describe the image to generate:'); if (p) { setAiImagePrompt(p); handleAiImageGenerate(); } }} title="AI Generate">
+          <TBtn onClick={() => setShowAiImageModal(true)} title="AI Generate Image">
             <Sparkles className="w-5 h-5 text-neutral-600" />
           </TBtn>
           <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
@@ -2203,6 +2210,185 @@ export function EditorPage() {
         </div>
       )}
 
+      {showAiImageModal && (
+        <AIImageModal
+          loading={aiImageLoading}
+          quota={aiImageQuota}
+          onClose={() => setShowAiImageModal(false)}
+          onGenerate={(p, s) => handleAiImageGenerate(p, s)}
+        />
+      )}
+
+    </div>
+  );
+}
+
+// ── AI Image Generation Modal ──────────────────────────────────────────────────
+const AI_STYLES = [
+  { value: 'photorealistic', label: '📷 Photorealistic', desc: 'Professional photography look' },
+  { value: 'illustration', label: '🎨 Illustration', desc: 'Vibrant digital art style' },
+  { value: '3d_render', label: '🧊 3D Render', desc: 'Cinematic 3D rendering' },
+  { value: 'cinematic', label: '🎬 Cinematic', desc: 'Dramatic film-quality shot' },
+  { value: 'minimalist', label: '⬜ Minimalist', desc: 'Clean, simple composition' },
+  { value: 'abstract', label: '🌀 Abstract', desc: 'Creative abstract art' },
+];
+
+function AIImageModal({
+  loading,
+  quota,
+  onClose,
+  onGenerate,
+}: {
+  loading: boolean;
+  quota: { used: number; limit: number; tier: string } | null;
+  onClose: () => void;
+  onGenerate: (prompt: string, style: string) => void;
+}) {
+  const [prompt, setPrompt] = useState('');
+  const [style, setStyle] = useState('photorealistic');
+
+  const remaining = quota ? quota.limit - quota.used : null;
+  const canGenerate = prompt.trim().length > 0 && !loading;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(8px)' }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div
+        className="w-full max-w-lg rounded-2xl overflow-hidden shadow-2xl border border-white/10"
+        style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%)' }}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center shadow-lg shadow-violet-500/25">
+              <Sparkles className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-white">AI Image Generator</h2>
+              <p className="text-xs text-white/50">Powered by DALL·E 3</p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-white/40 hover:text-white hover:bg-white/10 transition-all"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-5">
+          {/* Quota badge */}
+          {quota && (
+            <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs ${
+              remaining === 0 ? 'bg-red-500/15 text-red-300 border border-red-500/20' :
+              remaining !== null && remaining <= 3 ? 'bg-amber-500/15 text-amber-300 border border-amber-500/20' :
+              'bg-emerald-500/15 text-emerald-300 border border-emerald-500/20'
+            }`}>
+              <div className="w-1.5 h-1.5 rounded-full bg-current" />
+              {remaining === 0
+                ? `Monthly limit reached (${quota.limit}/${quota.limit} used). Upgrade to generate more.`
+                : `${remaining} of ${quota.limit} generations remaining this month`
+              }
+            </div>
+          )}
+
+          {/* Prompt textarea */}
+          <div>
+            <label className="block text-xs font-semibold text-white/60 uppercase tracking-wider mb-2">
+              Describe your image
+            </label>
+            <textarea
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              placeholder="e.g. A professional woman using a laptop in a modern office, golden hour lighting..."
+              rows={3}
+              disabled={loading}
+              className="w-full px-4 py-3 rounded-xl text-sm resize-none transition-all outline-none disabled:opacity-50"
+              style={{
+                background: 'rgba(255,255,255,0.05)',
+                border: '1px solid rgba(255,255,255,0.12)',
+                color: '#f8fafc',
+              }}
+              onFocus={(e) => { e.target.style.borderColor = 'rgba(139,92,246,0.6)'; e.target.style.boxShadow = '0 0 0 2px rgba(139,92,246,0.15)'; }}
+              onBlur={(e) => { e.target.style.borderColor = 'rgba(255,255,255,0.12)'; e.target.style.boxShadow = 'none'; }}
+            />
+            <p className="text-xs text-white/30 mt-1.5">{prompt.length}/500 characters</p>
+          </div>
+
+          {/* Style selector */}
+          <div>
+            <label className="block text-xs font-semibold text-white/60 uppercase tracking-wider mb-2">
+              Visual Style
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              {AI_STYLES.map((s) => (
+                <button
+                  key={s.value}
+                  onClick={() => setStyle(s.value)}
+                  disabled={loading}
+                  className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left text-sm transition-all disabled:opacity-40 ${
+                    style === s.value
+                      ? 'border border-violet-400/60 text-white'
+                      : 'border border-white/[0.08] text-white/60 hover:border-white/20 hover:text-white/80'
+                  }`}
+                  style={{
+                    background: style === s.value
+                      ? 'linear-gradient(135deg, rgba(139,92,246,0.2), rgba(217,70,239,0.15))'
+                      : 'rgba(255,255,255,0.03)',
+                  }}
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-xs truncate">{s.label}</p>
+                    <p className="text-[10px] text-white/40 truncate">{s.desc}</p>
+                  </div>
+                  {style === s.value && (
+                    <div className="w-4 h-4 rounded-full bg-violet-500 flex items-center justify-center flex-shrink-0">
+                      <div className="w-2 h-2 rounded-full bg-white" />
+                    </div>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 pb-6 flex items-center justify-between gap-3">
+          <button
+            onClick={onClose}
+            disabled={loading}
+            className="px-4 py-2.5 rounded-xl text-sm text-white/50 hover:text-white/80 hover:bg-white/5 transition-all disabled:opacity-40"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => onGenerate(prompt, style)}
+            disabled={!canGenerate || quota?.limit === 0}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+            style={{
+              background: (canGenerate && quota?.limit !== 0)
+                ? 'linear-gradient(135deg, #7c3aed, #a855f7, #d946ef)'
+                : 'rgba(255,255,255,0.1)',
+              boxShadow: (canGenerate && quota?.limit !== 0) ? '0 4px 20px rgba(139,92,246,0.4)' : 'none',
+            }}
+          >
+            {loading ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                Generating with DALL·E 3…
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-4 h-4" />
+                Generate Image
+              </>
+            )}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

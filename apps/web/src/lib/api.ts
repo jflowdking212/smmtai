@@ -380,6 +380,10 @@ export const api = {
       request<{ success: true; data: any }>('/ai/hashtags', { method: 'POST', body: JSON.stringify(data) }),
     imagePrompt: (data: any) =>
       request<{ success: true; data: any }>('/ai/image-prompt', { method: 'POST', body: JSON.stringify(data) }),
+    generateImage: (data: { prompt: string; style?: string; size?: string }) =>
+      request<{ success: true; data: { imageUrl: string; revisedPrompt: string; quota: any } }>('/ai/generate-image', { method: 'POST', body: JSON.stringify(data) }),
+    getImageGenQuota: () =>
+      request<{ success: true; data: { allowed: boolean; used: number; limit: number; tier: string } }>('/ai/image-gen-quota'),
     rewrite: (data: any) =>
       request<{ success: true; data: any }>('/ai/rewrite', { method: 'POST', body: JSON.stringify(data) }),
     translate: (data: any) =>
