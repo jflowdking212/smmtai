@@ -147,6 +147,7 @@ export const api = {
     regeneratePost: (postId: string) => request<any>(`/content-planner/post/${postId}/regenerate`, { method: 'POST' }),
     deletePost: (postId: string) => request<any>(`/content-planner/post/${postId}`, { method: 'DELETE' }),
     cancelPlan: (planId: string) => request<any>(`/content-planner/plan/${planId}/cancel`, { method: 'POST' }),
+    deletePlan: (planId: string) => request<any>(`/content-planner/plan/${planId}`, { method: 'DELETE' }),
     authorizePlan: (planId: string) => request<any>(`/content-planner/plan/${planId}/authorize`, { method: 'POST' }),
     reauthorizePlan: (planId: string) => request<any>(`/content-planner/plan/${planId}/reauthorize`, { method: 'POST' }),
     uploadMedia: (postId: string, formData: FormData) => request<any>(`/content-planner/post/${postId}/upload-media`, { method: 'POST', body: formData }),

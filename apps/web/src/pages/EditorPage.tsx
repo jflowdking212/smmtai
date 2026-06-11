@@ -9,6 +9,7 @@ import { SCENE_SHAPES } from '@/lib/sceneShapes';
 import { saveComposeSeed } from '@/lib/composeSeed';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/stores/authStore';
+import { toast } from 'react-hot-toast';
 import {
   Type, Square, Circle, Minus, MoveRight, ImageIcon, Undo2, Redo2, Trash2,
   Download, Layers, ArrowUp, ArrowDown, Palette, LayoutTemplate,
@@ -18,7 +19,7 @@ import {
   Monitor, Radio, Car, Smartphone, Coffee, Music, Camera, Heart, Star, Zap,
   Globe, MapPin, ShoppingBag, Briefcase, Megaphone, Pen, BookOpen, Cpu, Wifi,
   Scissors, RotateCcw, RotateCw, Link2, Send, AlignLeft, AlignCenter, AlignRight, Bold, Italic,
-  Clock,
+  Clock, CheckCircle2,
 } from 'lucide-react';
 
 const GOOGLE_FONTS = [
@@ -864,8 +865,14 @@ export function EditorPage() {
       
       if (contentPlanPostId) {
         // Upload media specifically for Content Planner
-        await api.contentPlanner.saveDesign(contentPlanPostId, { mediaUrl: blobUrl, designData: json });
-        navigate('/planner');
+        const fd = new FormData();
+        fd.append('media', file);
+        const updatedPost = await api.contentPlanner.uploadMedia(contentPlanPostId, fd);
+        await api.contentPlanner.saveDesign(contentPlanPostId, { 
+          mediaUrl: updatedPost.mediaUrls?.[0] || blobUrl, 
+          designData: json 
+        });
+        navigate(`/planner?planId=${updatedPost.planId}`);
         return;
       }
 
@@ -878,7 +885,7 @@ export function EditorPage() {
       if (initialDraftId) navigate(`/compose?draftId=${initialDraftId}`);
       else navigate('/compose');
     } catch (err: any) {
-      window.alert(err.message || 'Failed to send design');
+      toast.error(err.message || 'Failed to send design');
     } finally {
       setSendingToCompose(false);
     }
@@ -974,14 +981,13 @@ export function EditorPage() {
         setShowAiImageModal(false);
       }
     } catch (err: any) {
-      const msg = err?.message || 'Image generation failed';
-      const code = err?.code;
-      if (code === 'PLAN_UPGRADE_REQUIRED') {
-        alert('AI image generation requires a Pro plan or higher. Upgrade to access this feature.');
-      } else if (code === 'QUOTA_EXCEEDED') {
-        alert(msg);
+      const msg = err?.response?.data?.error?.message || err?.message || 'AI Image generation failed';
+      if (msg.includes('Upgrade to access') || msg.includes('limit reached')) {
+        toast.error('AI image generation requires a Pro plan or higher. Upgrade to access this feature.');
+      } else if (msg.includes('Monthly quota exceeded')) {
+        toast.error(msg);
       } else {
-        alert(`Generation failed: ${msg}`);
+        toast.error(`Generation failed: ${msg}`);
       }
     } finally {
       setAiImageLoading(false);
@@ -1042,22 +1048,24 @@ export function EditorPage() {
       // Export the selected image to blob
       const dataUrl = (obj as any).toDataURL?.({ format: 'png', multiplier: 1 });
       if (!dataUrl) return;
-      const blob = await (await fetch(dataUrl)).blob();
-      const formData = new FormData();
-      formData.append('image_file', blob, 'image.png');
-      formData.append('size', 'auto');
-      const resultBlob = await api.editor.removeBackground(formData);
+
+      // Dynamically load @imgly/background-removal via CDN to bypass npm issues
+      // @ts-ignore
+      const imgly = await import('https://unpkg.com/@imgly/background-removal@1.4.5/dist/imgly-background-removal.esm.js');
+      
+      const resultBlob = await imgly.default(dataUrl, {
+        output: { format: 'image/png', quality: 1.0 }
+      });
+      
       const url = URL.createObjectURL(resultBlob);
       addImage(url);
       c.remove(obj);
       c.requestRenderAll();
+      toast.success('Background removed successfully!');
     } catch (err: any) {
       const errMsg = err?.message || 'Background removal failed';
-      if (errMsg.includes('NOT_CONFIGURED') || errMsg.includes('not configured')) {
-        alert('Background removal is not configured on this server. Please contact support.');
-      } else {
-        alert(`Remove background failed: ${errMsg}. Make sure you have an image selected.`);
-      }
+      toast.error(`Remove background failed: ${errMsg}. Make sure you have an image selected.`);
+      console.error(err);
     } finally {
       setBgRemovalLoading(false);
     }
@@ -1190,12 +1198,20 @@ export function EditorPage() {
           <Button variant="secondary" size="sm" onClick={() => setShowTemplates(!showTemplates)}>
             <LayoutTemplate className="w-4 h-4" /> Templates
           </Button>
-          <Button variant="secondary" size="sm" onClick={handleSendToCompose} loading={sendingToCompose}>
-            <Send className="w-4 h-4" /> Send to Compose
-          </Button>
-          <Button variant="secondary" size="sm" onClick={handleScheduleFromEditor} loading={sendingToCompose}>
-            <Clock className="w-4 h-4" /> Schedule Post
-          </Button>
+          {contentPlanPostId ? (
+            <Button variant="primary" size="sm" className="bg-violet-600 hover:bg-violet-700" onClick={handleSendToCompose} loading={sendingToCompose}>
+              <CheckCircle2 className="w-4 h-4 mr-1" /> Save to Planner
+            </Button>
+          ) : (
+            <>
+              <Button variant="secondary" size="sm" onClick={handleSendToCompose} loading={sendingToCompose}>
+                <Send className="w-4 h-4" /> Send to Compose
+              </Button>
+              <Button variant="secondary" size="sm" onClick={handleScheduleFromEditor} loading={sendingToCompose}>
+                <Clock className="w-4 h-4" /> Schedule Post
+              </Button>
+            </>
+          )}
           <Button variant="secondary" size="sm" onClick={() => handleExport('jpeg')}>
             <Download className="w-4 h-4" /> JPG
           </Button>
@@ -1294,12 +1310,24 @@ export function EditorPage() {
               style={{ width: displayW, height: displayH, position: 'relative' }}
             >
               {dragActive && (
-                <div className="absolute inset-0 z-10 flex items-center justify-center bg-brand-blue/10 pointer-events-none">
-                  <div className="text-brand-blue font-medium text-sm flex items-center gap-2">
+                <div className="absolute inset-0 z-50 bg-brand-500/10 border-2 border-brand-500 border-dashed rounded flex items-center justify-center pointer-events-none">
+                  <div className="bg-white px-6 py-3 rounded-xl shadow-lg flex items-center gap-3 text-brand-700 font-medium">
                     <ImageIcon className="w-5 h-5" /> Drop image here
                   </div>
                 </div>
               )}
+              
+              {/* Background Removal Spinner Overlay */}
+              {bgRemovalLoading && (
+                <div className="absolute inset-0 z-[100] flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm transition-all duration-300">
+                  <div className="w-16 h-16 border-4 border-brand-500 border-t-transparent rounded-full animate-spin mb-4 shadow-[0_0_15px_rgba(59,130,246,0.5)]" />
+                  <p className="text-white text-lg font-bold tracking-wide drop-shadow-md">Isolating Subject...</p>
+                  <p className="text-brand-200 text-sm mt-2 flex items-center gap-2 drop-shadow-md bg-black/40 px-3 py-1 rounded-full border border-white/10">
+                    <Sparkles className="w-4 h-4" /> Running On-Device AI Model
+                  </p>
+                </div>
+              )}
+
               <div style={{ transform: `scale(${canvasScale})`, transformOrigin: 'top left' }}>
                 <canvas id="editor-canvas" />
               </div>

@@ -308,3 +308,29 @@ export function CardHeader({ className, children }: any) { return <div className
 export function CardTitle({ className, children }: any) { return <h3 className={cn('font-semibold leading-none tracking-tight', className)}>{children}</h3>; }
 export function CardContent({ className, children }: any) { return <div className={cn('p-6', className)}>{children}</div>; }
 export function CardFooter({ className, children }: any) { return <div className={cn('flex items-center p-6 pt-0', className)}>{children}</div>; }
+
+export function ConfirmDialog({ open, onOpenChange, title, message, onConfirm, loading }: any) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm transition-opacity">
+      <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden relative scale-100 transition-transform">
+        <div className="p-6">
+          <h2 className="text-xl font-bold mb-2 text-neutral-900">{title || 'Confirm Action'}</h2>
+          <p className="text-sm text-neutral-500 mb-6">{message || 'Are you sure you want to proceed?'}</p>
+          <div className="flex gap-3 justify-end mt-4">
+            <Button variant="secondary" onClick={() => onOpenChange(false)} disabled={loading}>Cancel</Button>
+            <Button 
+              className="bg-brand-600 hover:bg-brand-700 text-white" 
+              onClick={() => {
+                onConfirm();
+              }}
+              disabled={loading}
+            >
+              {loading ? 'Processing...' : 'Confirm'}
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

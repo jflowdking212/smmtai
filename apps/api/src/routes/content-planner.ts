@@ -291,6 +291,30 @@ contentPlannerRouter.post('/plan/:id/cancel', authenticate, async (req: AuthRequ
   }
 });
 
+// 5.5. Delete Plan
+contentPlannerRouter.delete('/plan/:id', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const plan = await prisma.contentPlan.findFirst({
+      where: { id: req.params.id as string, workspaceId: req.workspaceId! }
+    });
+    if (!plan) return res.status(404).json({ error: 'Plan not found' });
+
+    // First delete all associated posts
+    await prisma.contentPlanPost.deleteMany({
+      where: { planId: plan.id }
+    });
+
+    // Then delete the plan itself
+    await prisma.contentPlan.delete({
+      where: { id: plan.id }
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to delete plan' });
+  }
+});
+
 // 6. Authorize Plan
 contentPlannerRouter.post('/plan/:id/authorize', authenticate, async (req: AuthRequest, res: Response) => {
   try {

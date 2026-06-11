@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Button } from '@/components/ui';
+import { Button, ConfirmDialog } from '@/components/ui';
 import {
   Sparkles, CalendarDays, Upload, Image as ImageIcon, Send, RefreshCw,
   Trash2, Edit, Palette, X, AlertCircle, CheckCircle2, MessageSquare, Lock,
@@ -354,9 +354,7 @@ function NewPlanWizard({ onPlanCreated }: { onPlanCreated: (planId: string) => v
 function PlanReviewDashboard({ planId, onNewPlan }: { planId: string; onNewPlan: () => void }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [showMediaDialog, setShowMediaDialog] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
-  const [hasUploadedInitialMedia, setHasUploadedInitialMedia] = useState(false);
   const [authResult, setAuthResult] = useState<{ authorizedCount: number; errors: string[] } | null>(null);
 
   const { data: plan, isLoading } = useQuery({
@@ -369,12 +367,7 @@ function PlanReviewDashboard({ planId, onNewPlan }: { planId: string; onNewPlan:
   });
 
   // Prompt media dialog once plan is ready and no media exists
-  useEffect(() => {
-    if (plan?.status === 'ready' && !hasUploadedInitialMedia) {
-      const hasMedia = plan.posts?.some((p: any) => p.mediaUrls?.length > 0);
-      if (!hasMedia) setShowMediaDialog(true);
-    }
-  }, [plan?.status]);
+  // (Removed global media dialog logic)
 
   const authorizeMutation = useMutation({
     mutationFn: async () => api.contentPlanner.authorizePlan(planId),
@@ -440,10 +433,16 @@ function PlanReviewDashboard({ planId, onNewPlan }: { planId: string; onNewPlan:
       <div className="bg-white border border-neutral-200 rounded-xl p-6 shadow-sm flex flex-col sm:flex-row sm:items-center gap-4 justify-between">
         <div>
           <h2 className="text-lg font-bold">{isAuthorized ? 'Plan Overview' : 'Review Your Plan'}</h2>
-          <p className="text-sm text-neutral-500">
-            {activePosts.length} posts across {platformsCovered.length} platform{platformsCovered.length !== 1 ? 's' : ''} for{' '}
-            <span className="font-medium text-neutral-700">{plan.theme}</span>
-          </p>
+          {activePosts.length > 0 ? (
+            <p className="text-sm text-neutral-500">
+              {activePosts.length} posts across {platformsCovered.length} platform{platformsCovered.length !== 1 ? 's' : ''} for{' '}
+              <span className="font-medium text-neutral-700">{plan.theme}</span>
+            </p>
+          ) : (
+            <p className="text-sm text-red-500">
+              Content generation failed (0 posts generated). Please try creating a new plan.
+            </p>
+          )}
           {plan.dateRangeStart && plan.dateRangeEnd && (
             <p className="text-xs text-neutral-400 mt-1">
               {new Date(plan.dateRangeStart).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} –{' '}
@@ -581,78 +580,19 @@ function PlanReviewDashboard({ planId, onNewPlan }: { planId: string; onNewPlan:
 
       {/* Post grid */}
       {activePosts.length === 0 ? (
-        <div className="text-center py-16 bg-slate-50 rounded-2xl border-2 border-dashed border-neutral-200">
-          <Sparkles className="w-10 h-10 text-slate-300 mx-auto mb-3" />
-          <p className="text-neutral-500 font-medium">No posts in this plan.</p>
-          <p className="text-neutral-400 text-sm mt-1">Something went wrong during generation. Try creating a new plan.</p>
-          <Button size="sm" className="mt-4 bg-violet-600 hover:bg-violet-700" onClick={onNewPlan}>
-            New Plan
+        <div className="bg-red-50 text-red-600 p-6 rounded-xl border border-red-100 text-center">
+          <AlertCircle className="w-8 h-8 mx-auto mb-2 opacity-50" />
+          <h3 className="font-semibold text-lg mb-1">No Posts Generated</h3>
+          <p className="text-sm opacity-80 mb-4">There was an error generating posts for this plan. This could be due to missing platforms or an AI API timeout.</p>
+          <Button onClick={onNewPlan} variant="secondary" className="bg-white hover:bg-red-100 text-red-600 border-red-200">
+            Create a New Plan
           </Button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {activePosts.map((post: any) => (
-            <PostCard
-              key={post.id}
-              post={post}
-              planId={planId}
-              readOnly={isAuthorized && post.status !== 'failed'}
-            />
+            <PostCard key={post.id} post={post} planId={planId} readOnly={plan.status !== 'ready' && plan.status !== 'partial'} />
           ))}
-        </div>
-      )}
-
-      {/* Media check dialog */}
-      {showMediaDialog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md shadow-xl p-6 relative">
-            <button onClick={() => setShowMediaDialog(false)} className="absolute top-4 right-4 text-neutral-400 hover:text-black"><X className="w-5 h-5" /></button>
-            <h2 className="text-xl font-bold mb-2">Add Media to Your Posts?</h2>
-            <p className="text-sm text-neutral-500 mb-6">Posts with images or videos get 2-3× more engagement.</p>
-            <div className="flex flex-col gap-2">
-              <label className="flex items-center gap-3 border border-neutral-200 rounded-xl p-4 cursor-pointer hover:bg-slate-50 transition-all">
-                <Upload className="w-5 h-5 text-violet-500" />
-                <div>
-                  <p className="text-sm font-medium">Upload your own files</p>
-                  <p className="text-xs text-neutral-400">JPG, PNG, MP4 up to 250MB each</p>
-                </div>
-                <input type="file" accept="image/*,video/*" multiple className="hidden"
-                  onChange={async e => {
-                    const files = Array.from(e.target.files || []);
-                    if (!files.length || !plan.posts?.length) return;
-                    setShowMediaDialog(false);
-                    const firstPost = plan.posts[0];
-                    const fd = new FormData();
-                    files.forEach(f => fd.append('media', f));
-                    toast.loading('Uploading…', { id: 'upload-dialog' });
-                    try {
-                      await api.contentPlanner.uploadMedia(firstPost.id, fd);
-                      toast.success('Media uploaded!', { id: 'upload-dialog' });
-                      queryClient.invalidateQueries({ queryKey: ['content-plan', planId] });
-                    } catch {
-                      toast.error('Upload failed', { id: 'upload-dialog' });
-                    }
-                  }}
-                />
-              </label>
-              <button
-                onClick={() => {
-                  setShowMediaDialog(false);
-                  navigate(`/editor?contentPlanPostId=${plan.posts?.[0]?.id}&platform=${plan.posts?.[0]?.platform}`);
-                }}
-                className="flex items-center gap-3 border border-neutral-200 rounded-xl p-4 hover:bg-slate-50 transition-all text-left"
-              >
-                <Palette className="w-5 h-5 text-violet-500" />
-                <div>
-                  <p className="text-sm font-medium">Design with Template Editor</p>
-                  <p className="text-xs text-neutral-400">Use pre-made templates and brand elements</p>
-                </div>
-              </button>
-              <button onClick={() => setShowMediaDialog(false)} className="text-sm text-neutral-400 hover:text-neutral-600 py-2">
-                Skip for now
-              </button>
-            </div>
-          </div>
         </div>
       )}
 
@@ -827,9 +767,36 @@ function PostCard({ post, planId, readOnly }: { post: any; planId: string; readO
               </div>
             )}
             {post.mediaSuggestion && !post.mediaUrls?.length && (
-              <div className="flex items-start gap-2 p-2 bg-slate-50 rounded-lg border border-slate-100">
-                <ImageIcon className="w-4 h-4 text-slate-400 mt-0.5 flex-shrink-0" />
-                <p className="text-xs text-slate-500 italic">Suggestion: {post.mediaSuggestion}</p>
+              <div className="flex flex-col gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200 shadow-sm">
+                <div className="flex items-start gap-2">
+                  <ImageIcon className="w-4 h-4 text-slate-400 mt-0.5 flex-shrink-0" />
+                  <p className="text-xs text-slate-600 italic leading-relaxed">Suggestion: {post.mediaSuggestion}</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button size="sm" variant="secondary" className="text-xs h-8 bg-white hover:bg-violet-50 hover:text-violet-600 border-violet-100" onClick={() => navigate(`/editor?contentPlanPostId=${post.id}&platform=${post.platform}`)}>
+                    <Palette className="w-3.5 h-3.5 mr-1.5" /> Design Banner
+                  </Button>
+                  <label className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-xs font-medium transition-colors border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 h-8 px-3 cursor-pointer shadow-sm">
+                    <Upload className="w-3.5 h-3.5 mr-1.5" /> Upload Media
+                    <input
+                      type="file" accept="image/*,video/*" className="hidden"
+                      onChange={async e => {
+                        const files = Array.from(e.target.files || []);
+                        if (!files.length) return;
+                        const fd = new FormData();
+                        files.forEach(f => fd.append('media', f));
+                        toast.loading('Uploading...', { id: `upload-${post.id}` });
+                        try {
+                          await api.contentPlanner.uploadMedia(post.id, fd);
+                          toast.success('Uploaded!', { id: `upload-${post.id}` });
+                          queryClient.invalidateQueries({ queryKey: ['content-plan', planId] });
+                        } catch {
+                          toast.error('Upload failed', { id: `upload-${post.id}` });
+                        }
+                      }}
+                    />
+                  </label>
+                </div>
               </div>
             )}
             {post.mediaUrls?.length > 0 && (
@@ -868,30 +835,6 @@ function PostCard({ post, planId, readOnly }: { post: any; planId: string; readO
                 title="Regenerate" onClick={() => regenerateMutation.mutate()} disabled={regenerateMutation.isPending}
                 className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 transition-colors"
               ><RefreshCw className={`w-4 h-4 ${regenerateMutation.isPending ? 'animate-spin' : ''}`} /></button>
-              <label title="Upload media" className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 transition-colors cursor-pointer">
-                <Upload className="w-4 h-4" />
-                <input type="file" accept="image/*,video/*" multiple className="hidden"
-                  onChange={async e => {
-                    const files = Array.from(e.target.files || []);
-                    if (!files.length) return;
-                    const fd = new FormData();
-                    files.forEach(f => fd.append('media', f));
-                    toast.loading('Uploading…', { id: `upload-${post.id}` });
-                    try {
-                      await api.contentPlanner.uploadMedia(post.id, fd);
-                      toast.success('Uploaded!', { id: `upload-${post.id}` });
-                      queryClient.invalidateQueries({ queryKey: ['content-plan', planId] });
-                    } catch {
-                      toast.error('Upload failed', { id: `upload-${post.id}` });
-                    }
-                  }}
-                />
-              </label>
-              <button
-                title="Design in Editor"
-                onClick={() => navigate(`/editor?contentPlanPostId=${post.id}&platform=${post.platform}`)}
-                className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 transition-colors"
-              ><Palette className="w-4 h-4" /></button>
             </div>
             <div className="flex gap-1 items-center">
               {!isScheduled && (
@@ -929,6 +872,7 @@ const STATUS_BADGE: Record<string, string> = {
 
 function PlanHistory({ onViewPlan }: { onViewPlan: (planId: string) => void }) {
   const queryClient = useQueryClient();
+  const [confirmAction, setConfirmAction] = useState<{ title: string; message: string; action: () => void } | null>(null);
   const { data: response, isLoading } = useQuery({
     queryKey: ['content-plans-history'],
     queryFn: () => api.contentPlanner.listPlans()
@@ -943,6 +887,15 @@ function PlanHistory({ onViewPlan }: { onViewPlan: (planId: string) => void }) {
       queryClient.invalidateQueries({ queryKey: ['content-plans-history'] });
     },
     onError: () => toast.error('Could not cancel plan')
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (planId: string) => api.contentPlanner.deletePlan(planId),
+    onSuccess: () => {
+      toast.success('Plan deleted from history');
+      queryClient.invalidateQueries({ queryKey: ['content-plans-history'] });
+    },
+    onError: () => toast.error('Could not delete plan')
   });
 
   if (isLoading) {
